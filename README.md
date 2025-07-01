@@ -11,7 +11,7 @@ operaton-dmn-evaluator/
 ├── operaton-dmn-evaluator.php          # Main plugin file
 ├── assets/
 │   ├── js/
-│   │   └── frontend.js                  # Frontend JavaScript
+│   │   └── admin.js                     # Frontend JavaScript
 │   └── css/
 │       └── admin.css                    # Admin styles (optional)
 ├── templates/
@@ -19,6 +19,8 @@ operaton-dmn-evaluator/
 │   └── admin-form.php                   # Configuration form page
 ├── languages/
 │   └── operaton-dmn.pot                 # Translation template
+├── admin/
+│   └── class-admin.php                  # Enqueueing methods
 └── README.md                            # This file
 ```
 
@@ -33,14 +35,16 @@ operaton-dmn-evaluator/
 
 2. **Create Required Directories:**
    ```bash
-   mkdir -p assets/js assets/css templates languages
+   mkdir -p assets/js assets/css templates languages admin
    ```
 
 3. **Add Files:**
    - Copy the main plugin file as `operaton-dmn-evaluator.php`
-   - Copy the frontend JavaScript to `assets/js/frontend.js`
-   - Create `templates/` directory and add the admin template files
-   - Create `templates/admin-list.php` and `templates/admin-form.php`
+   - Copy the frontend JavaScript to `assets/js/admin.js`
+   - Copy the admin styles to `assets/css/admin.css`
+   - Copy the admin template files to `templates/admin-list.php` and `templates/admin-form.php`
+   - Copy the translation template to `languages/operaton-dmn.pot`
+   - Copy the enqueueing methods to `admin/class-admin.php`
 
 4. **Activate Plugin:**
    - Go to WordPress Admin → Plugins
