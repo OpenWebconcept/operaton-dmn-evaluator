@@ -6,17 +6,16 @@ A flexible WordPress plugin that integrates Gravity Forms with Operaton DMN deci
 
 ```
 operaton-dmn-evaluator/
-├── operaton-dmn-evaluator.php          # Main plugin file
 ├── assets/
+│   └── css/
+│       └── admin.css                    # Admin styles
+│       └── frontend.css                 # Frontend styles
 │   ├── js/
 │   │   └── frontend.js                  # Frontend JavaScript
-│   └── css/
-│       └── admin.css                    # Admin styles (optional)
 ├── templates/
-│   ├── admin-list.php                   # Configuration list page
-│   └── admin-form.php                   # Configuration form page
-├── languages/
-│   └── operaton-dmn.pot                 # Translation template
+│   ├── admin-form.php                   # Configuration form page
+│   └── admin-list.php                   # Configuration list page
+├── operaton-dmn-evaluator.php           # Main plugin file
 └── README.md                            # This file
 ```
 
@@ -31,14 +30,14 @@ operaton-dmn-evaluator/
 
 2. **Create Required Directories:**
    ```bash
-   mkdir -p assets/js assets/css templates languages
+   mkdir -p assets/css assets/js templates
    ```
 
 3. **Add Files:**
    - Copy the main plugin file as `operaton-dmn-evaluator.php`
    - Copy the frontend JavaScript to `assets/js/frontend.js`
    - Create `templates/` directory and add the admin template files
-   - Create `templates/admin-list.php` and `templates/admin-form.php`
+   - Create `templates/` directory and add the admin configuration page files
 
 4. **Activate Plugin:**
    - Go to WordPress Admin → Plugins
@@ -50,12 +49,14 @@ operaton-dmn-evaluator/
 
 1. Go to **Operaton DMN** → **Add Configuration** in WordPress admin
 2. Fill in the configuration:
-   - **Name:** Descriptive name for your configuration
+   - **Configuration Name:** Descriptive name for your configuration
    - **Gravity Form:** Select the form to integrate with
    - **DMN Endpoint:** Your Operaton API endpoint (e.g., `https://operatondev.open-regels.nl/engine-rest/decision-definition/key/dish/evaluate`)
    - **Decision Key:** The key of your DMN decision table
-   - **Result Field:** The output field name from your DMN table
+   - **Result Field Name:** The output field name from your DMN table
    - **Button Text:** Text for the evaluation button
+
+![Create DMN Configuration](assets/images/Plugin-Config-Top.png)
 
 ### 2. Configure Field Mappings
 
@@ -63,6 +64,8 @@ Map your Gravity Form fields to DMN variables:
 - **DMN Variable:** The variable name in your DMN table (e.g., `season`, `guestCount`)
 - **Form Field ID:** The Gravity Forms field ID (e.g., `1`, `3`)
 - **Data Type:** Choose the appropriate data type (String, Integer, Double, Boolean)
+
+![Configure Field Mappings](assets/images/plugin-Config-Bottom.png)
 
 ### 3. Test Your Configuration
 
@@ -126,6 +129,10 @@ https://operatondev.open-regels.nl/engine-rest/decision-definition/key/dish/eval
 - `guestCount` → Field ID `3` (Integer)
 
 **Result Field:** `desiredDish`
+
+![Example Configuration Live](assets/images/Dish-Plugin-Example.png)
+
+Live example url: https://owc-gemeente.open-regels.nl/operaton-dmn-evaluator-2/
 
 ## Troubleshooting
 
