@@ -44,7 +44,7 @@ jQuery(document).ready(function($) {
                 hasRequiredData = false;
                 missingFields.push(dmnVariable + ' (field ID: ' + fieldId + ')');
             } else {
-                formData[fieldId] = value;
+                formData[dmnVariable] = value;
             }
         });
         
