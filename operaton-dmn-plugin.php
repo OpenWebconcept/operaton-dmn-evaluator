@@ -3,7 +3,7 @@
  * Plugin Name: Operaton DMN Evaluator
  * Plugin URI: https://git.open-regels.nl/showcases/operaton-dmn-evaluator
  * Description: WordPress plugin to integrate Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.
- * Version: 1.0.0-beta.2
+ * Version: 1.0.0-beta.3
  * Author: Steven Gort
  * License: EU PL v1.2
  * Text Domain: operaton-dmn
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('OPERATON_DMN_VERSION', '1.0.0-beta.2');
+define('OPERATON_DMN_VERSION', '1.0.0-beta.3');
 define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('OPERATON_DMN_PLUGIN_PATH', plugin_dir_path(__FILE__));
 
@@ -43,6 +43,7 @@ class OperatonDMNEvaluator {
         // Add AJAX handlers
         add_action('wp_ajax_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
         add_action('wp_ajax_nopriv_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
+        add_action('wp_ajax_operaton_test_full_config', array($this, 'ajax_test_full_config'));
         
         // Admin notices and health checks
         add_action('admin_notices', array($this, 'admin_notices'));
@@ -252,7 +253,19 @@ class OperatonDMNEvaluator {
     }
     
     /**
-     * Enhanced form validation
+     * Build the full DMN evaluation endpoint URL
+     */
+    private function build_evaluation_endpoint($base_endpoint, $decision_key) {
+        // Ensure base endpoint ends with /
+        if (!empty($base_endpoint) && substr($base_endpoint, -1) !== '/') {
+            $base_endpoint .= '/';
+        }
+        
+        return $base_endpoint . $decision_key . '/evaluate';
+    }
+    
+    /**
+     * Enhanced form validation for separated URL components
      */
     private function validate_configuration_data($data) {
         $errors = array();
@@ -261,7 +274,7 @@ class OperatonDMNEvaluator {
         $required_fields = array(
             'name' => __('Configuration Name', 'operaton-dmn'),
             'form_id' => __('Gravity Form', 'operaton-dmn'),
-            'dmn_endpoint' => __('DMN Endpoint URL', 'operaton-dmn'),
+            'dmn_endpoint' => __('DMN Base Endpoint URL', 'operaton-dmn'),
             'decision_key' => __('Decision Key', 'operaton-dmn'),
             'result_field' => __('Result Field Name', 'operaton-dmn')
         );
@@ -274,7 +287,43 @@ class OperatonDMNEvaluator {
         
         // URL validation
         if (!empty($data['dmn_endpoint']) && !filter_var($data['dmn_endpoint'], FILTER_VALIDATE_URL)) {
-            $errors[] = __('DMN Endpoint URL is not valid.', 'operaton-dmn');
+            $errors[] = __('DMN Base Endpoint URL is not valid.', 'operaton-dmn');
+        }
+        
+        // Check that base URL doesn't include the decision key
+        if (!empty($data['dmn_endpoint']) && !empty($data['decision_key'])) {
+            $base_url = trim($data['dmn_endpoint']);
+            $decision_key = trim($data['decision_key']);
+            
+            // Check if decision key is already in the base URL
+            if (strpos($base_url, $decision_key) !== false) {
+                $errors[] = sprintf(__('The base endpoint URL should not include the decision key "%s". Please remove it from the URL.', 'operaton-dmn'), $decision_key);
+            }
+            
+            // Check if URL ends with /evaluate (which suggests it's a full endpoint)
+            if (substr($base_url, -9) === '/evaluate') {
+                $errors[] = __('The base endpoint URL should not include "/evaluate". This will be added automatically.', 'operaton-dmn');
+            }
+            
+            // Suggest proper format if URL structure looks wrong
+            if (!preg_match('/\/engine-rest\/decision-definition\/key\/?$/', $base_url)) {
+                $errors[] = __('The base endpoint URL should end with "/engine-rest/decision-definition/key/" for Operaton DMN engines.', 'operaton-dmn');
+            }
+        }
+        
+        // Decision key validation
+        if (!empty($data['decision_key'])) {
+            $decision_key = trim($data['decision_key']);
+            
+            // Basic validation for decision key format
+            if (!preg_match('/^[a-zA-Z0-9_-]+$/', $decision_key)) {
+                $errors[] = __('Decision key should only contain letters, numbers, hyphens, and underscores.', 'operaton-dmn');
+            }
+            
+            // Check for common mistakes
+            if (strpos($decision_key, '/') !== false) {
+                $errors[] = __('Decision key should not contain forward slashes.', 'operaton-dmn');
+            }
         }
         
         // Form ID validation
@@ -675,7 +724,7 @@ class OperatonDMNEvaluator {
     }
     
     /**
-     * Enhanced API call handling with better error handling
+     * Enhanced API call handling with separated URL construction
      */
     public function handle_evaluation($request) {
         try {
@@ -736,10 +785,15 @@ class OperatonDMNEvaluator {
                 return new WP_Error('no_data', 'No valid form data provided', array('status' => 400));
             }
             
+            // Build the full evaluation endpoint
+            $evaluation_endpoint = $this->build_evaluation_endpoint($config->dmn_endpoint, $config->decision_key);
+            
+            error_log('Operaton DMN: Using evaluation endpoint: ' . $evaluation_endpoint);
+            
             // Make API call with better error handling
             $operaton_data = array('variables' => $variables);
             
-            $response = wp_remote_post($config->dmn_endpoint, array(
+            $response = wp_remote_post($evaluation_endpoint, array(
                 'headers' => array(
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json',
@@ -781,7 +835,8 @@ class OperatonDMNEvaluator {
                 'result' => $result_value,
                 'debug_info' => defined('WP_DEBUG') && WP_DEBUG ? array(
                     'variables_sent' => $variables,
-                    'api_response' => $data
+                    'api_response' => $data,
+                    'endpoint_used' => $evaluation_endpoint
                 ) : null
             );
             
@@ -791,7 +846,7 @@ class OperatonDMNEvaluator {
     }
     
     /**
-     * AJAX handler for testing DMN endpoints
+     * Updated AJAX handler for testing DMN endpoints with URL construction
      */
     public function ajax_test_endpoint() {
         // Verify nonce
@@ -818,9 +873,17 @@ class OperatonDMNEvaluator {
         ));
         
         if (is_wp_error($response)) {
-            wp_send_json_error(array(
-                'message' => sprintf(__('Connection failed: %s', 'operaton-dmn'), $response->get_error_message())
+            // Try a HEAD request if OPTIONS fails
+            $response = wp_remote_head($endpoint, array(
+                'timeout' => 10,
+                'sslverify' => false,
             ));
+            
+            if (is_wp_error($response)) {
+                wp_send_json_error(array(
+                    'message' => sprintf(__('Connection failed: %s', 'operaton-dmn'), $response->get_error_message())
+                ));
+            }
         }
         
         $http_code = wp_remote_retrieve_response_code($response);
@@ -832,13 +895,144 @@ class OperatonDMNEvaluator {
         } elseif ($http_code === 405) {
             // Method not allowed is actually good - means endpoint exists
             wp_send_json_success(array(
-                'message' => __('Endpoint is reachable (Method Not Allowed is expected).', 'operaton-dmn')
+                'message' => __('Endpoint is reachable (Method Not Allowed is expected for evaluation endpoints).', 'operaton-dmn')
+            ));
+        } elseif ($http_code === 404) {
+            wp_send_json_error(array(
+                'message' => sprintf(__('Endpoint not found (404). Please check your base URL and decision key.', 'operaton-dmn'))
             ));
         } else {
             wp_send_json_error(array(
-                'message' => sprintf(__('Endpoint returned status code: %d', 'operaton-dmn'), $http_code)
+                'message' => sprintf(__('Endpoint returned status code: %d. This may indicate a configuration issue.', 'operaton-dmn'), $http_code)
             ));
         }
+    }
+    
+    /**
+     * Method to test a complete endpoint configuration
+     */
+    public function test_full_endpoint_configuration($base_endpoint, $decision_key) {
+        $full_endpoint = $this->build_evaluation_endpoint($base_endpoint, $decision_key);
+        
+        // Test with minimal DMN evaluation payload
+        $test_data = array(
+            'variables' => array(
+                'test' => array(
+                    'value' => 'test',
+                    'type' => 'String'
+                )
+            )
+        );
+        
+        $response = wp_remote_post($full_endpoint, array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+            ),
+            'body' => wp_json_encode($test_data),
+            'timeout' => 15,
+            'sslverify' => false, // Only for development
+        ));
+        
+        if (is_wp_error($response)) {
+            return array(
+                'success' => false,
+                'message' => 'Connection failed: ' . $response->get_error_message(),
+                'endpoint' => $full_endpoint
+            );
+        }
+        
+        $http_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        
+        // Analyze response
+        if ($http_code === 200) {
+            return array(
+                'success' => true,
+                'message' => 'Endpoint is working correctly and accepts DMN evaluations.',
+                'endpoint' => $full_endpoint
+            );
+        } elseif ($http_code === 400) {
+            // Bad request might mean the decision doesn't exist or input is wrong
+            return array(
+                'success' => false,
+                'message' => 'Endpoint is reachable but decision key may be incorrect or decision table has different input requirements.',
+                'endpoint' => $full_endpoint,
+                'http_code' => $http_code,
+                'response' => $body
+            );
+        } elseif ($http_code === 404) {
+            return array(
+                'success' => false,
+                'message' => 'Decision not found. Please check your decision key.',
+                'endpoint' => $full_endpoint,
+                'http_code' => $http_code
+            );
+        } else {
+            return array(
+                'success' => false,
+                'message' => 'Unexpected response code: ' . $http_code,
+                'endpoint' => $full_endpoint,
+                'http_code' => $http_code,
+                'response' => substr($body, 0, 200) // Truncate long responses
+            );
+        }
+    }
+    
+    /**
+     * WordPress admin AJAX action for comprehensive endpoint testing
+     */
+    public function ajax_test_full_config() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'operaton_test_endpoint')) {
+            wp_die('Security check failed');
+        }
+        
+        // Check user permissions
+        if (!current_user_can('manage_options')) {
+            wp_die('Insufficient permissions');
+        }
+        
+        $base_endpoint = sanitize_url($_POST['base_endpoint']);
+        $decision_key = sanitize_text_field($_POST['decision_key']);
+        
+        if (empty($base_endpoint) || empty($decision_key)) {
+            wp_send_json_error(array('message' => __('Both base endpoint and decision key are required.', 'operaton-dmn')));
+        }
+        
+        $test_result = $this->test_full_endpoint_configuration($base_endpoint, $decision_key);
+        
+        if ($test_result['success']) {
+            wp_send_json_success($test_result);
+        } else {
+            wp_send_json_error($test_result);
+        }
+    }
+    
+    /**
+     * Helper method to get example configurations for documentation
+     */
+    public function get_endpoint_examples() {
+        return array(
+            'operaton_cloud' => array(
+                'name' => 'Operaton Cloud',
+                'base_endpoint' => 'https://your-tenant.operaton.cloud/engine-rest/decision-definition/key/',
+                'example_decision_key' => 'loan-approval',
+                'full_example' => 'https://your-tenant.operaton.cloud/engine-rest/decision-definition/key/loan-approval/evaluate'
+            ),
+            'operaton_self_hosted' => array(
+                'name' => 'Self-hosted Operaton',
+                'base_endpoint' => 'https://operatondev.open-regels.nl/engine-rest/decision-definition/key/',
+                'example_decision_key' => 'dish',
+                'full_example' => 'https://operatondev.open-regels.nl/engine-rest/decision-definition/key/dish/evaluate'
+            ),
+            'local_development' => array(
+                'name' => 'Local Development',
+                'base_endpoint' => 'http://localhost:8080/engine-rest/decision-definition/key/',
+                'example_decision_key' => 'my-decision',
+                'full_example' => 'http://localhost:8080/engine-rest/decision-definition/key/my-decision/evaluate'
+            )
+        );
     }
     
     /**
