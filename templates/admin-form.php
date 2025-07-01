@@ -1,5 +1,5 @@
 <?php
-// templates/admin-form.php
+// File: templates/admin-form.php
 $editing = isset($config) && $config;
 $field_mappings = $editing ? json_decode($config->field_mappings, true) : array();
 ?>
@@ -124,58 +124,3 @@ $field_mappings = $editing ? json_decode($config->field_mappings, true) : array(
         <?php submit_button($editing ? __('Update Configuration', 'operaton-dmn') : __('Save Configuration', 'operaton-dmn'), 'primary', 'save_config'); ?>
     </form>
 </div>
-
-<script>
-jQuery(document).ready(function($) {
-    var mappingIndex = 0;
-    
-    $('#add-field-mapping').click(function() {
-        var newMapping = `
-            <div class="field-mapping-row">
-                <label><?php _e('DMN Variable:', 'operaton-dmn'); ?></label>
-                <input type="text" name="field_mappings[${mappingIndex}][dmn_variable]" class="regular-text">
-                
-                <label><?php _e('Form Field ID:', 'operaton-dmn'); ?></label>
-                <input type="text" name="field_mappings[${mappingIndex}][field_id]" class="regular-text">
-                
-                <label><?php _e('Data Type:', 'operaton-dmn'); ?></label>
-                <select name="field_mappings[${mappingIndex}][type]">
-                    <option value="String">String</option>
-                    <option value="Integer">Integer</option>
-                    <option value="Double">Double</option>
-                    <option value="Boolean">Boolean</option>
-                </select>
-                
-                <button type="button" class="button remove-mapping"><?php _e('Remove', 'operaton-dmn'); ?></button>
-            </div>
-        `;
-        $('#field-mappings').append(newMapping);
-        mappingIndex++;
-    });
-    
-    $(document).on('click', '.remove-mapping', function() {
-        $(this).closest('.field-mapping-row').remove();
-    });
-});
-</script>
-
-<style>
-.field-mapping-row {
-    margin-bottom: 15px;
-    padding: 15px;
-    border: 1px solid #ddd;
-    background: #f9f9f9;
-}
-
-.field-mapping-row label {
-    display: inline-block;
-    width: 120px;
-    margin-right: 10px;
-    font-weight: bold;
-}
-
-.field-mapping-row input,
-.field-mapping-row select {
-    margin-right: 15px;
-}
-</style>

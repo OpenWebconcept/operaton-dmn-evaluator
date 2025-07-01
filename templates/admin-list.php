@@ -1,5 +1,5 @@
 <?php
-// templates/admin-list.php
+// File: templates/admin-list.php
 ?>
 <div class="wrap">
     <h1><?php _e('Operaton DMN Configurations', 'operaton-dmn'); ?></h1>
