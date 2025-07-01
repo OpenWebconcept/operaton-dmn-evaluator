@@ -36,12 +36,12 @@ class OperatonDMNEvaluator {
     private function __construct() {
         add_action('init', array($this, 'init'));
         add_action('admin_menu', array($this, 'add_admin_menu'));
-        add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
         add_action('rest_api_init', array($this, 'register_rest_routes'));
         
-        // Gravity Forms integration
-        add_action('gform_enqueue_scripts', array($this, 'enqueue_gravity_scripts'), 10, 2);
-        add_filter('gform_submit_button', array($this, 'add_evaluate_button'), 10, 2);
+        // Gravity Forms integration - only load if not in admin or if specifically needed
+        add_action('init', array($this, 'init_gravity_forms_integration'));
         
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
@@ -49,6 +49,14 @@ class OperatonDMNEvaluator {
     
     public function init() {
         load_plugin_textdomain('operaton-dmn', false, dirname(plugin_basename(__FILE__)) . '/languages/');
+    }
+    
+    public function init_gravity_forms_integration() {
+        // Only add Gravity Forms hooks on frontend or when specifically needed
+        if (!is_admin() || (isset($_GET['page']) && strpos($_GET['page'], 'gf_') === 0)) {
+            add_action('gform_enqueue_scripts', array($this, 'enqueue_gravity_scripts'), 10, 2);
+            add_filter('gform_submit_button', array($this, 'add_evaluate_button'), 10, 2);
+        }
     }
     
     public function activate() {
@@ -207,45 +215,76 @@ class OperatonDMNEvaluator {
         echo '<div class="notice notice-success"><p>' . __('Configuration deleted successfully!', 'operaton-dmn') . '</p></div>';
     }
     
-    public function enqueue_scripts() {
-        wp_enqueue_script('jquery');
-        wp_enqueue_script(
-            'operaton-dmn-frontend',
-            OPERATON_DMN_PLUGIN_URL . 'assets/js/frontend.js',
-            array('jquery'),
-            OPERATON_DMN_VERSION,
-            true
-        );
-        
-        // Enqueue frontend styles
-        wp_enqueue_style(
-            'operaton-dmn-frontend',
-            OPERATON_DMN_PLUGIN_URL . 'assets/css/frontend.css',
-            array(),
-            OPERATON_DMN_VERSION
-        );
+    public function enqueue_frontend_scripts() {
+        // Only enqueue on frontend
+        if (!is_admin()) {
+            wp_enqueue_script('jquery');
+            wp_enqueue_script(
+                'operaton-dmn-frontend',
+                OPERATON_DMN_PLUGIN_URL . 'assets/js/frontend.js',
+                array('jquery'),
+                OPERATON_DMN_VERSION,
+                true
+            );
+            
+            // Enqueue frontend styles
+            wp_enqueue_style(
+                'operaton-dmn-frontend',
+                OPERATON_DMN_PLUGIN_URL . 'assets/css/frontend.css',
+                array(),
+                OPERATON_DMN_VERSION
+            );
 
-
-        // Fixed REST API URL - make sure it matches the registered route
-        wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
-            'url' => rest_url('operaton-dmn/v1/evaluate'),
-            'nonce' => wp_create_nonce('wp_rest')
-        ));
-        
-        // Enqueue admin styles
-        if (is_admin()) {
+            // Fixed REST API URL - make sure it matches the registered route
+            wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
+                'url' => rest_url('operaton-dmn/v1/evaluate'),
+                'nonce' => wp_create_nonce('wp_rest')
+            ));
+        }
+    }
+    
+    public function enqueue_admin_scripts($hook) {
+        // Only enqueue admin styles on our plugin pages
+        if (strpos($hook, 'operaton-dmn') !== false) {
             wp_enqueue_style(
                 'operaton-dmn-admin',
                 OPERATON_DMN_PLUGIN_URL . 'assets/css/admin.css',
                 array(),
                 OPERATON_DMN_VERSION
             );
+            
+            wp_enqueue_script('jquery');
+            wp_enqueue_script(
+                'operaton-dmn-admin',
+                OPERATON_DMN_PLUGIN_URL . 'assets/js/admin.js',
+                array('jquery'),
+                OPERATON_DMN_VERSION,
+                true
+            );
         }
     }
     
     public function enqueue_gravity_scripts($form, $is_ajax) {
+        // Only enqueue if we have a config for this form
         $config = $this->get_config_by_form_id($form['id']);
         if ($config) {
+            // Make sure frontend script is loaded
+            if (!wp_script_is('operaton-dmn-frontend', 'enqueued')) {
+                wp_enqueue_script(
+                    'operaton-dmn-frontend',
+                    OPERATON_DMN_PLUGIN_URL . 'assets/js/frontend.js',
+                    array('jquery'),
+                    OPERATON_DMN_VERSION,
+                    true
+                );
+                
+                wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
+                    'url' => rest_url('operaton-dmn/v1/evaluate'),
+                    'nonce' => wp_create_nonce('wp_rest')
+                ));
+            }
+            
+            // Localize config for this specific form
             wp_localize_script('operaton-dmn-frontend', 'operaton_config_' . $form['id'], array(
                 'config_id' => $config->id,
                 'button_text' => $config->button_text,
@@ -255,11 +294,14 @@ class OperatonDMNEvaluator {
     }
     
     public function add_evaluate_button($button, $form) {
-        $config = $this->get_config_by_form_id($form['id']);
-        if ($config) {
-            $evaluate_button = '<input type="button" id="operaton-evaluate-' . $form['id'] . '" value="' . esc_attr($config->button_text) . '" class="gform_button button operaton-evaluate-btn" data-form-id="' . $form['id'] . '" data-config-id="' . $config->id . '" style="margin-left: 10px;">';
-            $button .= $evaluate_button;
-            $button .= '<div class="gfield"><div id="operaton-result-' . $form['id'] . '" class="ginput_container operaton-result gfield"> <h4>' . __('Result:', 'operaton-dmn') . '</h4><div class="result-content"></div></div></div>';
+        // Only add button if we have a config for this form and we're not in admin
+        if (!is_admin()) {
+            $config = $this->get_config_by_form_id($form['id']);
+            if ($config) {
+                $evaluate_button = '<input type="button" id="operaton-evaluate-' . $form['id'] . '" value="' . esc_attr($config->button_text) . '" class="gform_button button operaton-evaluate-btn" data-form-id="' . $form['id'] . '" data-config-id="' . $config->id . '" style="margin-left: 10px;">';
+                $button .= $evaluate_button;
+                $button .= '<div class="gfield"><div id="operaton-result-' . $form['id'] . '" class="ginput_container operaton-result gfield" style="display: none;"> <h4>' . __('Result:', 'operaton-dmn') . '</h4><div class="result-content"></div></div></div>';
+            }
         }
         return $button;
     }
