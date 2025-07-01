@@ -1,0 +1,10 @@
+.operaton-evaluate-btn {
+    display: inline-block;
+    margin-bottom: 12px;
+}
+
+.operaton-result {
+    display: block;
+    margin-top: 10px;
+    clear: both;
+}

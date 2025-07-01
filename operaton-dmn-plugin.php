@@ -217,6 +217,15 @@ class OperatonDMNEvaluator {
             true
         );
         
+        // Enqueue frontend styles
+        wp_enqueue_style(
+            'operaton-dmn-frontend',
+            OPERATON_DMN_PLUGIN_URL . 'assets/css/frontend.css',
+            array(),
+            OPERATON_DMN_VERSION
+        );
+
+
         // Fixed REST API URL - make sure it matches the registered route
         wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
             'url' => rest_url('operaton-dmn/v1/evaluate'),
