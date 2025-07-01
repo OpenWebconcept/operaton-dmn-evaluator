@@ -313,8 +313,8 @@ class OperatonDMNEvaluator {
         
         // Map form data to DMN variables
         foreach ($field_mappings as $dmn_variable => $form_field) {
-            if (isset($params['form_data'][$form_field['field_id']])) {
-                $value = $params['form_data'][$form_field['field_id']];
+            if (isset($params['form_data'][$dmn_variable])) {
+                $value = $params['form_data'][$dmn_variable];
                 
                 // Type conversion
                 switch ($form_field['type']) {
