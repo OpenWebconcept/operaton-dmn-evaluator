@@ -185,3 +185,36 @@ jQuery(document).ready(function($) {
         });
     }
 });
+
+/* source: admin-templates */
+jQuery(document).ready(function($) {
+    var mappingIndex = 0;
+    
+    $('#add-field-mapping').click(function() {
+        var newMapping = `
+            <div class="field-mapping-row">
+                <label><?php _e('DMN Variable:', 'operaton-dmn'); ?></label>
+                <input type="text" name="field_mappings[${mappingIndex}][dmn_variable]" class="regular-text">
+                
+                <label><?php _e('Form Field ID:', 'operaton-dmn'); ?></label>
+                <input type="text" name="field_mappings[${mappingIndex}][field_id]" class="regular-text">
+                
+                <label><?php _e('Data Type:', 'operaton-dmn'); ?></label>
+                <select name="field_mappings[${mappingIndex}][type]">
+                    <option value="String">String</option>
+                    <option value="Integer">Integer</option>
+                    <option value="Double">Double</option>
+                    <option value="Boolean">Boolean</option>
+                </select>
+                
+                <button type="button" class="button remove-mapping"><?php _e('Remove', 'operaton-dmn'); ?></button>
+            </div>
+        `;
+        $('#field-mappings').append(newMapping);
+        mappingIndex++;
+    });
+    
+    $(document).on('click', '.remove-mapping', function() {
+        $(this).closest('.field-mapping-row').remove();
+    });
+});

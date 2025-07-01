@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/yourorg/operaton-dmn-evaluator
  * Description: WordPress plugin to integrate Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.
  * Version: 1.0.0-beta.1
- * Author: Steven Gort
+ * Author: Steven Gort assisted by Claude.ai
  * License: GPL v2 or later
  * Text Domain: operaton-dmn
  */

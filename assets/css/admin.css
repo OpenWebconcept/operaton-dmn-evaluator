@@ -297,3 +297,23 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* source: admin-templates */
+.field-mapping-row {
+    margin-bottom: 15px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    background: #f9f9f9;
+}
+
+.field-mapping-row label {
+    display: inline-block;
+    width: 120px;
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+.field-mapping-row input,
+.field-mapping-row select {
+    margin-right: 15px;
+}
