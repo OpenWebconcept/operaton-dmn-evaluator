@@ -65,8 +65,6 @@ Map your Gravity Form fields to DMN variables:
 - **Form Field ID:** The Gravity Forms field ID (e.g., `1`, `3`)
 - **Data Type:** Choose the appropriate data type (String, Integer, Double, Boolean)
 
-![Configure Field Mappings](assets/images/plugin-Config-Top.png)
-
 ### 3. Test Your Configuration
 
 1. Visit your form page
