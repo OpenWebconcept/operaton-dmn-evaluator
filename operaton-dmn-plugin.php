@@ -143,50 +143,51 @@ class OperatonDMNEvaluator {
         return $forms;
     }
     
-private function save_configuration($data) {
-    global $wpdb;
-    
-    $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-    
-    // Process field mappings with proper structure
-    $field_mappings = array();
-    
-    if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
-        $dmn_variables = $data['field_mappings_dmn_variable'];
-        $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
-        $types = isset($data['field_mappings_type']) ? $data['field_mappings_type'] : array();
+    private function save_configuration($data) {
+        global $wpdb;
         
-        for ($i = 0; $i < count($dmn_variables); $i++) {
-            $dmn_var = sanitize_text_field($dmn_variables[$i]);
-            if (!empty($dmn_var)) {
-                $field_mappings[$dmn_var] = array(
-                    'field_id' => isset($field_ids[$i]) ? sanitize_text_field($field_ids[$i]) : '',
-                    'type' => isset($types[$i]) ? sanitize_text_field($types[$i]) : 'String'
-                );
+        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
+        
+        // Process field mappings with proper structure
+        $field_mappings = array();
+        
+        if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
+            $dmn_variables = $data['field_mappings_dmn_variable'];
+            $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
+            $types = isset($data['field_mappings_type']) ? $data['field_mappings_type'] : array();
+            
+            for ($i = 0; $i < count($dmn_variables); $i++) {
+                $dmn_var = sanitize_text_field($dmn_variables[$i]);
+                if (!empty($dmn_var)) {
+                    $field_mappings[$dmn_var] = array(
+                        'field_id' => isset($field_ids[$i]) ? sanitize_text_field($field_ids[$i]) : '',
+                        'type' => isset($types[$i]) ? sanitize_text_field($types[$i]) : 'String'
+                    );
+                }
             }
         }
-    }
+        
+        $config_data = array(
+            'name' => sanitize_text_field($data['name']),
+            'form_id' => intval($data['form_id']),
+            'dmn_endpoint' => esc_url_raw($data['dmn_endpoint']),
+            'decision_key' => sanitize_text_field($data['decision_key']),
+            'field_mappings' => wp_json_encode($field_mappings),
+            'result_field' => sanitize_text_field($data['result_field']),
+            'button_text' => sanitize_text_field($data['button_text'])
+        );
+        
+        if (isset($data['config_id']) && !empty($data['config_id'])) {
+            $wpdb->update($table_name, $config_data, array('id' => intval($data['config_id'])));
+            $message = __('Configuration updated successfully!', 'operaton-dmn');
+        } else {
+            $wpdb->insert($table_name, $config_data);
+            $message = __('Configuration saved successfully!', 'operaton-dmn');
+        }
+        
+        echo '<div class="notice notice-success"><p>' . $message . '</p></div>';
+    }    
     
-    $config_data = array(
-        'name' => sanitize_text_field($data['name']),
-        'form_id' => intval($data['form_id']),
-        'dmn_endpoint' => esc_url_raw($data['dmn_endpoint']),
-        'decision_key' => sanitize_text_field($data['decision_key']),
-        'field_mappings' => wp_json_encode($field_mappings),
-        'result_field' => sanitize_text_field($data['result_field']),
-        'button_text' => sanitize_text_field($data['button_text'])
-    );
-    
-    if (isset($data['config_id']) && !empty($data['config_id'])) {
-        $wpdb->update($table_name, $config_data, array('id' => intval($data['config_id'])));
-        $message = __('Configuration updated successfully!', 'operaton-dmn');
-    } else {
-        $wpdb->insert($table_name, $config_data);
-        $message = __('Configuration saved successfully!', 'operaton-dmn');
-    }
-    
-    echo '<div class="notice notice-success"><p>' . $message . '</p></div>';
-}    
     private function get_all_configurations() {
         global $wpdb;
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
@@ -216,6 +217,7 @@ private function save_configuration($data) {
             true
         );
         
+        // Fixed REST API URL - make sure it matches the registered route
         wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
             'url' => rest_url('operaton-dmn/v1/evaluate'),
             'nonce' => wp_create_nonce('wp_rest')
@@ -260,24 +262,51 @@ private function save_configuration($data) {
     }
     
     public function register_rest_routes() {
+        // Register the REST API route - make sure this matches what we're calling from frontend
         register_rest_route('operaton-dmn/v1', '/evaluate', array(
             'methods' => 'POST',
             'callback' => array($this, 'handle_evaluation'),
             'permission_callback' => '__return_true',
+            'args' => array(
+                'config_id' => array(
+                    'required' => true,
+                    'type' => 'integer',
+                ),
+                'form_data' => array(
+                    'required' => true,
+                    'type' => 'object',
+                )
+            )
+        ));
+        
+        // Add a test endpoint for debugging
+        register_rest_route('operaton-dmn/v1', '/test', array(
+            'methods' => 'GET',
+            'callback' => function() {
+                return array('status' => 'Plugin REST API is working!');
+            },
+            'permission_callback' => '__return_true'
         ));
     }
     
     public function handle_evaluation($request) {
+        // Add error logging for debugging
+        error_log('Operaton DMN: Evaluation request received');
+        
         $params = $request->get_json_params();
         
         if (!isset($params['config_id']) || !isset($params['form_data'])) {
+            error_log('Operaton DMN: Missing required parameters');
             return new WP_Error('missing_params', 'Configuration ID and form data are required', array('status' => 400));
         }
         
         $config = $this->get_configuration($params['config_id']);
         if (!$config) {
+            error_log('Operaton DMN: Configuration not found for ID: ' . $params['config_id']);
             return new WP_Error('invalid_config', 'Configuration not found', array('status' => 404));
         }
+        
+        error_log('Operaton DMN: Processing config: ' . $config->name);
         
         $field_mappings = json_decode($config->field_mappings, true);
         $variables = array();
@@ -306,11 +335,17 @@ private function save_configuration($data) {
                     'value' => $value,
                     'type' => $form_field['type']
                 );
+            } else {
+                error_log('Operaton DMN: Missing form data for field: ' . $form_field['field_id']);
             }
         }
         
+        error_log('Operaton DMN: Variables prepared: ' . json_encode($variables));
+        
         // Prepare data for Operaton API
         $operaton_data = array('variables' => $variables);
+        
+        error_log('Operaton DMN: Calling endpoint: ' . $config->dmn_endpoint);
         
         // Make API call to Operaton
         $response = wp_remote_post($config->dmn_endpoint, array(
@@ -322,13 +357,20 @@ private function save_configuration($data) {
         ));
         
         if (is_wp_error($response)) {
+            error_log('Operaton DMN: API call failed: ' . $response->get_error_message());
             return new WP_Error('api_error', 'Failed to connect to Operaton API: ' . $response->get_error_message(), array('status' => 500));
         }
         
         $body = wp_remote_retrieve_body($response);
+        $http_code = wp_remote_retrieve_response_code($response);
+        
+        error_log('Operaton DMN: API response code: ' . $http_code);
+        error_log('Operaton DMN: API response body: ' . $body);
+        
         $data = json_decode($body, true);
         
         if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log('Operaton DMN: Invalid JSON response');
             return new WP_Error('invalid_response', 'Invalid response from Operaton API', array('status' => 500));
         }
         
@@ -336,6 +378,9 @@ private function save_configuration($data) {
         $result_value = '';
         if (isset($data[0][$config->result_field]['value'])) {
             $result_value = $data[0][$config->result_field]['value'];
+        } else {
+            error_log('Operaton DMN: Result field not found in response: ' . $config->result_field);
+            error_log('Operaton DMN: Available fields: ' . json_encode(array_keys($data[0] ?? array())));
         }
         
         return array(
