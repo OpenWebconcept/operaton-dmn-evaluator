@@ -1,12 +1,52 @@
-// assets/js/frontend.js
+// assets/js/frontend.js - IMPROVED VERSION
 jQuery(document).ready(function($) {
     console.log('Operaton DMN frontend script loaded');
     
-    // Handle evaluate button clicks
-    $(document).on('click', '.operaton-evaluate-btn', function(e) {
-        e.preventDefault();
+    // Wait for Gravity Forms to fully initialize
+    var initOperatonDMN = function() {
+        if (typeof gform !== 'undefined' && gform.initializeOnLoaded) {
+            gform.addAction('gform_post_render', function(formId) {
+                console.log('Gravity Form rendered, initializing Operaton DMN for form:', formId);
+                initializeFormEvaluation(formId);
+            });
+        } else {
+            // Fallback for when gform is not available
+            setTimeout(function() {
+                $('form[id^="gform_"]').each(function() {
+                    var formId = $(this).attr('id').replace('gform_', '');
+                    initializeFormEvaluation(formId);
+                });
+            }, 500);
+        }
+    };
+    
+    // Initialize evaluation for a specific form
+    function initializeFormEvaluation(formId) {
+        var configVar = 'operaton_config_' + formId;
+        if (typeof window[configVar] !== 'undefined') {
+            console.log('Configuration found for form:', formId);
+            
+            // Re-bind event handlers for this form
+            bindEvaluationEvents(formId);
+        }
+    }
+    
+    // Bind evaluation events for a specific form
+    function bindEvaluationEvents(formId) {
+        var selector = '.operaton-evaluate-btn[data-form-id="' + formId + '"]';
         
-        var $button = $(this);
+        // Remove existing handlers to prevent duplicates
+        $(document).off('click', selector);
+        
+        // Bind new handler
+        $(document).on('click', selector, function(e) {
+            e.preventDefault();
+            handleEvaluateClick($(this));
+        });
+    }
+    
+    // Handle evaluate button clicks
+    function handleEvaluateClick($button) {
         var formId = $button.data('form-id');
         var configId = $button.data('config-id');
         var originalText = $button.val();
@@ -17,7 +57,7 @@ jQuery(document).ready(function($) {
         var configVar = 'operaton_config_' + formId;
         if (typeof window[configVar] === 'undefined') {
             console.error('Configuration not found for form:', formId);
-            alert('Configuration error. Please contact the administrator.');
+            showError('Configuration error. Please contact the administrator.');
             return;
         }
         
@@ -25,6 +65,12 @@ jQuery(document).ready(function($) {
         var fieldMappings = config.field_mappings;
         
         console.log('Field mappings:', fieldMappings);
+        
+        // Validate form before collecting data
+        if (!validateForm(formId)) {
+            showError('Please fill in all required fields before evaluation.');
+            return;
+        }
         
         // Collect form data based on field mappings
         var formData = {};
@@ -35,15 +81,18 @@ jQuery(document).ready(function($) {
             var fieldId = mapping.field_id;
             console.log('Processing DMN variable:', dmnVariable, 'Field ID:', fieldId);
             
-            // Try to get the field value using multiple strategies
             var value = getGravityFieldValue(formId, fieldId);
-            
             console.log('Found value for field', fieldId + ':', value);
             
             if (value === null || value === '' || value === undefined) {
                 hasRequiredData = false;
                 missingFields.push(dmnVariable + ' (field ID: ' + fieldId + ')');
             } else {
+                // Validate data type
+                if (!validateFieldType(value, mapping.type)) {
+                    showError('Invalid data type for field ' + dmnVariable + '. Expected: ' + mapping.type);
+                    return false;
+                }
                 formData[dmnVariable] = value;
             }
         });
@@ -53,13 +102,14 @@ jQuery(document).ready(function($) {
         
         // Validate that we have all required data
         if (!hasRequiredData) {
-            alert('Please fill in all required fields: ' + missingFields.join(', '));
+            showError('Please fill in all required fields: ' + missingFields.join(', '));
             return;
         }
         
         // Show loading state
         $button.val('Evaluating...').prop('disabled', true);
-        $('#operaton-result-' + formId).hide();
+        hideResult(formId);
+        showLoading(formId);
         
         console.log('Making AJAX call to:', operaton_ajax.url);
         
@@ -77,11 +127,12 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 console.log('AJAX success:', response);
-                if (response.success && response.result) {
-                    $('#operaton-result-' + formId + ' .result-content').html('<strong>' + response.result + '</strong>');
-                    $('#operaton-result-' + formId).fadeIn(200);
+                hideLoading(formId);
+                
+                if (response.success && response.result !== undefined && response.result !== null) {
+                    showResult(formId, response.result);
                 } else {
-                    alert('No result received from evaluation.');
+                    showError('No result received from evaluation.');
                 }
             },
             error: function(xhr, status, error) {
@@ -89,65 +140,109 @@ jQuery(document).ready(function($) {
                 console.error('Status:', status);
                 console.error('Response:', xhr.responseText);
                 
+                hideLoading(formId);
+                
                 var errorMessage = 'Error during evaluation. Please try again.';
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    errorMessage = xhr.responseJSON.message;
+                
+                try {
+                    var errorResponse = JSON.parse(xhr.responseText);
+                    if (errorResponse.message) {
+                        errorMessage = errorResponse.message;
+                    }
+                } catch (e) {
+                    if (xhr.status === 0) {
+                        errorMessage = 'Connection error. Please check your internet connection.';
+                    } else if (xhr.status === 404) {
+                        errorMessage = 'Evaluation service not found.';
+                    } else if (xhr.status === 500) {
+                        errorMessage = 'Server error occurred during evaluation.';
+                    }
                 }
-                alert(errorMessage);
+                
+                showError(errorMessage);
             },
             complete: function() {
                 $button.val(originalText).prop('disabled', false);
             }
         });
-    });
+    }
     
     // Enhanced field detection for Gravity Forms
     function getGravityFieldValue(formId, fieldId) {
         console.log('Getting value for form:', formId, 'field:', fieldId);
         
-        // Strategy 1: Standard Gravity Forms naming convention: input_{form_id}_{field_id}
+        var $form = $('#gform_' + formId);
+        var value = null;
+        
+        // Strategy 1: Direct field selectors (most common)
         var selectors = [
+            '#input_' + formId + '_' + fieldId,
             'input[name="input_' + formId + '_' + fieldId + '"]',
             'select[name="input_' + formId + '_' + fieldId + '"]',
-            'textarea[name="input_' + formId + '_' + fieldId + '"]',
-            '#input_' + formId + '_' + fieldId,
-            // Strategy 2: Alternative naming patterns
-            'input[name="input_' + fieldId + '"]',
-            'select[name="input_' + fieldId + '"]',
-            'textarea[name="input_' + fieldId + '"]',
-            '#input_' + fieldId,
-            // Strategy 3: Handle radio buttons and checkboxes
-            'input[name="input_' + formId + '_' + fieldId + '"]:checked',
-            'input[name="input_' + fieldId + '"]:checked'
+            'textarea[name="input_' + formId + '_' + fieldId + '"]'
         ];
         
         for (var i = 0; i < selectors.length; i++) {
-            var selector = selectors[i];
-            var $field = $(selector);
-            console.log('Trying selector:', selector, 'Found:', $field.length);
-            
+            var $field = $form.find(selectors[i]);
             if ($field.length > 0) {
-                var value = $field.val();
-                console.log('Value from selector:', selector, 'Value:', value);
-                
-                if (value !== '' && value !== null && value !== undefined) {
+                value = getFieldValue($field);
+                if (value !== null && value !== '') {
+                    console.log('Found value using selector:', selectors[i], 'Value:', value);
                     return value;
                 }
             }
         }
         
-        // Strategy 4: Look for any input with a data attribute or class that contains the field ID
-        var $possibleFields = $('input, select, textarea').filter(function() {
-            var name = $(this).attr('name') || '';
+        // Strategy 2: Handle multi-part fields (name, address, etc.)
+        var $multiFields = $form.find('[id^="input_' + formId + '_' + fieldId + '_"]');
+        if ($multiFields.length > 0) {
+            var multiValue = {};
+            $multiFields.each(function() {
+                var $this = $(this);
+                var subFieldId = $this.attr('id').split('_').pop();
+                var subValue = getFieldValue($this);
+                if (subValue) {
+                    multiValue[subFieldId] = subValue;
+                }
+            });
+            
+            if (Object.keys(multiValue).length > 0) {
+                console.log('Found multi-part field value:', multiValue);
+                return JSON.stringify(multiValue);
+            }
+        }
+        
+        // Strategy 3: Handle radio buttons and checkboxes
+        var $radioChecked = $form.find('input[name="input_' + formId + '_' + fieldId + '"]:checked');
+        if ($radioChecked.length > 0) {
+            value = $radioChecked.val();
+            console.log('Found radio/checkbox value:', value);
+            return value;
+        }
+        
+        // Strategy 4: Handle file uploads
+        var $fileField = $form.find('input[name="input_' + formId + '_' + fieldId + '"]');
+        if ($fileField.length > 0 && $fileField.attr('type') === 'file') {
+            var files = $fileField[0].files;
+            if (files && files.length > 0) {
+                return files[0].name;
+            }
+        }
+        
+        // Strategy 5: Fallback - search by partial ID match
+        var $possibleFields = $form.find('input, select, textarea').filter(function() {
             var id = $(this).attr('id') || '';
-            return name.indexOf('_' + fieldId) > -1 || id.indexOf('_' + fieldId) > -1;
+            var name = $(this).attr('name') || '';
+            return id.indexOf('_' + fieldId + '_') > -1 || 
+                   id.indexOf('_' + fieldId) > -1 || 
+                   name.indexOf('_' + fieldId + '_') > -1 || 
+                   name.indexOf('_' + fieldId) > -1;
         });
         
         if ($possibleFields.length > 0) {
-            console.log('Found possible fields:', $possibleFields);
-            var value = $possibleFields.first().val();
-            if (value !== '' && value !== null && value !== undefined) {
-                console.log('Using value from possible field:', value);
+            value = getFieldValue($possibleFields.first());
+            if (value !== null && value !== '') {
+                console.log('Found value using fallback search:', value);
                 return value;
             }
         }
@@ -156,12 +251,116 @@ jQuery(document).ready(function($) {
         return null;
     }
     
-    // Debug function to help with field mapping
-    function debugFormFields(formId) {
-        if (typeof console !== 'undefined' && console.log) {
+    // Get value from a jQuery field object
+    function getFieldValue($field) {
+        if ($field.length === 0) return null;
+        
+        var tagName = $field.prop('tagName').toLowerCase();
+        var fieldType = $field.attr('type');
+        
+        if (tagName === 'select') {
+            return $field.val();
+        } else if (fieldType === 'checkbox' || fieldType === 'radio') {
+            return $field.is(':checked') ? $field.val() : null;
+        } else if (tagName === 'textarea' || fieldType === 'text' || fieldType === 'email' || fieldType === 'number' || fieldType === 'hidden') {
+            var val = $field.val();
+            return val && val.trim() !== '' ? val : null;
+        }
+        
+        return $field.val();
+    }
+    
+    // Validate field type
+    function validateFieldType(value, expectedType) {
+        switch (expectedType) {
+            case 'Integer':
+                return /^-?\d+$/.test(value);
+            case 'Double':
+                return /^-?\d*\.?\d+$/.test(value);
+            case 'Boolean':
+                return ['true', 'false', '1', '0', 'yes', 'no'].includes(value.toString().toLowerCase());
+            case 'String':
+            default:
+                return true; // Any value can be a string
+        }
+    }
+    
+    // Validate form using Gravity Forms built-in validation
+    function validateForm(formId) {
+        if (typeof gform !== 'undefined' && gform.validators && gform.validators[formId]) {
+            // Use Gravity Forms built-in validation
+            var isValid = gform.validators[formId]();
+            console.log('Gravity Forms validation result:', isValid);
+            return isValid;
+        }
+        
+        // Fallback validation - check required fields
+        var $form = $('#gform_' + formId);
+        var allValid = true;
+        
+        $form.find('.gfield_contains_required input, .gfield_contains_required select, .gfield_contains_required textarea').each(function() {
+            var $field = $(this);
+            var value = getFieldValue($field);
+            
+            if (!value || value.trim() === '') {
+                console.log('Required field is empty:', $field.attr('name'));
+                allValid = false;
+                return false;
+            }
+        });
+        
+        return allValid;
+    }
+    
+    // Show result
+    function showResult(formId, result) {
+        var $resultContainer = $('#operaton-result-' + formId);
+        $resultContainer.find('.result-content').html('<strong>' + escapeHtml(result) + '</strong>');
+        $resultContainer.fadeIn(200);
+    }
+    
+    // Hide result
+    function hideResult(formId) {
+        $('#operaton-result-' + formId).hide();
+    }
+    
+    // Show loading indicator
+    function showLoading(formId) {
+        var $resultContainer = $('#operaton-result-' + formId);
+        $resultContainer.find('.result-content').html('<span class="operaton-spinner"></span> Evaluating...');
+        $resultContainer.show();
+    }
+    
+    // Hide loading indicator
+    function hideLoading(formId) {
+        // Loading will be replaced by result or hidden by hideResult
+    }
+    
+    // Show error message
+    function showError(message) {
+        if (typeof console !== 'undefined') {
+            console.error('Operaton DMN Error:', message);
+        }
+        alert(message);
+    }
+    
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.toString().replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+    
+    // Debug functions for development
+    if (operaton_ajax.debug) {
+        window.operatonDebugFields = function(formId) {
             console.log('=== Debug Form Fields for Form ID: ' + formId + ' ===');
             
-            // Find all input fields
             var $form = $('#gform_' + formId);
             if ($form.length) {
                 $form.find('input, select, textarea').each(function() {
@@ -169,55 +368,37 @@ jQuery(document).ready(function($) {
                     var name = $field.attr('name');
                     var id = $field.attr('id');
                     var type = $field.attr('type');
-                    var value = $field.val();
+                    var value = getFieldValue($field);
                     
                     console.log('Field - Name:', name, 'ID:', id, 'Type:', type, 'Value:', value);
                 });
-            } else {
-                // Try to find fields without form wrapper
-                console.log('Form wrapper not found, checking all fields on page:');
-                $('input, select, textarea').each(function() {
-                    var $field = $(this);
-                    var name = $field.attr('name') || '';
-                    var id = $field.attr('id') || '';
-                    var type = $field.attr('type');
-                    var value = $field.val();
-                    
-                    if (name.indexOf('input_') === 0 || id.indexOf('input_') === 0) {
-                        console.log('Gravity Field - Name:', name, 'ID:', id, 'Type:', type, 'Value:', value);
-                    }
-                });
             }
             console.log('=== End Debug ===');
+        };
+        
+        window.operatonTestField = function(formId, fieldId) {
+            var value = getGravityFieldValue(formId, fieldId);
+            console.log('Test result for form:', formId, 'field:', fieldId, 'value:', value);
+            return value;
+        };
+        
+        // Auto-debug on page load if debug parameter is present
+        if (window.location.search.indexOf('operaton_debug=1') > -1) {
+            setTimeout(function() {
+                $('form[id^="gform_"]').each(function() {
+                    var formId = $(this).attr('id').replace('gform_', '');
+                    window.operatonDebugFields(formId);
+                });
+            }, 1000);
         }
     }
     
-    // Auto-debug on page load if in development mode
-    if (window.location.search.indexOf('operaton_debug=1') > -1) {
-        // Find all Gravity Forms and debug their fields
-        $('form[id^="gform_"]').each(function() {
-            var formId = $(this).attr('id').replace('gform_', '');
-            debugFormFields(formId);
-        });
-        
-        // Also debug if no forms found
-        setTimeout(function() {
-            if ($('form[id^="gform_"]').length === 0) {
-                console.log('No Gravity Forms found, debugging all form fields:');
-                debugFormFields('unknown');
-            }
-        }, 1000);
-    }
+    // Initialize the plugin
+    initOperatonDMN();
     
-    // Add a manual debug function that can be called from browser console
-    window.operatonDebugFields = function(formId) {
-        debugFormFields(formId || 'all');
-    };
-    
-    // Add helper to test field detection
-    window.operatonTestField = function(formId, fieldId) {
-        var value = getGravityFieldValue(formId, fieldId);
-        console.log('Test result for form:', formId, 'field:', fieldId, 'value:', value);
-        return value;
-    };
+    // Re-initialize when forms are dynamically loaded (AJAX forms)
+    $(document).on('gform_post_render', function(event, formId, currentPage) {
+        console.log('Form re-rendered:', formId, 'page:', currentPage);
+        initializeFormEvaluation(formId);
+    });
 });
