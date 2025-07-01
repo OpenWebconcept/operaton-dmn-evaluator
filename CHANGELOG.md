@@ -3,6 +3,9 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.0-beta.3] - 2025-07-01
 
+## Issues
+- [Issue #1](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/1)
+
 ## 🔧 New Features Added:
 
 ### Separated URL Construction:
