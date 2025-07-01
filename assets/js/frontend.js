@@ -24,6 +24,8 @@ jQuery(document).ready(function($) {
         var config = window[configVar];
         var fieldMappings = config.field_mappings;
         
+        console.log('Field mappings:', fieldMappings);
+        
         // Collect form data based on field mappings
         var formData = {};
         var hasRequiredData = true;
@@ -31,45 +33,18 @@ jQuery(document).ready(function($) {
         
         $.each(fieldMappings, function(dmnVariable, mapping) {
             var fieldId = mapping.field_id;
-            var fieldSelector = '#input_' + formId + '_' + fieldId;
-            var $field = $(fieldSelector);
+            console.log('Processing DMN variable:', dmnVariable, 'Field ID:', fieldId);
             
-            console.log('Looking for field:', fieldSelector, 'Found:', $field.length);
+            // Try to get the field value using multiple strategies
+            var value = getGravityFieldValue(formId, fieldId);
             
-            if ($field.length) {
-                var value = $field.val();
-                if (value === '' || value === null) {
-                    hasRequiredData = false;
-                    missingFields.push(dmnVariable);
-                } else {
-                    formData[fieldId] = value;
-                }
+            console.log('Found value for field', fieldId + ':', value);
+            
+            if (value === null || value === '' || value === undefined) {
+                hasRequiredData = false;
+                missingFields.push(dmnVariable + ' (field ID: ' + fieldId + ')');
             } else {
-                // Try alternative selectors for different field types
-                var altSelectors = [
-                    'input[name="input_' + fieldId + '"]',
-                    'select[name="input_' + fieldId + '"]',
-                    'textarea[name="input_' + fieldId + '"]',
-                    'input[name="input_' + formId + '_' + fieldId + '"]'
-                ];
-                
-                var found = false;
-                $.each(altSelectors, function(index, selector) {
-                    var $altField = $(selector);
-                    if ($altField.length) {
-                        var value = $altField.val();
-                        if (value !== '' && value !== null) {
-                            formData[fieldId] = value;
-                            found = true;
-                            return false; // break loop
-                        }
-                    }
-                });
-                
-                if (!found) {
-                    hasRequiredData = false;
-                    missingFields.push(dmnVariable + ' (field ID: ' + fieldId + ')');
-                }
+                formData[fieldId] = value;
             }
         });
         
@@ -128,27 +103,56 @@ jQuery(document).ready(function($) {
     
     // Enhanced field detection for Gravity Forms
     function getGravityFieldValue(formId, fieldId) {
+        console.log('Getting value for form:', formId, 'field:', fieldId);
+        
+        // Strategy 1: Standard Gravity Forms naming convention: input_{form_id}_{field_id}
         var selectors = [
+            'input[name="input_' + formId + '_' + fieldId + '"]',
+            'select[name="input_' + formId + '_' + fieldId + '"]',
+            'textarea[name="input_' + formId + '_' + fieldId + '"]',
             '#input_' + formId + '_' + fieldId,
+            // Strategy 2: Alternative naming patterns
             'input[name="input_' + fieldId + '"]',
             'select[name="input_' + fieldId + '"]',
             'textarea[name="input_' + fieldId + '"]',
-            'input[name="input_' + formId + '_' + fieldId + '"]',
-            // Handle radio buttons and checkboxes
-            'input[name="input_' + fieldId + '"]:checked',
-            'input[name="input_' + formId + '_' + fieldId + '"]:checked'
+            '#input_' + fieldId,
+            // Strategy 3: Handle radio buttons and checkboxes
+            'input[name="input_' + formId + '_' + fieldId + '"]:checked',
+            'input[name="input_' + fieldId + '"]:checked'
         ];
         
         for (var i = 0; i < selectors.length; i++) {
-            var $field = $(selectors[i]);
-            if ($field.length) {
+            var selector = selectors[i];
+            var $field = $(selector);
+            console.log('Trying selector:', selector, 'Found:', $field.length);
+            
+            if ($field.length > 0) {
                 var value = $field.val();
+                console.log('Value from selector:', selector, 'Value:', value);
+                
                 if (value !== '' && value !== null && value !== undefined) {
                     return value;
                 }
             }
         }
         
+        // Strategy 4: Look for any input with a data attribute or class that contains the field ID
+        var $possibleFields = $('input, select, textarea').filter(function() {
+            var name = $(this).attr('name') || '';
+            var id = $(this).attr('id') || '';
+            return name.indexOf('_' + fieldId) > -1 || id.indexOf('_' + fieldId) > -1;
+        });
+        
+        if ($possibleFields.length > 0) {
+            console.log('Found possible fields:', $possibleFields);
+            var value = $possibleFields.first().val();
+            if (value !== '' && value !== null && value !== undefined) {
+                console.log('Using value from possible field:', value);
+                return value;
+            }
+        }
+        
+        console.log('No value found for field:', fieldId);
         return null;
     }
     
@@ -167,8 +171,20 @@ jQuery(document).ready(function($) {
                     var type = $field.attr('type');
                     var value = $field.val();
                     
-                    if (name && name.indexOf('input_') === 0) {
-                        console.log('Field - Name:', name, 'ID:', id, 'Type:', type, 'Value:', value);
+                    console.log('Field - Name:', name, 'ID:', id, 'Type:', type, 'Value:', value);
+                });
+            } else {
+                // Try to find fields without form wrapper
+                console.log('Form wrapper not found, checking all fields on page:');
+                $('input, select, textarea').each(function() {
+                    var $field = $(this);
+                    var name = $field.attr('name') || '';
+                    var id = $field.attr('id') || '';
+                    var type = $field.attr('type');
+                    var value = $field.val();
+                    
+                    if (name.indexOf('input_') === 0 || id.indexOf('input_') === 0) {
+                        console.log('Gravity Field - Name:', name, 'ID:', id, 'Type:', type, 'Value:', value);
                     }
                 });
             }
@@ -183,38 +199,25 @@ jQuery(document).ready(function($) {
             var formId = $(this).attr('id').replace('gform_', '');
             debugFormFields(formId);
         });
+        
+        // Also debug if no forms found
+        setTimeout(function() {
+            if ($('form[id^="gform_"]').length === 0) {
+                console.log('No Gravity Forms found, debugging all form fields:');
+                debugFormFields('unknown');
+            }
+        }, 1000);
     }
-});
-
-/* source: admin-templates */
-jQuery(document).ready(function($) {
-    var mappingIndex = 0;
     
-    $('#add-field-mapping').click(function() {
-        var newMapping = `
-            <div class="field-mapping-row">
-                <label><?php _e('DMN Variable:', 'operaton-dmn'); ?></label>
-                <input type="text" name="field_mappings[${mappingIndex}][dmn_variable]" class="regular-text">
-                
-                <label><?php _e('Form Field ID:', 'operaton-dmn'); ?></label>
-                <input type="text" name="field_mappings[${mappingIndex}][field_id]" class="regular-text">
-                
-                <label><?php _e('Data Type:', 'operaton-dmn'); ?></label>
-                <select name="field_mappings[${mappingIndex}][type]">
-                    <option value="String">String</option>
-                    <option value="Integer">Integer</option>
-                    <option value="Double">Double</option>
-                    <option value="Boolean">Boolean</option>
-                </select>
-                
-                <button type="button" class="button remove-mapping"><?php _e('Remove', 'operaton-dmn'); ?></button>
-            </div>
-        `;
-        $('#field-mappings').append(newMapping);
-        mappingIndex++;
-    });
+    // Add a manual debug function that can be called from browser console
+    window.operatonDebugFields = function(formId) {
+        debugFormFields(formId || 'all');
+    };
     
-    $(document).on('click', '.remove-mapping', function() {
-        $(this).closest('.field-mapping-row').remove();
-    });
+    // Add helper to test field detection
+    window.operatonTestField = function(formId, fieldId) {
+        var value = getGravityFieldValue(formId, fieldId);
+        console.log('Test result for form:', formId, 'field:', fieldId, 'value:', value);
+        return value;
+    };
 });
