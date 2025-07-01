@@ -1,57 +1,299 @@
-/* File: assets/css/admin.css */
+/* assets/css/admin.css */
+
+.operaton-dmn-admin {
+    max-width: 1200px;
+}
+
+.operaton-dmn-admin h1 {
+    margin-bottom: 20px;
+}
+
+/* Configuration List Styles */
+.operaton-configs-table {
+    margin-top: 20px;
+}
+
+.operaton-configs-table th {
+    font-weight: 600;
+    padding: 12px;
+}
+
+.operaton-configs-table td {
+    padding: 12px;
+    vertical-align: middle;
+}
+
+.operaton-configs-table .config-name {
+    font-weight: 600;
+    color: #2271b1;
+}
+
+.operaton-configs-table .endpoint-url {
+    font-family: monospace;
+    font-size: 12px;
+    color: #666;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.operaton-configs-table .actions {
+    white-space: nowrap;
+}
+
+.operaton-configs-table .actions .button {
+    margin-right: 5px;
+}
+
+/* Configuration Form Styles */
+.operaton-config-form {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.operaton-config-section {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e1e1e1;
+}
+
+.operaton-config-section:last-child {
+    border-bottom: none;
+}
+
+.operaton-config-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #23282d;
+}
+
+/* Field Mapping Styles */
+.field-mappings-container {
+    background: #f8f9fa;
+    border: 1px solid #e1e1e1;
+    border-radius: 4px;
+    padding: 20px;
+    margin-top: 15px;
+}
+
 .field-mapping-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 120px auto;
+    gap: 15px;
+    align-items: center;
     margin-bottom: 15px;
     padding: 15px;
+    background: #fff;
     border: 1px solid #ddd;
-    background: #f9f9f9;
     border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.field-mapping-row:last-child {
+    margin-bottom: 0;
+}
+
+.field-mapping-row .form-field {
+    display: flex;
+    flex-direction: column;
 }
 
 .field-mapping-row label {
-    display: inline-block;
-    width: 120px;
-    margin-right: 10px;
-    font-weight: bold;
-    vertical-align: top;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #555;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .field-mapping-row input,
 .field-mapping-row select {
-    margin-right: 15px;
-    margin-bottom: 5px;
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.field-mapping-row input:focus,
+.field-mapping-row select:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: none;
 }
 
 .field-mapping-row .remove-mapping {
-    background: #dc3232;
-    border-color: #dc3232;
-    color: #fff;
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.2s;
 }
 
 .field-mapping-row .remove-mapping:hover {
-    background: #a00;
-    border-color: #a00;
+    background: #c82333;
 }
 
-#field-mappings {
+.add-field-mapping {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background-color 0.2s;
+    margin-top: 15px;
+}
+
+.add-field-mapping:hover {
+    background: #218838;
+}
+
+/* Form Field Styles */
+.operaton-form-field {
     margin-bottom: 20px;
 }
 
-#add-field-mapping {
+.operaton-form-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #23282d;
+}
+
+.operaton-form-field input,
+.operaton-form-field select,
+.operaton-form-field textarea {
+    width: 100%;
+    max-width: 500px;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.operaton-form-field input:focus,
+.operaton-form-field select:focus,
+.operaton-form-field textarea:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: none;
+}
+
+.operaton-form-field .description {
+    margin-top: 5px;
+    font-size: 13px;
+    color: #666;
+    font-style: italic;
+}
+
+.operaton-form-field .example {
+    margin-top: 5px;
+    font-size: 12px;
+    color: #888;
+    font-family: monospace;
+    background: #f1f1f1;
+    padding: 5px 8px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+/* Status and Messages */
+.operaton-status {
+    padding: 10px 15px;
+    border-radius: 4px;
     margin-bottom: 20px;
 }
 
-/* Responsive adjustments */
-@media (max-width: 782px) {
-    .field-mapping-row label {
-        display: block;
-        width: auto;
-        margin-bottom: 5px;
+.operaton-status.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.operaton-status.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.operaton-status.warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .field-mapping-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
     }
     
-    .field-mapping-row input,
-    .field-mapping-row select {
-        width: 100%;
-        margin-right: 0;
-        margin-bottom: 10px;
+    .field-mapping-row .remove-mapping {
+        justify-self: start;
+        width: auto;
     }
+    
+    .operaton-configs-table {
+        font-size: 14px;
+    }
+    
+    .operaton-configs-table th,
+    .operaton-configs-table td {
+        padding: 8px;
+    }
+}
+
+/* Help Text */
+.operaton-help {
+    background: #f0f6fc;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 16px;
+    margin: 20px 0;
+}
+
+.operaton-help h4 {
+    margin-top: 0;
+    color: #0969da;
+}
+
+.operaton-help ul {
+    margin-bottom: 0;
+}
+
+.operaton-help li {
+    margin-bottom: 5px;
+}
+
+/* Loading States */
+.operaton-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.operaton-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #2271b1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
