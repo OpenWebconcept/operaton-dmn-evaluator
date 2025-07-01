@@ -1,7 +1,6 @@
 // assets/js/frontend.js
 jQuery(document).ready(function($) {
     console.log('Operaton DMN frontend script loaded');
-    if ($('.operaton-evaluate-btn').length === 0) return;
     
     // Handle evaluate button clicks
     $(document).on('click', '.operaton-evaluate-btn', function(e) {
