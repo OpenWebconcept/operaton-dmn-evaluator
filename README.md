@@ -2,6 +2,10 @@
 
 A flexible WordPress plugin that integrates Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.
 
+## Change Log
+
+All notable changes to this project will be documented in the [CHANGELOG.md](./CHANGELOG.md).
+
 ## Plugin Structure
 
 ```

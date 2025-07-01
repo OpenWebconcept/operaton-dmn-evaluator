@@ -1,5 +1,6 @@
 <?php
-// templates/admin-form.php - IMPROVED VERSION
+// Updated admin-form.php with separated DMN Endpoint and Decision Key
+
 $editing = isset($config) && $config;
 $field_mappings = $editing ? json_decode($config->field_mappings, true) : array();
 
@@ -73,13 +74,14 @@ if ($editing && $config->form_id) {
                 
                 <tr>
                     <th scope="row">
-                        <label for="dmn_endpoint"><?php _e('DMN Endpoint URL', 'operaton-dmn'); ?> <span class="required">*</span></label>
+                        <label for="dmn_endpoint"><?php _e('DMN Base Endpoint URL', 'operaton-dmn'); ?> <span class="required">*</span></label>
                     </th>
                     <td>
                         <input type="url" name="dmn_endpoint" id="dmn_endpoint" class="regular-text" 
                                value="<?php echo $editing ? esc_attr($config->dmn_endpoint) : ''; ?>" required>
-                        <p class="description"><?php _e('Full URL to your Operaton DMN evaluation endpoint.', 'operaton-dmn'); ?></p>
-                        <p class="description"><strong><?php _e('Example:', 'operaton-dmn'); ?></strong> https://operatondev.open-regels.nl/engine-rest/decision-definition/key/dish/evaluate</p>
+                        <p class="description"><?php _e('Base URL to your Operaton DMN engine (without the decision key).', 'operaton-dmn'); ?></p>
+                        <p class="description"><strong><?php _e('Example:', 'operaton-dmn'); ?></strong> https://operatondev.open-regels.nl/engine-rest/decision-definition/key/</p>
+                        <p class="description"><em><?php _e('The decision key will be automatically appended to create the full evaluation URL.', 'operaton-dmn'); ?></em></p>
                         <button type="button" id="test-endpoint" class="button button-secondary"><?php _e('Test Connection', 'operaton-dmn'); ?></button>
                         <div id="endpoint-test-result"></div>
                     </td>
@@ -92,7 +94,11 @@ if ($editing && $config->form_id) {
                     <td>
                         <input type="text" name="decision_key" id="decision_key" class="regular-text" 
                                value="<?php echo $editing ? esc_attr($config->decision_key) : ''; ?>" required>
-                        <p class="description"><?php _e('The key/ID of your DMN decision table.', 'operaton-dmn'); ?></p>
+                        <p class="description"><?php _e('The key/ID of your DMN decision table (e.g., "dish", "loan-approval").', 'operaton-dmn'); ?></p>
+                        <div id="full-endpoint-preview" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 12px; color: #666; display: none;">
+                            <strong><?php _e('Full Evaluation URL:', 'operaton-dmn'); ?></strong><br>
+                            <span id="preview-url"></span>
+                        </div>
                     </td>
                 </tr>
                 
@@ -103,7 +109,7 @@ if ($editing && $config->form_id) {
                     <td>
                         <input type="text" name="result_field" id="result_field" class="regular-text" 
                                value="<?php echo $editing ? esc_attr($config->result_field) : ''; ?>" required>
-                        <p class="description"><?php _e('The name of the output field from your DMN table (e.g., "desiredDish").', 'operaton-dmn'); ?></p>
+                        <p class="description"><?php _e('The name of the output field from your DMN table (e.g., "desiredDish", "approved").', 'operaton-dmn'); ?></p>
                     </td>
                 </tr>
                 
@@ -167,11 +173,13 @@ if ($editing && $config->form_id) {
         </button>
         
         <div class="operaton-help">
-            <h4><?php _e('Field Mapping Help', 'operaton-dmn'); ?></h4>
+            <h4><?php _e('Configuration Help', 'operaton-dmn'); ?></h4>
             <ul>
-                <li><?php _e('DMN Variable: The variable name as defined in your DMN table', 'operaton-dmn'); ?></li>
-                <li><?php _e('Form Field ID: The numeric ID of the Gravity Forms field (e.g., "1", "2", "3")', 'operaton-dmn'); ?></li>
-                <li><?php _e('Data Type: The expected data type for the DMN evaluation', 'operaton-dmn'); ?></li>
+                <li><strong><?php _e('DMN Base Endpoint:', 'operaton-dmn'); ?></strong> <?php _e('The base URL to your Operaton engine, ending with "/key/"', 'operaton-dmn'); ?></li>
+                <li><strong><?php _e('Decision Key:', 'operaton-dmn'); ?></strong> <?php _e('The specific decision table identifier', 'operaton-dmn'); ?></li>
+                <li><strong><?php _e('DMN Variable:', 'operaton-dmn'); ?></strong> <?php _e('The variable name as defined in your DMN table', 'operaton-dmn'); ?></li>
+                <li><strong><?php _e('Form Field ID:', 'operaton-dmn'); ?></strong> <?php _e('The numeric ID of the Gravity Forms field (e.g., "1", "2", "3")', 'operaton-dmn'); ?></li>
+                <li><strong><?php _e('Data Type:', 'operaton-dmn'); ?></strong> <?php _e('The expected data type for the DMN evaluation', 'operaton-dmn'); ?></li>
             </ul>
         </div>
         
@@ -211,6 +219,7 @@ jQuery(document).ready(function($) {
             </div>
         `;
         $('#field-mappings').append(newMapping);
+        updateEndpointPreview(); // Update preview when adding new mapping
     });
     
     $(document).on('click', '.remove-mapping', function() {
@@ -246,13 +255,49 @@ jQuery(document).ready(function($) {
         }
     });
     
-    // Test endpoint functionality
+    // Update endpoint preview when base URL or decision key changes
+    function updateEndpointPreview() {
+        var baseUrl = $('#dmn_endpoint').val().trim();
+        var decisionKey = $('#decision_key').val().trim();
+        
+        if (baseUrl && decisionKey) {
+            // Ensure base URL ends with /
+            if (!baseUrl.endsWith('/')) {
+                baseUrl += '/';
+            }
+            
+            var fullUrl = baseUrl + decisionKey + '/evaluate';
+            $('#preview-url').text(fullUrl);
+            $('#full-endpoint-preview').show();
+        } else {
+            $('#full-endpoint-preview').hide();
+        }
+    }
+    
+    // Bind preview update to input changes
+    $('#dmn_endpoint, #decision_key').on('input keyup', updateEndpointPreview);
+    
+    // Test endpoint functionality (now builds the full URL)
     $('#test-endpoint').click(function() {
-        var endpoint = $('#dmn_endpoint').val();
-        if (!endpoint) {
-            alert('<?php _e('Please enter an endpoint URL first.', 'operaton-dmn'); ?>');
+        var baseEndpoint = $('#dmn_endpoint').val().trim();
+        var decisionKey = $('#decision_key').val().trim();
+        
+        if (!baseEndpoint) {
+            alert('<?php _e('Please enter a base endpoint URL first.', 'operaton-dmn'); ?>');
             return;
         }
+        
+        if (!decisionKey) {
+            alert('<?php _e('Please enter a decision key first.', 'operaton-dmn'); ?>');
+            return;
+        }
+        
+        // Build full endpoint URL
+        var fullEndpoint = baseEndpoint;
+        if (!fullEndpoint.endsWith('/')) {
+            fullEndpoint += '/';
+        }
+        fullEndpoint += decisionKey + '/evaluate';
         
         var $button = $(this);
         var originalText = $button.text();
@@ -263,7 +308,7 @@ jQuery(document).ready(function($) {
             type: 'POST',
             data: {
                 action: 'operaton_test_endpoint',
-                endpoint: endpoint,
+                endpoint: fullEndpoint,
                 nonce: '<?php echo wp_create_nonce('operaton_test_endpoint'); ?>'
             },
             success: function(response) {
@@ -308,7 +353,20 @@ jQuery(document).ready(function($) {
             e.preventDefault();
             return false;
         }
+        
+        // Validate that base endpoint doesn't include decision key
+        var baseUrl = $('#dmn_endpoint').val().trim();
+        var decisionKey = $('#decision_key').val().trim();
+        
+        if (baseUrl.includes(decisionKey)) {
+            alert('<?php _e('The base endpoint URL should not include the decision key. Please remove the decision key from the URL.', 'operaton-dmn'); ?>');
+            e.preventDefault();
+            return false;
+        }
     });
+    
+    // Initialize preview on page load
+    updateEndpointPreview();
     
     // Trigger form selection change if editing
     <?php if ($editing && $config->form_id): ?>
@@ -356,5 +414,9 @@ jQuery(document).ready(function($) {
 #endpoint-test-result .notice {
     margin: 0;
     padding: 8px 12px;
+}
+
+#full-endpoint-preview {
+    word-break: break-all;
 }
 </style>
