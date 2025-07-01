@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Operaton DMN Evaluator
  * Description: Gravity Forms integration with Operaton DMN Engine
- * Version: 1.0.0
- * Author: Your Name
+ * Version: 1.0.0-beta.1
+ * Author: Steven Gort
  * Text Domain: operaton-dmn
  * Domain Path: /languages
  */
@@ -14,10 +14,10 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('OPERATON_DMN_VERSION', '1.0.0');
+define('OPERATON_DMN_VERSION', '1.0.0-beta.1');
 define('OPERATON_DMN_PLUGIN_FILE', __FILE__);
 define('OPERATON_DMN_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(`https://git.open-regels.nl/showcases/operaton-dmn-evaluator`));
 define('OPERATON_DMN_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
 /**
