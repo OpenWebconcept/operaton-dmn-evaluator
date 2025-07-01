@@ -259,7 +259,7 @@ class OperatonDMNEvaluator {
         if ($config) {
             $evaluate_button = '<input type="button" id="operaton-evaluate-' . $form['id'] . '" value="' . esc_attr($config->button_text) . '" class="gform_button button operaton-evaluate-btn" data-form-id="' . $form['id'] . '" data-config-id="' . $config->id . '" style="margin-left: 10px;">';
             $button .= $evaluate_button;
-            $button .= '<div id="operaton-result-' . $form['id'] . '" class="operaton-result" style="margin-top: 20px; padding: 15px; border: 1px solid #ddd; background: #f9f9f9; display: none;"><h4>' . __('Result:', 'operaton-dmn') . '</h4><div class="result-content"></div></div>';
+            $button .= '<div class="gfield"><div id="operaton-result-' . $form['id'] . '" class="ginput_container operaton-result gfield"> <h4>' . __('Result:', 'operaton-dmn') . '</h4><div class="result-content"></div></div></div>';
         }
         return $button;
     }

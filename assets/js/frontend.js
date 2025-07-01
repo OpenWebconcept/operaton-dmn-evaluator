@@ -79,7 +79,7 @@ jQuery(document).ready(function($) {
                 console.log('AJAX success:', response);
                 if (response.success && response.result) {
                     $('#operaton-result-' + formId + ' .result-content').html('<strong>' + response.result + '</strong>');
-                    $('#operaton-result-' + formId).slideDown();
+                    $('#operaton-result-' + formId).fadeIn(200);
                 } else {
                     alert('No result received from evaluation.');
                 }

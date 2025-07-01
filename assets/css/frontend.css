@@ -1,10 +1,21 @@
-.operaton-evaluate-btn {
-    display: inline-block;
-    margin-bottom: 12px;
-}
-
+/* Ensure the result is styled like a Gravity Forms field */
 .operaton-result {
     display: block;
-    margin-top: 10px;
-    clear: both;
+    margin-top: 16px;
+    padding: 16px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.operaton-result h4 {
+    margin-top: 0;
+    font-size: 1.1em;
+    color: #333;
+}
+
+.operaton-result .result-content {
+    margin-top: 8px;
+    font-weight: bold;
+    color: #222;
 }
