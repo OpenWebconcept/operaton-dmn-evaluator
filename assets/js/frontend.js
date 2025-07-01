@@ -1,6 +1,9 @@
-// assets/js/frontend.js - IMPROVED VERSION
+// assets/js/frontend.js - FIXED VERSION for WordPress jQuery no-conflict mode
+console.log('Operaton DMN frontend script loading...');
+
+// Use jQuery instead of $ to handle WordPress no-conflict mode
 jQuery(document).ready(function($) {
-    console.log('Operaton DMN frontend script loaded');
+    console.log('Operaton DMN frontend script loaded with jQuery no-conflict wrapper');
     
     // Wait for Gravity Forms to fully initialize
     var initOperatonDMN = function() {
@@ -35,14 +38,19 @@ jQuery(document).ready(function($) {
     function bindEvaluationEvents(formId) {
         var selector = '.operaton-evaluate-btn[data-form-id="' + formId + '"]';
         
+        console.log('Binding events for selector:', selector);
+        
         // Remove existing handlers to prevent duplicates
         $(document).off('click', selector);
         
         // Bind new handler
         $(document).on('click', selector, function(e) {
             e.preventDefault();
+            console.log('Button clicked!', this);
             handleEvaluateClick($(this));
         });
+        
+        console.log('Event handler bound for form:', formId);
     }
     
     // Handle evaluate button clicks
@@ -394,11 +402,20 @@ jQuery(document).ready(function($) {
     }
     
     // Initialize the plugin
+    console.log('Initializing Operaton DMN...');
     initOperatonDMN();
+    
+    // Also bind events immediately for any existing forms
+    $('form[id^="gform_"]').each(function() {
+        var formId = $(this).attr('id').replace('gform_', '');
+        initializeFormEvaluation(formId);
+    });
     
     // Re-initialize when forms are dynamically loaded (AJAX forms)
     $(document).on('gform_post_render', function(event, formId, currentPage) {
         console.log('Form re-rendered:', formId, 'page:', currentPage);
         initializeFormEvaluation(formId);
     });
+    
+    console.log('Operaton DMN frontend script initialization complete');
 });
