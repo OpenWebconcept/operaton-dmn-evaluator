@@ -14,6 +14,8 @@ All notable changes to this project will be documented in this file.
 - Enhanced validation to prevent URL mistakes
 - Real-time preview of full evaluation URL
 
+![Separated URL Construction](assets/images/New-Config-URL.png)
+
 ### Enhanced Validation:
 
 - Checks that decision key isn't already in base URL
