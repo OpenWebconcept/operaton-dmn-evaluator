@@ -96,15 +96,15 @@ $field_mappings = $editing ? json_decode($config->field_mappings, true) : array(
                 <?php foreach ($field_mappings as $dmn_var => $mapping): ?>
                     <div class="field-mapping-row">
                         <label><?php _e('DMN Variable:', 'operaton-dmn'); ?></label>
-                        <input type="text" name="field_mappings[<?php echo esc_attr($dmn_var); ?>][dmn_variable]" 
-                               value="<?php echo esc_attr($dmn_var); ?>" class="regular-text">
+                        <input type="text" name="field_mappings_dmn_variable[]" 
+                               value="<?php echo esc_attr($dmn_var); ?>" class="regular-text dmn-variable-input">
                         
                         <label><?php _e('Form Field ID:', 'operaton-dmn'); ?></label>
-                        <input type="text" name="field_mappings[<?php echo esc_attr($dmn_var); ?>][field_id]" 
+                        <input type="text" name="field_mappings_field_id[]" 
                                value="<?php echo esc_attr($mapping['field_id']); ?>" class="regular-text">
                         
                         <label><?php _e('Data Type:', 'operaton-dmn'); ?></label>
-                        <select name="field_mappings[<?php echo esc_attr($dmn_var); ?>][type]">
+                        <select name="field_mappings_type[]">
                             <option value="String" <?php selected($mapping['type'], 'String'); ?>>String</option>
                             <option value="Integer" <?php selected($mapping['type'], 'Integer'); ?>>Integer</option>
                             <option value="Double" <?php selected($mapping['type'], 'Double'); ?>>Double</option>
@@ -127,19 +127,17 @@ $field_mappings = $editing ? json_decode($config->field_mappings, true) : array(
 
 <script>
 jQuery(document).ready(function($) {
-    var mappingIndex = 0;
-    
     $('#add-field-mapping').click(function() {
         var newMapping = `
             <div class="field-mapping-row">
                 <label><?php _e('DMN Variable:', 'operaton-dmn'); ?></label>
-                <input type="text" name="field_mappings[${mappingIndex}][dmn_variable]" class="regular-text">
+                <input type="text" name="field_mappings_dmn_variable[]" class="regular-text dmn-variable-input">
                 
                 <label><?php _e('Form Field ID:', 'operaton-dmn'); ?></label>
-                <input type="text" name="field_mappings[${mappingIndex}][field_id]" class="regular-text">
+                <input type="text" name="field_mappings_field_id[]" class="regular-text">
                 
                 <label><?php _e('Data Type:', 'operaton-dmn'); ?></label>
-                <select name="field_mappings[${mappingIndex}][type]">
+                <select name="field_mappings_type[]">
                     <option value="String">String</option>
                     <option value="Integer">Integer</option>
                     <option value="Double">Double</option>
@@ -150,7 +148,6 @@ jQuery(document).ready(function($) {
             </div>
         `;
         $('#field-mappings').append(newMapping);
-        mappingIndex++;
     });
     
     $(document).on('click', '.remove-mapping', function() {

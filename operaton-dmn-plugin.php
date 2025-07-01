@@ -143,32 +143,50 @@ class OperatonDMNEvaluator {
         return $forms;
     }
     
-    private function save_configuration($data) {
-        global $wpdb;
+private function save_configuration($data) {
+    global $wpdb;
+    
+    $table_name = $wpdb->prefix . 'operaton_dmn_configs';
+    
+    // Process field mappings with proper structure
+    $field_mappings = array();
+    
+    if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
+        $dmn_variables = $data['field_mappings_dmn_variable'];
+        $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
+        $types = isset($data['field_mappings_type']) ? $data['field_mappings_type'] : array();
         
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        
-        $config_data = array(
-            'name' => sanitize_text_field($data['name']),
-            'form_id' => intval($data['form_id']),
-            'dmn_endpoint' => esc_url_raw($data['dmn_endpoint']),
-            'decision_key' => sanitize_text_field($data['decision_key']),
-            'field_mappings' => wp_json_encode($data['field_mappings']),
-            'result_field' => sanitize_text_field($data['result_field']),
-            'button_text' => sanitize_text_field($data['button_text'])
-        );
-        
-        if (isset($data['config_id']) && !empty($data['config_id'])) {
-            $wpdb->update($table_name, $config_data, array('id' => intval($data['config_id'])));
-            $message = __('Configuration updated successfully!', 'operaton-dmn');
-        } else {
-            $wpdb->insert($table_name, $config_data);
-            $message = __('Configuration saved successfully!', 'operaton-dmn');
+        for ($i = 0; $i < count($dmn_variables); $i++) {
+            $dmn_var = sanitize_text_field($dmn_variables[$i]);
+            if (!empty($dmn_var)) {
+                $field_mappings[$dmn_var] = array(
+                    'field_id' => isset($field_ids[$i]) ? sanitize_text_field($field_ids[$i]) : '',
+                    'type' => isset($types[$i]) ? sanitize_text_field($types[$i]) : 'String'
+                );
+            }
         }
-        
-        echo '<div class="notice notice-success"><p>' . $message . '</p></div>';
     }
     
+    $config_data = array(
+        'name' => sanitize_text_field($data['name']),
+        'form_id' => intval($data['form_id']),
+        'dmn_endpoint' => esc_url_raw($data['dmn_endpoint']),
+        'decision_key' => sanitize_text_field($data['decision_key']),
+        'field_mappings' => wp_json_encode($field_mappings),
+        'result_field' => sanitize_text_field($data['result_field']),
+        'button_text' => sanitize_text_field($data['button_text'])
+    );
+    
+    if (isset($data['config_id']) && !empty($data['config_id'])) {
+        $wpdb->update($table_name, $config_data, array('id' => intval($data['config_id'])));
+        $message = __('Configuration updated successfully!', 'operaton-dmn');
+    } else {
+        $wpdb->insert($table_name, $config_data);
+        $message = __('Configuration saved successfully!', 'operaton-dmn');
+    }
+    
+    echo '<div class="notice notice-success"><p>' . $message . '</p></div>';
+}    
     private function get_all_configurations() {
         global $wpdb;
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
