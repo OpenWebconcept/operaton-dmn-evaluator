@@ -65,7 +65,7 @@ Map your Gravity Form fields to DMN variables:
 - **Form Field ID:** The Gravity Forms field ID (e.g., `1`, `3`)
 - **Data Type:** Choose the appropriate data type (String, Integer, Double, Boolean)
 
-![Configure Field Mappings](assets/images/plugin-Config-Bottom.png)
+![Configure Field Mappings](assets/images/plugin-Config-Top.png)
 
 ### 3. Test Your Configuration
 
@@ -171,11 +171,3 @@ Live example url: https://owc-gemeente.open-regels.nl/operaton-dmn-evaluator-2/
 - Nonce verification for AJAX requests
 - Capability checks for admin functions
 - Escaped output to prevent XSS
-
-## License
-
-GPL v2 or later
-
-## Support
-
-For issues and feature requests, please contact your development team or check the plugin documentation.
