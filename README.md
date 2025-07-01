@@ -1,5 +1,3 @@
-# Operaton DMN Evaluator
-
 # Operaton DMN WordPress Plugin
 
 A flexible WordPress plugin that integrates Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.
