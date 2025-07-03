@@ -7,7 +7,9 @@
  * Author: Steven Gort
  * License: EU PL v1.2
  * Text Domain: operaton-dmn
+ * Update URI: https://git.open-regels.nl/showcases/operaton-dmn-evaluator
  */
+
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -18,6 +20,9 @@ if (!defined('ABSPATH')) {
 define('OPERATON_DMN_VERSION', '1.0.0-beta.3');
 define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('OPERATON_DMN_PLUGIN_PATH', plugin_dir_path(__FILE__));
+
+// Initialize the update checker
+require_once OPERATON_DMN_PLUGIN_PATH . 'includes/plugin-updater.php';
 
 /**
  * Main plugin class
@@ -1095,6 +1100,31 @@ class OperatonDMNEvaluator {
         // This could clean up old logs, temporary data, etc.
         // For now, just clear cache
         $this->clear_config_cache();
+    }
+    
+    // Add version check for database migrations
+    public function check_version() {
+        $installed_version = get_option('operaton_dmn_version', '1.0.0-beta.1');
+        
+        if (version_compare($installed_version, OPERATON_DMN_VERSION, '<')) {
+            // Run any necessary upgrades
+            $this->upgrade_database($installed_version);
+            
+            // Update stored version
+            update_option('operaton_dmn_version', OPERATON_DMN_VERSION);
+        }
+    }
+    
+    /**
+     * Handle database upgrades between versions
+     */
+    private function upgrade_database($from_version) {
+        // Add any database schema changes here for future versions
+        
+        if (version_compare($from_version, '1.0.0-beta.3', '<')) {
+            // Any upgrade logic for beta.3
+            error_log('Operaton DMN: Upgraded to version ' . OPERATON_DMN_VERSION);
+        }
     }
 }
 
