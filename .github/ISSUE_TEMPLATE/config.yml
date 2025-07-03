@@ -1,0 +1,20 @@
+# File: .github/ISSUE_TEMPLATE/config.yml
+# This creates a custom issue template configuration that redirects users
+
+blank_issues_enabled: false
+contact_links:
+  - name: 🚀 Report a Bug or Request a Feature
+    url: https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/new
+    about: Please create issues on our primary GitLab repository where active development happens.
+  
+  - name: 📖 Documentation & Wiki
+    url: https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/wikis/home
+    about: Check our GitLab wiki for documentation and setup guides.
+    
+  - name: 🔧 GitLab Repository (Primary)
+    url: https://git.open-regels.nl/showcases/operaton-dmn-evaluator
+    about: Main development repository with latest code, releases, and active development.
+    
+  - name: 💬 Community Discussion
+    url: https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues
+    about: Join discussions and see what's being worked on in our GitLab issues.
