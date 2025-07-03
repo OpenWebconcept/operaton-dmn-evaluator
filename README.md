@@ -1,15 +1,34 @@
-# Operaton DMN WordPress Plugin
+# Operaton DMN Evaluator
 
 A flexible WordPress plugin that integrates Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.
 
-## Repositories
+## 📍 Repository Information
 
-- **Primary Development**: [GitLab](https://git.open-regels.nl/showcases/operaton-dmn-evaluator) 
-- **Public Mirror**: [GitHub](https://github.com/OpenWebconcept/operaton-dmn-evaluator)
+### Primary Development Repository
+🚀 **Active development happens on GitLab**: [git.open-regels.nl/showcases/operaton-dmn-evaluator](https://git.open-regels.nl/showcases/operaton-dmn-evaluator)
 
-> **Note**: Active development happens on GitLab. GitHub is a read-only mirror for visibility within the OpenWebConcept ecosystem.
->
-> ![OWC logo](./assets/images/OWC-logo.jpg)
+### Public Mirror
+📋 **GitHub mirror for visibility**: [github.com/OpenWebconcept/operaton-dmn-evaluator](https://github.com/OpenWebconcept/operaton-dmn-evaluator)
+
+### Where to Go for:
+
+| Need | Location | Link |
+|------|----------|------|
+| 🐛 **Report Bugs** | GitLab Issues | [Create Issue](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/new) |
+| ✨ **Feature Requests** | GitLab Issues | [Create Issue](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/new) |
+| 💾 **Latest Releases** | GitLab Releases | [View Releases](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/releases) |
+| 📖 **Documentation** | GitLab Wiki | [Read Docs](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/wikis/home) |
+| 🔄 **Auto-Updates** | Configured via GitLab | [Release System](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/releases) |
+
+> **Note**: Active development happens on GitLab. GitHub is a read-only mirror for visibility within the OpenWebconcept ecosystem.
+
+## About OpenWebconcept
+
+This plugin is part of the [OpenWebconcept](https://github.com/OpenWebconcept) ecosystem - a collection of WordPress building blocks for government and public sector websites.
+
+![OWC logo](./assets/images/OWC-logo.jpg)
+
+---
 
 ## Change Log
 
