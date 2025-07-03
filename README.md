@@ -2,6 +2,15 @@
 
 A flexible WordPress plugin that integrates Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.
 
+> During development phase and Until further notice the source code is offered in 2 places.
+> ```
+> $ git remote -v
+> > origin  https://git.open-regels.nl/showcases/operaton-dmn-evaluator.git (push)
+> owc     https://github.com/OpenWebconcept/operaton-dmn-evaluator.git (push)
+> ```
+> The V1.0.0 release will be hosted on [github](https://github.com/OpenWebconcept/operaton-dmn-evaluator) Open Web Concept.<br>
+> </br>
+
 ## Change Log
 
 All notable changes to this project will be documented in the [CHANGELOG.md](./CHANGELOG.md).
