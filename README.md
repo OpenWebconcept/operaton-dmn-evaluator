@@ -7,8 +7,8 @@ A flexible WordPress plugin that integrates Gravity Forms with Operaton DMN deci
 - **Primary Development**: [GitLab](https://git.open-regels.nl/showcases/operaton-dmn-evaluator) 
 - **Public Mirror**: [GitHub](https://github.com/OpenWebconcept/operaton-dmn-evaluator)
 
-> **Note**: Active development happens on GitLab. GitHub is a read-only mirror for visibility within the OpenWebConcept ecosystem.
-> ![OWC logo](./assets/images/OWC-logo.jpg)
+> **Note**: Active development happens on GitLab. GitHub is a read-only mirror for visibility within the OpenWebConcept ecosystem.<br>
+> </br>![OWC logo](./assets/images/OWC-logo.jpg)
 
 ## Change Log
 
