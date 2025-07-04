@@ -20,56 +20,58 @@ if (is_admin() || wp_doing_cron()) {
         // Include the update checker library
         require_once $update_checker_path;
         
-        use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
-        
-        try {
-            // Initialize the update checker
-            $operatonUpdateChecker = PucFactory::buildUpdateChecker(
-                'https://git.open-regels.nl/showcases/operaton-dmn-evaluator',
-                OPERATON_DMN_PLUGIN_PATH . 'operaton-dmn-plugin.php', // Adjust filename if different
-                'operaton-dmn-evaluator'
-            );
+        // Check if the class exists before using it
+        if (class_exists('YahnisElsts\PluginUpdateChecker\v5\PucFactory')) {
             
-            // Set the branch for beta releases (optional)
-            // $operatonUpdateChecker->setBranch('main');
-            
-            // Add authentication if your repository is private (optional)
-            // $operatonUpdateChecker->setAuthentication('your-token-here');
-            
-            // Customize the update checker
-            $operatonUpdateChecker->addFilter('request_info_result', function($pluginInfo, $result) {
-                // Add custom plugin information
-                if ($pluginInfo) {
-                    $pluginInfo->short_description = 'WordPress plugin to integrate Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.';
-                    $pluginInfo->author = 'Steven Gort';
-                    $pluginInfo->homepage = 'https://git.open-regels.nl/showcases/operaton-dmn-evaluator';
-                    $pluginInfo->requires = '5.0';
-                    $pluginInfo->tested = '6.4';
-                    $pluginInfo->requires_php = '7.4';
-                }
-                return $pluginInfo;
-            });
-            
-            // Add filter to modify the update notification
-            $operatonUpdateChecker->addFilter('request_info_query_args', function($queryArgs) {
-                // Add any custom query arguments for the update check
-                $queryArgs['installed_version'] = OPERATON_DMN_VERSION;
-                return $queryArgs;
-            });
-            
-            // Log update checks (for debugging)
-            if (defined('WP_DEBUG') && WP_DEBUG) {
+            try {
+                // Initialize the update checker
+                $operatonUpdateChecker = YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+                    'https://git.open-regels.nl/showcases/operaton-dmn-evaluator',
+                    OPERATON_DMN_PLUGIN_PATH . 'operaton-dmn-plugin.php',
+                    'operaton-dmn-evaluator'
+                );
+                
+                // Customize the update checker
                 $operatonUpdateChecker->addFilter('request_info_result', function($pluginInfo, $result) {
-                    if ($pluginInfo && isset($pluginInfo->version)) {
-                        error_log('Operaton DMN: Update check - Remote version: ' . $pluginInfo->version . ', Local version: ' . OPERATON_DMN_VERSION);
+                    // Add custom plugin information
+                    if ($pluginInfo) {
+                        $pluginInfo->short_description = 'WordPress plugin to integrate Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.';
+                        $pluginInfo->author = 'Steven Gort';
+                        $pluginInfo->homepage = 'https://git.open-regels.nl/showcases/operaton-dmn-evaluator';
+                        $pluginInfo->requires = '5.0';
+                        $pluginInfo->tested = '6.4';
+                        $pluginInfo->requires_php = '7.4';
                     }
                     return $pluginInfo;
                 });
+                
+                // Add filter to modify the update notification
+                $operatonUpdateChecker->addFilter('request_info_query_args', function($queryArgs) {
+                    // Add any custom query arguments for the update check
+                    $queryArgs['installed_version'] = OPERATON_DMN_VERSION;
+                    return $queryArgs;
+                });
+                
+                // Log update checks (for debugging)
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    $operatonUpdateChecker->addFilter('request_info_result', function($pluginInfo, $result) {
+                        if ($pluginInfo && isset($pluginInfo->version)) {
+                            error_log('Operaton DMN: Update check - Remote version: ' . $pluginInfo->version . ', Local version: ' . OPERATON_DMN_VERSION);
+                        }
+                        return $pluginInfo;
+                    });
+                }
+                
+            } catch (Exception $e) {
+                // Log error if update checker fails to initialize
+                error_log('Operaton DMN: Update checker failed to initialize: ' . $e->getMessage());
             }
             
-        } catch (Exception $e) {
-            // Log error if update checker fails to initialize
-            error_log('Operaton DMN: Update checker failed to initialize: ' . $e->getMessage());
+        } else {
+            // Log error if class doesn't exist
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: PucFactory class not found after including update checker library');
+            }
         }
         
     } else {
