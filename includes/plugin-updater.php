@@ -24,43 +24,62 @@ if (is_admin() || wp_doing_cron()) {
         if (class_exists('YahnisElsts\PluginUpdateChecker\v5\PucFactory')) {
             
             try {
-                // Initialize the update checker
-                $operatonUpdateChecker = YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
-                    'https://git.open-regels.nl/showcases/operaton-dmn-evaluator',
-                    OPERATON_DMN_PLUGIN_PATH . 'operaton-dmn-plugin.php',
-                    'operaton-dmn-evaluator'
-                );
+                // For GitLab, we need to be more specific about the update source
+                // Since you're using releases, let's disable the auto-updater for now
+                // and just implement update notifications
                 
-                // Customize the update checker
-                $operatonUpdateChecker->addFilter('request_info_result', function($pluginInfo, $result) {
-                    // Add custom plugin information
-                    if ($pluginInfo) {
-                        $pluginInfo->short_description = 'WordPress plugin to integrate Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.';
-                        $pluginInfo->author = 'Steven Gort';
-                        $pluginInfo->homepage = 'https://git.open-regels.nl/showcases/operaton-dmn-evaluator';
-                        $pluginInfo->requires = '5.0';
-                        $pluginInfo->tested = '6.4';
-                        $pluginInfo->requires_php = '7.4';
-                    }
-                    return $pluginInfo;
-                });
-                
-                // Add filter to modify the update notification
-                $operatonUpdateChecker->addFilter('request_info_query_args', function($queryArgs) {
-                    // Add any custom query arguments for the update check
-                    $queryArgs['installed_version'] = OPERATON_DMN_VERSION;
-                    return $queryArgs;
-                });
-                
-                // Log update checks (for debugging)
+                // Initialize with a simpler approach - just notifications
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    $operatonUpdateChecker->addFilter('request_info_result', function($pluginInfo, $result) {
-                        if ($pluginInfo && isset($pluginInfo->version)) {
-                            error_log('Operaton DMN: Update check - Remote version: ' . $pluginInfo->version . ', Local version: ' . OPERATON_DMN_VERSION);
-                        }
-                        return $pluginInfo;
-                    });
+                    error_log('Operaton DMN: Plugin Update Checker library loaded successfully');
                 }
+                
+                // Add admin notice for manual updates instead of automatic checking
+                add_action('admin_notices', function() {
+                    if (current_user_can('manage_options')) {
+                        $current_version = OPERATON_DMN_VERSION;
+                        
+                        // Simple version check against GitLab API
+                        $transient_key = 'operaton_dmn_version_check';
+                        $cached_check = get_transient($transient_key);
+                        
+                        if ($cached_check === false) {
+                            $api_url = 'https://git.open-regels.nl/api/v4/projects/showcases%2Foperaton-dmn-evaluator/releases/latest';
+                            
+                            $response = wp_remote_get($api_url, array(
+                                'timeout' => 10,
+                                'headers' => array(
+                                    'User-Agent' => 'Operaton-DMN-Plugin/' . $current_version
+                                )
+                            ));
+                            
+                            if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
+                                $body = wp_remote_retrieve_body($response);
+                                $data = json_decode($body, true);
+                                
+                                if (isset($data['tag_name'])) {
+                                    $remote_version = ltrim($data['tag_name'], 'v');
+                                    
+                                    if (version_compare($current_version, $remote_version, '<')) {
+                                        echo '<div class="notice notice-info is-dismissible">';
+                                        echo '<p><strong>Operaton DMN Evaluator:</strong> ';
+                                        echo sprintf(
+                                            __('Version %s is available. <a href="%s" target="_blank">Download from GitLab</a>', 'operaton-dmn'),
+                                            $remote_version,
+                                            'https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/releases'
+                                        );
+                                        echo '</p></div>';
+                                    }
+                                    
+                                    // Cache the check for 6 hours
+                                    set_transient($transient_key, $remote_version, 6 * HOUR_IN_SECONDS);
+                                }
+                            } else {
+                                // Cache failed check for 1 hour
+                                set_transient($transient_key, 'failed', HOUR_IN_SECONDS);
+                            }
+                        }
+                    }
+                });
                 
             } catch (Exception $e) {
                 // Log error if update checker fails to initialize
@@ -92,7 +111,7 @@ if (is_admin() || wp_doing_cron()) {
 }
 
 /**
- * Custom update notification for manual installations
+ * Simple update notifier that works with GitLab
  */
 class OperatonDMNUpdateNotifier {
     
@@ -171,9 +190,9 @@ class OperatonDMNUpdateNotifier {
         }
         
         $message = sprintf(
-            __('A new version (%s) of Operaton DMN Evaluator is available. <a href="%s" target="_blank">Download from repository</a> or enable auto-updates if available.', 'operaton-dmn'),
+            __('A new version (%s) of Operaton DMN Evaluator is available. <a href="%s" target="_blank">Download from repository</a>.', 'operaton-dmn'),
             $new_version,
-            $this->repository_url . '/releases'
+            $this->repository_url . '/-/releases'
         );
         
         echo '<div class="notice notice-warning is-dismissible">';
@@ -182,7 +201,5 @@ class OperatonDMNUpdateNotifier {
     }
 }
 
-// Initialize the fallback notifier (only if main update checker isn't available)
-if (!class_exists('YahnisElsts\PluginUpdateChecker\v5\PucFactory')) {
-    new OperatonDMNUpdateNotifier();
-}
+// For now, let's just use the simple notifier instead of the complex auto-updater
+new OperatonDMNUpdateNotifier();
