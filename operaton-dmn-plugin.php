@@ -3,13 +3,12 @@
  * Plugin Name: Operaton DMN Evaluator
  * Plugin URI: https://git.open-regels.nl/showcases/operaton-dmn-evaluator
  * Description: WordPress plugin to integrate Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.
- * Version: 1.0.0-beta.6-test
+ * Version: 1.0.0-beta.4-test
  * Author: Steven Gort
  * License: EU PL v1.2
  * Text Domain: operaton-dmn
  * Update URI: https://git.open-regels.nl/showcases/operaton-dmn-evaluator
  */
-
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -17,18 +16,18 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('OPERATON_DMN_VERSION', '1.0.0-beta.6-test');
+define('OPERATON_DMN_VERSION', '1.0.0-beta.4-test');
 define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('OPERATON_DMN_PLUGIN_PATH', plugin_dir_path(__FILE__));
 
-// Initialize the update checker - FIXED VERSION
+// Initialize the update checker - CLEAN VERSION
 if (is_admin()) {
     // Only load auto-updater in admin context
     $updater_file = OPERATON_DMN_PLUGIN_PATH . 'includes/plugin-updater.php';
     
     if (file_exists($updater_file)) {
         require_once $updater_file;
-    
+        
         // IMPORTANT: Initialize with the MAIN plugin file, not the updater file
         new OperatonDMNAutoUpdater(__FILE__, OPERATON_DMN_VERSION);
         
@@ -76,7 +75,6 @@ if (is_admin()) {
             error_log('Operaton DMN: Debug file NOT found at: ' . $debug_file);
         }
     }
-
 }
 
 /**
