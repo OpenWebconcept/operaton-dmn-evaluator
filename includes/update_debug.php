@@ -2,7 +2,7 @@
 /**
  * Operaton DMN Auto-Update Debug and Test Script
  * 
- * Add this as a temporary admin page to test your auto-update functionality
+ * This file provides debugging tools for the auto-update functionality
  * File: includes/update-debug.php
  */
 
