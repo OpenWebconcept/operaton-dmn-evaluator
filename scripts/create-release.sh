@@ -7,10 +7,10 @@ set -e
 # Configuration
 PLUGIN_NAME="operaton-dmn-evaluator"
 VERSION="$1"
-BUILD_DIR="./build"
-RELEASE_DIR="$BUILD_DIR/release"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+BUILD_DIR="$PROJECT_ROOT/build"
+RELEASE_DIR="$BUILD_DIR/release"
 
 # Check if version is provided
 if [ -z "$VERSION" ]; then
@@ -139,8 +139,7 @@ elif command -v tar &> /dev/null; then
     if command -v python3 &> /dev/null; then
         echo "Python available - attempting to create ZIP version as well..."
         
-        # Save current directory and go to build dir
-        CURRENT_DIR=$(pwd)
+        # Go to build dir using absolute path
         cd "$BUILD_DIR"
         
         # Check if we can actually access the tar file
@@ -186,8 +185,8 @@ except Exception as e:
             echo "⚠ Could not find tar file for Python conversion"
         fi
         
-        # Return to original directory
-        cd "$CURRENT_DIR"
+        # Return to release directory
+        cd "$RELEASE_DIR"
     else
         echo "⚠ Python not available (tar.gz is fine for manual deployment)"
     fi
