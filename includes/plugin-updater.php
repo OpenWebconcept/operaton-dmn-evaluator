@@ -109,7 +109,7 @@ class OperatonDMNAutoUpdater {
                     'new_version' => $new_version,
                     'tested' => get_bloginfo('version'),
                     'package' => $this->get_download_url($remote_version),
-                    'url' => $this->gitlab_url . '/' . $this->gitlab_project_id,
+                    'url' => 'https://git.open-regels.nl/showcases/operaton-dmn-evaluator',
                 );
                 
                 if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -141,9 +141,9 @@ class OperatonDMNAutoUpdater {
                         'tested' => get_bloginfo('version'),
                         'requires' => '5.0',
                         'author' => 'Steven Gort',
-                        'author_profile' => $this->gitlab_url . '/' . $this->gitlab_project_id,
+                        'author_profile' => 'https://git.open-regels.nl/showcases/operaton-dmn-evaluator',
                         'donate_link' => '',
-                        'homepage' => $this->gitlab_url . '/' . $this->gitlab_project_id,
+                        'homepage' => 'https://git.open-regels.nl/showcases/operaton-dmn-evaluator',
                         'download_link' => $this->get_download_url($remote_version),
                         'trunk' => $this->get_download_url($remote_version),
                         'requires_php' => '7.4',
