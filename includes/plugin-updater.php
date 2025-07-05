@@ -217,23 +217,6 @@ public function request() {
 }
 
 /**
- * Initialize the auto-updater
- */
-if (is_admin()) {
-    $auto_updater = new OperatonDMNAutoUpdater(__FILE__, OPERATON_DMN_VERSION);
-    
-    // Add admin action to clear update cache
-    add_action('wp_ajax_operaton_clear_update_cache', function() {
-        if (current_user_can('manage_options')) {
-            $auto_updater = new OperatonDMNAutoUpdater(__FILE__, OPERATON_DMN_VERSION);
-            $auto_updater->clear_cache();
-            wp_send_json_success(array('message' => 'Update cache cleared'));
-        }
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
-    });
-}
-
-/**
  * Fallback update notification system
  */
 class OperatonDMNUpdateNotifier {

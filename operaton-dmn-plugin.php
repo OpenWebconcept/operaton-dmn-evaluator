@@ -28,10 +28,15 @@ if (is_admin()) {
     
     if (file_exists($updater_file)) {
         require_once $updater_file;
+    
+        // IMPORTANT: Initialize with the MAIN plugin file, not the updater file
+        new OperatonDMNAutoUpdater(__FILE__, OPERATON_DMN_VERSION);
         
         // Log successful loading if debug is enabled
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN: Auto-updater loaded successfully');
+            error_log('Operaton DMN: Plugin file for updater: ' . __FILE__);
+            error_log('Operaton DMN: Plugin basename: ' . plugin_basename(__FILE__));
         }
         
         // Add debug information to admin
