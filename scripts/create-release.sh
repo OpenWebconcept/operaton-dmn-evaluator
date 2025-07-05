@@ -127,17 +127,25 @@ if command -v zip &> /dev/null; then
     ARCHIVE_PATH="$BUILD_DIR/$ARCHIVE_NAME"
     ARCHIVE_CREATED=true
 elif command -v tar &> /dev/null; then
-    # Create tar.gz first
+    # Create tar.gz
     TAR_NAME="$PLUGIN_NAME-$VERSION.tar.gz"
     echo "Zip not available, creating tar.gz: $TAR_NAME"
     tar --exclude="*.DS_Store*" --exclude="*__MACOSX*" --exclude="*.git*" -czf "../$TAR_NAME" "$PLUGIN_NAME/"
+    ARCHIVE_PATH="$BUILD_DIR/$TAR_NAME"
+    ARCHIVE_NAME="$TAR_NAME"
+    ARCHIVE_CREATED=true
     
-    # Try to convert tar.gz to zip using Python (if available)
+    # Try to convert tar.gz to zip using Python (if available) - OPTIONAL
     if command -v python3 &> /dev/null; then
-        echo "Attempting to convert tar.gz to zip using Python..."
+        echo "Python available - attempting to create ZIP version as well..."
+        
+        # Save current directory and go to build dir
+        CURRENT_DIR=$(pwd)
         cd "$BUILD_DIR"
         
-        python3 -c "
+        # Check if we can actually access the tar file
+        if [ -f "$TAR_NAME" ]; then
+            python3 -c "
 import tarfile
 import zipfile
 import os
@@ -161,29 +169,27 @@ try:
     import shutil
     shutil.rmtree('temp_extract')
     
-    print(f'Successfully created {zip_name}')
+    print('Successfully created ZIP version as well!')
     sys.exit(0)
 except Exception as e:
-    print(f'Python conversion failed: {e}')
+    print(f'Python conversion failed (this is OK): {e}')
     sys.exit(1)
-"
-        
-        if [ $? -eq 0 ]; then
-            ARCHIVE_NAME="$PLUGIN_NAME-$VERSION.zip"
-            ARCHIVE_PATH="$BUILD_DIR/$ARCHIVE_NAME"
-            echo "✓ Successfully converted to ZIP format"
-            ARCHIVE_CREATED=true
+" 2>/dev/null
+            
+            if [ $? -eq 0 ]; then
+                echo "✓ Bonus: Also created ZIP version using Python"
+                # Don't change ARCHIVE_NAME/PATH - keep tar.gz as primary
+            else
+                echo "⚠ Python conversion failed (keeping tar.gz - this is fine)"
+            fi
         else
-            ARCHIVE_NAME="$TAR_NAME"
-            ARCHIVE_PATH="$BUILD_DIR/$TAR_NAME"
-            echo "⚠ Using tar.gz format (conversion failed)"
-            ARCHIVE_CREATED=true
+            echo "⚠ Could not find tar file for Python conversion"
         fi
+        
+        # Return to original directory
+        cd "$CURRENT_DIR"
     else
-        ARCHIVE_NAME="$TAR_NAME"
-        ARCHIVE_PATH="$BUILD_DIR/$TAR_NAME"
-        echo "⚠ Using tar.gz format (Python not available for conversion)"
-        ARCHIVE_CREATED=true
+        echo "⚠ Python not available (tar.gz is fine for manual deployment)"
     fi
 else
     echo "❌ Neither zip nor tar command found!"
@@ -204,6 +210,7 @@ else
     exit 0
 fi
 
+# Ensure we have created something
 if [ "$ARCHIVE_CREATED" = false ]; then
     echo "❌ Failed to create archive"
     cd "$PROJECT_ROOT"
