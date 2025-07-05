@@ -116,29 +116,98 @@ fi
 echo "Creating archive..."
 cd "$RELEASE_DIR"
 
+# Try multiple archive methods
+ARCHIVE_CREATED=false
+
 if command -v zip &> /dev/null; then
     # Use zip if available (preferred for WordPress)
     ARCHIVE_NAME="$PLUGIN_NAME-$VERSION.zip"
     echo "Using zip to create: $ARCHIVE_NAME"
     zip -r "../$ARCHIVE_NAME" "$PLUGIN_NAME/" -x "*.DS_Store*" "*__MACOSX*" "*.git*"
     ARCHIVE_PATH="$BUILD_DIR/$ARCHIVE_NAME"
+    ARCHIVE_CREATED=true
 elif command -v tar &> /dev/null; then
-    # Fallback to tar
-    ARCHIVE_NAME="$PLUGIN_NAME-$VERSION.tar.gz"
-    echo "Using tar to create: $ARCHIVE_NAME"
-    tar --exclude="*.DS_Store*" --exclude="*__MACOSX*" --exclude="*.git*" -czf "../$ARCHIVE_NAME" "$PLUGIN_NAME/"
-    ARCHIVE_PATH="$BUILD_DIR/$ARCHIVE_NAME"
+    # Create tar.gz first
+    TAR_NAME="$PLUGIN_NAME-$VERSION.tar.gz"
+    echo "Zip not available, creating tar.gz: $TAR_NAME"
+    tar --exclude="*.DS_Store*" --exclude="*__MACOSX*" --exclude="*.git*" -czf "../$TAR_NAME" "$PLUGIN_NAME/"
+    
+    # Try to convert tar.gz to zip using Python (if available)
+    if command -v python3 &> /dev/null; then
+        echo "Attempting to convert tar.gz to zip using Python..."
+        cd "$BUILD_DIR"
+        
+        python3 -c "
+import tarfile
+import zipfile
+import os
+import sys
+
+try:
+    # Extract tar.gz
+    with tarfile.open('$TAR_NAME', 'r:gz') as tar:
+        tar.extractall('temp_extract')
+    
+    # Create zip
+    zip_name = '$PLUGIN_NAME-$VERSION.zip'
+    with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk('temp_extract'):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arc_name = os.path.relpath(file_path, 'temp_extract')
+                zipf.write(file_path, arc_name)
+    
+    # Cleanup
+    import shutil
+    shutil.rmtree('temp_extract')
+    
+    print(f'Successfully created {zip_name}')
+    sys.exit(0)
+except Exception as e:
+    print(f'Python conversion failed: {e}')
+    sys.exit(1)
+"
+        
+        if [ $? -eq 0 ]; then
+            ARCHIVE_NAME="$PLUGIN_NAME-$VERSION.zip"
+            ARCHIVE_PATH="$BUILD_DIR/$ARCHIVE_NAME"
+            echo "✓ Successfully converted to ZIP format"
+            ARCHIVE_CREATED=true
+        else
+            ARCHIVE_NAME="$TAR_NAME"
+            ARCHIVE_PATH="$BUILD_DIR/$TAR_NAME"
+            echo "⚠ Using tar.gz format (conversion failed)"
+            ARCHIVE_CREATED=true
+        fi
+    else
+        ARCHIVE_NAME="$TAR_NAME"
+        ARCHIVE_PATH="$BUILD_DIR/$TAR_NAME"
+        echo "⚠ Using tar.gz format (Python not available for conversion)"
+        ARCHIVE_CREATED=true
+    fi
 else
-    echo "Neither zip nor tar command found!"
-    echo "Archive NOT created, but files are ready in: $RELEASE_DIR/$PLUGIN_NAME/"
+    echo "❌ Neither zip nor tar command found!"
     echo ""
-    echo "Please manually create an archive from: $RELEASE_DIR/$PLUGIN_NAME/"
+    echo "Files are ready in: $RELEASE_DIR/$PLUGIN_NAME/"
+    echo ""
+    echo "Manual archive creation steps:"
     echo "  1. Navigate to: $RELEASE_DIR/"
     echo "  2. Right-click on '$PLUGIN_NAME' folder"
-    echo "  3. Create compressed archive"
+    echo "  3. Create compressed archive (ZIP format preferred)"
     echo "  4. Name it: $PLUGIN_NAME-$VERSION.zip"
+    echo ""
+    echo "Alternative: Install zip command:"
+    echo "  Ubuntu/Debian: sudo apt install zip"
+    echo "  CentOS/RHEL:   sudo yum install zip"
+    echo "  macOS:         brew install zip"
     cd "$PROJECT_ROOT"
     exit 0
+fi
+
+if [ "$ARCHIVE_CREATED" = false ]; then
+    echo "❌ Failed to create archive"
+    cd "$PROJECT_ROOT"
+    exit 1
 fi
 
 cd "$PROJECT_ROOT"
