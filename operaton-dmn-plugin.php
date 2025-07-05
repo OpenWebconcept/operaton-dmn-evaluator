@@ -21,8 +21,50 @@ define('OPERATON_DMN_VERSION', '1.0.0-beta.5-test');
 define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('OPERATON_DMN_PLUGIN_PATH', plugin_dir_path(__FILE__));
 
-// Initialize the update checker
-require_once OPERATON_DMN_PLUGIN_PATH . 'includes/plugin-updater.php';
+// Initialize the update checker - FIXED VERSION
+if (is_admin()) {
+    // Only load auto-updater in admin context
+    $updater_file = OPERATON_DMN_PLUGIN_PATH . 'includes/plugin-updater.php';
+    
+    if (file_exists($updater_file)) {
+        require_once $updater_file;
+        
+        // Log successful loading if debug is enabled
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: Auto-updater loaded successfully');
+        }
+        
+        // Add debug information to admin
+        add_action('admin_footer', function() {
+            if (current_user_can('manage_options') && isset($_GET['page']) && strpos($_GET['page'], 'operaton-dmn') !== false) {
+                echo '<script>console.log("Operaton DMN Auto-Updater: Loaded");</script>';
+            }
+        });
+        
+    } else {
+        // Log missing file if debug is enabled
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: Auto-updater file not found at: ' . $updater_file);
+        }
+        
+        // Show admin notice about missing auto-updater
+        add_action('admin_notices', function() {
+            if (current_user_can('manage_options')) {
+                echo '<div class="notice notice-warning is-dismissible">';
+                echo '<p><strong>Operaton DMN Evaluator:</strong> Auto-update system files are missing. Please reinstall the plugin to enable automatic updates.</p>';
+                echo '</div>';
+            }
+        });
+    }
+    
+    // Load debug tools if in debug mode (remove in production)
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        $debug_file = OPERATON_DMN_PLUGIN_PATH . 'includes/update-debug.php';
+        if (file_exists($debug_file)) {
+            require_once $debug_file;
+        }
+    }
+}
 
 /**
  * Main plugin class
@@ -60,6 +102,9 @@ class OperatonDMNEvaluator {
         
         // Gravity Forms integration - fixed to always load when GF is available
         add_action('init', array($this, 'init_gravity_forms_integration'));
+        
+        // Version check for upgrades
+        add_action('admin_init', array($this, 'check_version'));
         
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
@@ -214,6 +259,10 @@ class OperatonDMNEvaluator {
         }
         
         $configs = $this->get_all_configurations();
+        
+        // Show update management section
+        $this->show_update_management_section();
+        
         include OPERATON_DMN_PLUGIN_PATH . 'templates/admin-list.php';
     }
     
@@ -225,6 +274,90 @@ class OperatonDMNEvaluator {
         $gravity_forms = $this->get_gravity_forms();
         $config = isset($_GET['edit']) ? $this->get_configuration($_GET['edit']) : null;
         include OPERATON_DMN_PLUGIN_PATH . 'templates/admin-form.php';
+    }
+    
+    /**
+     * Show update management section in admin
+     */
+    private function show_update_management_section() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        
+        $current_version = OPERATON_DMN_VERSION;
+        $update_plugins = get_site_transient('update_plugins');
+        $has_update = false;
+        $new_version = '';
+        
+        if (isset($update_plugins->response)) {
+            foreach ($update_plugins->response as $plugin => $data) {
+                if (strpos($plugin, 'operaton-dmn') !== false) {
+                    $has_update = true;
+                    $new_version = $data->new_version;
+                    break;
+                }
+            }
+        }
+        
+        ?>
+        <div class="operaton-update-section" style="background: #f9f9f9; padding: 15px; margin: 20px 0; border-left: 4px solid #0073aa;">
+            <h3><?php _e('Plugin Updates', 'operaton-dmn'); ?></h3>
+            
+            <p><strong><?php _e('Current Version:', 'operaton-dmn'); ?></strong> <?php echo esc_html($current_version); ?></p>
+            
+            <?php if ($has_update): ?>
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px 0;">
+                    <p><strong><?php _e('Update Available:', 'operaton-dmn'); ?></strong> <?php echo esc_html($new_version); ?></p>
+                    <p>
+                        <a href="<?php echo admin_url('plugins.php'); ?>" class="button button-primary">
+                            <?php _e('Go to Plugins Page to Update', 'operaton-dmn'); ?>
+                        </a>
+                    </p>
+                </div>
+            <?php else: ?>
+                <p style="color: #46b450;">✓ <?php _e('You are running the latest version', 'operaton-dmn'); ?></p>
+            <?php endif; ?>
+            
+            <p>
+                <button type="button" id="operaton-check-updates" class="button">
+                    <?php _e('Check for Updates Now', 'operaton-dmn'); ?>
+                </button>
+                <span id="operaton-update-status" style="margin-left: 10px;"></span>
+            </p>
+            
+            <script>
+            jQuery(document).ready(function($) {
+                $('#operaton-check-updates').click(function() {
+                    var button = $(this);
+                    var status = $('#operaton-update-status');
+                    
+                    button.prop('disabled', true).text('<?php _e('Checking...', 'operaton-dmn'); ?>');
+                    status.html('<span style="color: #666;">⏳ Checking for updates...</span>');
+                    
+                    // Clear update transients to force fresh check
+                    $.post(ajaxurl, {
+                        action: 'operaton_clear_update_cache',
+                        _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+                    }, function(response) {
+                        if (response.success) {
+                            // Reload page to show updated status
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1000);
+                            status.html('<span style="color: #46b450;">✓ Update check completed</span>');
+                        } else {
+                            status.html('<span style="color: #dc3232;">✗ Update check failed</span>');
+                            button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
+                        }
+                    }).fail(function() {
+                        status.html('<span style="color: #dc3232;">✗ Update check failed</span>');
+                        button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
+                    });
+                });
+            });
+            </script>
+        </div>
+        <?php
     }
     
     /**
@@ -1102,7 +1235,9 @@ class OperatonDMNEvaluator {
         $this->clear_config_cache();
     }
     
-    // Add version check for database migrations
+    /**
+     * Add version check for database migrations
+     */
     public function check_version() {
         $installed_version = get_option('operaton_dmn_version', '1.0.0-beta.1');
         
@@ -1127,6 +1262,23 @@ class OperatonDMNEvaluator {
         }
     }
 }
+
+// Add AJAX handler for clearing update cache
+add_action('wp_ajax_operaton_clear_update_cache', function() {
+    if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce')) {
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    }
+    
+    // Clear WordPress update transients
+    delete_site_transient('update_plugins');
+    delete_transient('operaton_dmn_updater');
+    delete_transient('operaton_dmn_fallback_check');
+    
+    // Force WordPress to check for updates
+    wp_update_plugins();
+    
+    wp_send_json_success(array('message' => 'Update cache cleared'));
+});
 
 // Initialize the plugin
 OperatonDMNEvaluator::get_instance();
