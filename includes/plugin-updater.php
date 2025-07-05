@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Update Checker Implementation - FIXED VERSION
+ * Plugin Update Checker Implementation - SAFE VERSION
  * File: includes/plugin-updater.php
  */
 
@@ -26,7 +26,7 @@ class OperatonDMNAutoUpdater {
         $this->plugin_file = $plugin_file;
         $this->plugin_slug = plugin_basename($plugin_file);
         $this->version = $version;
-        $this->gitlab_project_id = '39'; // Use numeric ID instead of path
+        $this->gitlab_project_id = '39';
         $this->gitlab_url = 'https://git.open-regels.nl';
         $this->cache_key = 'operaton_dmn_updater';
         $this->cache_allowed = true;
@@ -35,7 +35,6 @@ class OperatonDMNAutoUpdater {
         add_filter('plugins_api', array($this, 'plugin_popup'), 10, 3);
         add_filter('upgrader_pre_download', array($this, 'download_package'), 10, 3);
         
-        // Add debug logging
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Auto-Updater initialized for: ' . $this->plugin_slug);
         }
@@ -51,7 +50,6 @@ class OperatonDMNAutoUpdater {
             return $remote_get;
         }
         
-        // Use the releases endpoint
         $request = wp_remote_get(
             $this->gitlab_url . '/api/v4/projects/' . $this->gitlab_project_id . '/releases',
             array(
@@ -66,9 +64,8 @@ class OperatonDMNAutoUpdater {
         if (!is_wp_error($request) && wp_remote_retrieve_response_code($request) === 200) {
             $releases = json_decode(wp_remote_retrieve_body($request), true);
             
-            // Get the most recent release (first in the array)
             if (!empty($releases) && is_array($releases)) {
-                $remote_get = $releases[0]; // Most recent release
+                $remote_get = $releases[0];
                 
                 if (defined('WP_DEBUG') && WP_DEBUG) {
                     error_log('Operaton DMN: Latest release found: ' . $remote_get['tag_name']);
@@ -175,7 +172,6 @@ class OperatonDMNAutoUpdater {
         // Check if there are any assets (uploaded files)
         if (isset($remote_version['assets']['links']) && !empty($remote_version['assets']['links'])) {
             foreach ($remote_version['assets']['links'] as $link) {
-                // Look for zip file
                 if (strpos($link['name'], '.zip') !== false || strpos($link['url'], '.zip') !== false) {
                     if (defined('WP_DEBUG') && WP_DEBUG) {
                         error_log('Operaton DMN: Using asset download URL: ' . $link['url']);
@@ -210,428 +206,21 @@ class OperatonDMNAutoUpdater {
     }
     
     /**
-     * Download package and handle authentication if needed
+     * Download package - SIMPLIFIED VERSION
      */
     public function download_package($result, $package, $upgrader) {
-        if (strpos($package, $this->gitlab_url) !== false) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Custom download handler - Package: ' . $package);
-            }
-            
-            // Download with better error handling
-            $temp_file = $this->download_gitlab_archive($package);
-            
-            if (is_wp_error($temp_file)) {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('Operaton DMN: Download failed: ' . $temp_file->get_error_message());
-                }
-                return $temp_file;
-            }
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Downloaded to: ' . $temp_file);
-                error_log('Operaton DMN: File size: ' . filesize($temp_file) . ' bytes');
-            }
-            
-            // Verify the downloaded file is a valid ZIP
-            if (!$this->is_valid_zip($temp_file)) {
-                @unlink($temp_file);
-                return new WP_Error('invalid_zip', 'Downloaded file is not a valid ZIP archive');
-            }
-            
-            // Create a properly structured ZIP for WordPress
-            $proper_zip = $this->restructure_gitlab_zip($temp_file);
-            
-            // Clean up original
-            @unlink($temp_file);
-            
-            return $proper_zip;
+        // Only handle our GitLab packages
+        if (strpos($package, $this->gitlab_url) === false) {
+            return $result;
         }
         
-        return $result;
-    }
-    
-    /**
-     * Download GitLab archive with proper headers and error handling
-     */
-    private function download_gitlab_archive($url) {
-        $temp_file = wp_tempnam('operaton-dmn-download');
-        
-        if (!$temp_file) {
-            return new WP_Error('temp_file_failed', 'Could not create temporary file');
-        }
-        
-        $args = array(
-            'timeout' => 300,
-            'stream' => true,
-            'filename' => $temp_file,
-            'headers' => array(
-                'Accept' => 'application/zip, application/octet-stream',
-                'User-Agent' => 'WordPress-Plugin-Updater/1.0'
-            )
-        );
-        
-        $response = wp_remote_get($url, $args);
-        
-        if (is_wp_error($response)) {
-            @unlink($temp_file);
-            return $response;
-        }
-        
-        $response_code = wp_remote_retrieve_response_code($response);
-        if ($response_code !== 200) {
-            @unlink($temp_file);
-            return new WP_Error('download_failed', 'HTTP ' . $response_code . ': ' . wp_remote_retrieve_response_message($response));
-        }
-        
-        // Verify file was downloaded
-        if (!file_exists($temp_file) || filesize($temp_file) === 0) {
-            @unlink($temp_file);
-            return new WP_Error('empty_file', 'Downloaded file is empty');
-        }
-        
-        return $temp_file;
-    }
-    
-    /**
-     * Check if file is a valid ZIP archive
-     */
-    private function is_valid_zip($file_path) {
-        // Quick check: ZIP files start with "PK"
-        $handle = fopen($file_path, 'rb');
-        if (!$handle) {
-            return false;
-        }
-        
-        $header = fread($handle, 4);
-        fclose($handle);
-        
-        // Check for ZIP signature
-        if (substr($header, 0, 2) !== 'PK') {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: File does not have ZIP signature. Header: ' . bin2hex($header));
-            }
-            return false;
-        }
-        
-        // Try to open with ZipArchive if available
-        if (class_exists('ZipArchive')) {
-            $zip = new ZipArchive();
-            $result = $zip->open($file_path, ZipArchive::CHECKCONS);
-            if ($result === TRUE) {
-                $zip->close();
-                return true;
-            } else {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('Operaton DMN: ZipArchive validation failed with code: ' . $result);
-                }
-                return false;
-            }
-        }
-        
-        return true; // Fallback - assume valid if basic check passes
-    }
-    
-    /**
-     * Restructure GitLab source archive to WordPress plugin format
-     */
-    private function restructure_gitlab_zip($source_zip) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Starting ZIP restructure');
+            error_log('Operaton DMN: Using simplified download for: ' . $package);
         }
         
-        // Use ZipArchive if available (more reliable than PclZip)
-        if (class_exists('ZipArchive')) {
-            return $this->restructure_with_ziparchive($source_zip);
-        } else {
-            return $this->restructure_with_pclzip($source_zip);
-        }
-    }
-    
-    /**
-     * Restructure using ZipArchive (preferred method)
-     */
-    private function restructure_with_ziparchive($source_zip) {
-        $temp_dir = wp_tempnam('operaton-dmn-extract');
-        @unlink($temp_dir); // Remove the file, we need it as a directory
-        
-        if (!wp_mkdir_p($temp_dir)) {
-            return new WP_Error('mkdir_failed', 'Failed to create extraction directory');
-        }
-        
-        $output_zip = wp_tempnam('operaton-dmn-final') . '.zip';
-        
-        try {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Starting ZipArchive restructure');
-                error_log('Operaton DMN: Temp dir: ' . $temp_dir);
-                error_log('Operaton DMN: Output zip: ' . $output_zip);
-            }
-            
-            // Extract source ZIP
-            $zip = new ZipArchive();
-            $result = $zip->open($source_zip);
-            
-            if ($result !== TRUE) {
-                return new WP_Error('zip_open_failed', 'Failed to open source ZIP: ' . $result);
-            }
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: ZIP opened, extracting to: ' . $temp_dir);
-            }
-            
-            if (!$zip->extractTo($temp_dir)) {
-                $zip->close();
-                return new WP_Error('extract_failed', 'Failed to extract ZIP contents');
-            }
-            
-            $zip->close();
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: ZIP extracted successfully');
-                // List contents of temp directory
-                $contents = scandir($temp_dir);
-                error_log('Operaton DMN: Temp dir contents: ' . implode(', ', $contents));
-            }
-            
-            // Find the extracted folder - look for any folder starting with 'operaton-dmn-evaluator'
-            $extracted_folders = glob($temp_dir . '/operaton-dmn-evaluator*', GLOB_ONLYDIR);
-            
-            if (empty($extracted_folders)) {
-                // Fallback: look for any directory
-                $all_folders = glob($temp_dir . '/*', GLOB_ONLYDIR);
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('Operaton DMN: No operaton-dmn-evaluator* folder found. All folders: ' . implode(', ', array_map('basename', $all_folders)));
-                }
-                
-                if (!empty($all_folders)) {
-                    $extracted_folders = array($all_folders[0]);
-                } else {
-                    return new WP_Error('no_folder', 'No extracted folder found in: ' . $temp_dir);
-                }
-            }
-            
-            $source_folder = $extracted_folders[0];
-            $plugin_folder = $temp_dir . '/operaton-dmn-evaluator';
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Source folder: ' . $source_folder);
-                error_log('Operaton DMN: Target folder: ' . $plugin_folder);
-                error_log('Operaton DMN: Source folder exists: ' . (is_dir($source_folder) ? 'YES' : 'NO'));
-            }
-            
-            // If the folder is already named correctly, no need to rename
-            if (basename($source_folder) !== 'operaton-dmn-evaluator') {
-                // Rename to proper WordPress plugin folder name
-                if (!rename($source_folder, $plugin_folder)) {
-                    $error_msg = 'Failed to rename ' . basename($source_folder) . ' to operaton-dmn-evaluator';
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        error_log('Operaton DMN: ' . $error_msg);
-                        error_log('Operaton DMN: Source exists: ' . (file_exists($source_folder) ? 'YES' : 'NO'));
-                        error_log('Operaton DMN: Target exists: ' . (file_exists($plugin_folder) ? 'YES' : 'NO'));
-                    }
-                    return new WP_Error('rename_failed', $error_msg);
-                }
-                
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('Operaton DMN: Successfully renamed to: ' . $plugin_folder);
-                }
-            } else {
-                $plugin_folder = $source_folder; // Already correctly named
-            }
-            
-            // Verify the plugin folder exists and has content
-            if (!is_dir($plugin_folder)) {
-                return new WP_Error('plugin_folder_missing', 'Plugin folder not found after rename: ' . $plugin_folder);
-            }
-            
-            $folder_contents = scandir($plugin_folder);
-            if (count($folder_contents) <= 2) { // Only . and .. 
-                return new WP_Error('empty_plugin_folder', 'Plugin folder is empty: ' . $plugin_folder);
-            }
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Plugin folder contents: ' . implode(', ', array_slice($folder_contents, 0, 10))); // Show first 10 items
-            }
-            
-            // Create new ZIP with proper structure
-            $new_zip = new ZipArchive();
-            $result = $new_zip->open($output_zip, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-            
-            if ($result !== TRUE) {
-                return new WP_Error('new_zip_failed', 'Failed to create output ZIP: ' . $result);
-            }
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Creating new ZIP archive');
-            }
-            
-            // Add files to ZIP recursively
-            $files_added = $this->add_folder_to_zip($new_zip, $plugin_folder, 'operaton-dmn-evaluator');
-            
-            $new_zip->close();
-            
-            // Verify the new ZIP was created successfully
-            if (!file_exists($output_zip) || filesize($output_zip) === 0) {
-                return new WP_Error('output_zip_failed', 'Output ZIP file was not created or is empty');
-            }
-            
-            // Clean up temp directory
-            $this->delete_directory($temp_dir);
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: New ZIP created successfully: ' . $output_zip . ' (size: ' . filesize($output_zip) . ' bytes)');
-                error_log('Operaton DMN: Files added to ZIP: ' . $files_added);
-            }
-            
-            return $output_zip;
-            
-        } catch (Exception $e) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Exception in restructure_with_ziparchive: ' . $e->getMessage());
-                error_log('Operaton DMN: Exception trace: ' . $e->getTraceAsString());
-            }
-            
-            // Clean up on error
-            if (is_dir($temp_dir)) {
-                $this->delete_directory($temp_dir);
-            }
-            @unlink($output_zip);
-            return new WP_Error('restructure_failed', $e->getMessage());
-        }
-    }
-    
-    /**
-     * Add folder contents to ZIP recursively
-     */
-    private function add_folder_to_zip($zip, $folder_path, $zip_folder_name) {
-        $files_added = 0;
-        
-        try {
-            $files = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($folder_path),
-                RecursiveIteratorIterator::LEAVES_ONLY
-            );
-            
-            foreach ($files as $name => $file) {
-                if (!$file->isDir()) {
-                    $file_path = $file->getRealPath();
-                    $relative_path = $zip_folder_name . '/' . substr($file_path, strlen($folder_path) + 1);
-                    
-                    // Normalize path separators for Windows compatibility
-                    $relative_path = str_replace('\\', '/', $relative_path);
-                    
-                    if ($zip->addFile($file_path, $relative_path)) {
-                        $files_added++;
-                    } else {
-                        if (defined('WP_DEBUG') && WP_DEBUG) {
-                            error_log('Operaton DMN: Failed to add file to ZIP: ' . $relative_path);
-                        }
-                    }
-                }
-            }
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Added ' . $files_added . ' files to ZIP');
-            }
-            
-        } catch (Exception $e) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Exception in add_folder_to_zip: ' . $e->getMessage());
-            }
-        }
-        
-        return $files_added;
-    }
-    
-    /**
-     * Restructure using PclZip (fallback method)
-     */
-    private function restructure_with_pclzip($source_zip) {
-        require_once(ABSPATH . 'wp-admin/includes/class-pclzip.php');
-        
-        $temp_dir = wp_tempnam('operaton-dmn-extract');
-        @unlink($temp_dir); // Remove the file, we need it as a directory
-        
-        if (!wp_mkdir_p($temp_dir)) {
-            return new WP_Error('mkdir_failed', 'Failed to create extraction directory');
-        }
-        
-        $output_zip = wp_tempnam('operaton-dmn-final') . '.zip';
-        
-        try {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Using PclZip for restructure');
-            }
-            
-            // Extract source ZIP
-            $zip = new PclZip($source_zip);
-            $result = $zip->extract(PCLZIP_OPT_PATH, $temp_dir);
-            
-            if (!$result) {
-                return new WP_Error('extract_failed', 'PclZip extraction failed: ' . $zip->errorInfo(true));
-            }
-            
-            // Find the extracted folder
-            $extracted_folders = glob($temp_dir . '/*', GLOB_ONLYDIR);
-            if (empty($extracted_folders)) {
-                return new WP_Error('no_folder', 'No extracted folder found');
-            }
-            
-            $source_folder = $extracted_folders[0];
-            $plugin_folder = $temp_dir . '/operaton-dmn-evaluator';
-            
-            // Rename to proper WordPress plugin folder name
-            if (!rename($source_folder, $plugin_folder)) {
-                return new WP_Error('rename_failed', 'Failed to rename extracted folder');
-            }
-            
-            // Create new ZIP with proper structure
-            $new_zip = new PclZip($output_zip);
-            $result = $new_zip->create($plugin_folder, PCLZIP_OPT_REMOVE_PATH, dirname($plugin_folder));
-            
-            if (!$result) {
-                return new WP_Error('zip_failed', 'Failed to create proper ZIP structure: ' . $new_zip->errorInfo(true));
-            }
-            
-            // Clean up temp directory
-            $this->delete_directory($temp_dir);
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: PclZip restructure completed: ' . $output_zip);
-            }
-            
-            return $output_zip;
-            
-        } catch (Exception $e) {
-            // Clean up on error
-            if (is_dir($temp_dir)) {
-                $this->delete_directory($temp_dir);
-            }
-            @unlink($output_zip);
-            return new WP_Error('restructure_failed', $e->getMessage());
-        }
-    }
-    
-    /**
-     * Recursively delete directory
-     */
-    private function delete_directory($dir) {
-        if (!is_dir($dir)) return;
-        
-        $files = array_diff(scandir($dir), array('.', '..'));
-        foreach ($files as $file) {
-            $path = $dir . '/' . $file;
-            is_dir($path) ? $this->delete_directory($path) : unlink($path);
-        }
-        rmdir($dir);
-    }
-    
-    /**
-     * Get GitLab access token (optional, for private repos)
-     */
-    private function get_gitlab_token() {
-        return defined('OPERATON_DMN_GITLAB_TOKEN') ? OPERATON_DMN_GITLAB_TOKEN : '';
+        // Let WordPress handle the download normally
+        // The GitLab API provides a properly formatted ZIP that WordPress can handle
+        return $result;
     }
     
     /**
