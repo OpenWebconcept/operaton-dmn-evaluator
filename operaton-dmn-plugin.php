@@ -231,36 +231,79 @@ class OperatonDMNEvaluator {
         return $result;
     }
     
-    public function add_admin_menu() {
-        add_menu_page(
-            __('Operaton DMN', 'operaton-dmn'),
-            __('Operaton DMN', 'operaton-dmn'),
-            'manage_options',
-            'operaton-dmn',
-            array($this, 'admin_page'),
-            'dashicons-analytics',
-            30
-        );
-        
-        add_submenu_page(
-            'operaton-dmn',
-            __('Configurations', 'operaton-dmn'),
-            __('Configurations', 'operaton-dmn'),
-            'manage_options',
-            'operaton-dmn',
-            array($this, 'admin_page')
-        );
-        
-        add_submenu_page(
-            'operaton-dmn',
-            __('Add Configuration', 'operaton-dmn'),
-            __('Add Configuration', 'operaton-dmn'),
-            'manage_options',
-            'operaton-dmn-add',
-            array($this, 'add_config_page')
-        );
-    }
+public function add_admin_menu() {
+    add_menu_page(
+        __('Operaton DMN', 'operaton-dmn'),
+        __('Operaton DMN', 'operaton-dmn'),
+        'manage_options',
+        'operaton-dmn',
+        array($this, 'admin_page'),
+        'dashicons-analytics',
+        30
+    );
     
+    add_submenu_page(
+        'operaton-dmn',
+        __('Configurations', 'operaton-dmn'),
+        __('Configurations', 'operaton-dmn'),
+        'manage_options',
+        'operaton-dmn',
+        array($this, 'admin_page')
+    );
+    
+    add_submenu_page(
+        'operaton-dmn',
+        __('Add Configuration', 'operaton-dmn'),
+        __('Add Configuration', 'operaton-dmn'),
+        'manage_options',
+        'operaton-dmn-add',
+        array($this, 'add_config_page')
+    );
+    
+    // Add debug menu directly (temporary for testing)
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN: Adding debug menu directly from main plugin');
+        
+        // Check if debug class exists and use it, otherwise use temp page
+        if (class_exists('OperatonDMNUpdateDebugger')) {
+            // Create an instance to call the debug page method
+            global $operaton_debug_instance;
+            if (!$operaton_debug_instance) {
+                $operaton_debug_instance = new OperatonDMNUpdateDebugger();
+            }
+            
+            add_submenu_page(
+                'operaton-dmn',
+                __('Update Debug', 'operaton-dmn'),
+                __('Update Debug', 'operaton-dmn'),
+                'manage_options',
+                'operaton-dmn-update-debug',
+                array($operaton_debug_instance, 'debug_page')
+            );
+            error_log('Operaton DMN: Debug menu added using OperatonDMNUpdateDebugger class');
+        } else {
+            add_submenu_page(
+                'operaton-dmn',
+                __('Update Debug', 'operaton-dmn'),
+                __('Update Debug', 'operaton-dmn'),
+                'manage_options',
+                'operaton-dmn-update-debug',
+                array($this, 'temp_debug_page')
+            );
+            error_log('Operaton DMN: Debug menu added using temp page (class not found)');
+        }
+    }
+}
+
+// Add this temporary method to the main plugin class
+public function temp_debug_page() {
+    echo '<div class="wrap">';
+    echo '<h1>Debug Menu Test</h1>';
+    echo '<p>✅ Debug menu is working! The debug system is properly integrated.</p>';
+    echo '<p>OperatonDMNUpdateDebugger class exists: ' . (class_exists('OperatonDMNUpdateDebugger') ? 'YES' : 'NO') . '</p>';
+    echo '<p>If the class exists, the full debug interface should work.</p>';
+    echo '</div>';
+}
     public function admin_page() {
         if (isset($_POST['delete_config']) && wp_verify_nonce($_POST['_wpnonce'], 'delete_config')) {
             $this->delete_config($_POST['config_id']);
