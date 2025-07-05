@@ -24,122 +24,6 @@ class OperatonDMNUpdateDebugger {
         // Wait for WordPress to be fully loaded before checking user capabilities
         add_action('admin_init', array($this, 'init_debug_tools'));
     }
-
-    /**
-     * Test the fallback "Download manually" link system
-     */
-    public function ajax_test_fallback_link() {
-        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
-            wp_send_json_error(array('message' => 'Security check failed'));
-        }
-
-        $gitlab_url = 'https://git.open-regels.nl';
-        $project_id = '39';
-        $repository_url = 'https://git.open-regels.nl/showcases/operaton-dmn-evaluator';
-        
-        try {
-            // Test the GitLab API call that the fallback system uses
-            $api_url = $gitlab_url . '/api/v4/projects/' . $project_id . '/releases';
-            
-            $response = wp_remote_get($api_url, array(
-                'timeout' => 10,
-                'headers' => array(
-                    'User-Agent' => 'Operaton-DMN-Plugin/' . OPERATON_DMN_VERSION,
-                    'Accept' => 'application/json'
-                )
-            ));
-            
-            if (is_wp_error($response)) {
-                wp_send_json_error(array('message' => 'GitLab API request failed: ' . $response->get_error_message()));
-            }
-            
-            $response_code = wp_remote_retrieve_response_code($response);
-            if ($response_code !== 200) {
-                wp_send_json_error(array('message' => 'GitLab API returned status: ' . $response_code));
-            }
-            
-            $body = wp_remote_retrieve_body($response);
-            $releases = json_decode($body, true);
-            
-            if (empty($releases)) {
-                wp_send_json_error(array('message' => 'No releases found in GitLab API response'));
-            }
-            
-            $latest_release = $releases[0];
-            $remote_version = ltrim($latest_release['tag_name'], 'v');
-            $tag_name = $latest_release['tag_name'];
-            $current_version = OPERATON_DMN_VERSION;
-            
-            // Check if update would be available
-            $update_available = version_compare($current_version, $remote_version, '<');
-            
-            // Generate the manual download URL (same logic as fallback notifier)
-            $manual_download_url = null;
-            $url_test_result = 'N/A';
-            
-            if ($update_available) {
-                $manual_download_url = $repository_url . '/-/releases/' . $tag_name;
-                
-                // Test if the manual download URL actually works
-                $url_test_response = wp_remote_head($manual_download_url, array(
-                    'timeout' => 10,
-                    'redirection' => 5
-                ));
-                
-                if (is_wp_error($url_test_response)) {
-                    $url_test_result = '✗ URL test failed: ' . $url_test_response->get_error_message();
-                } else {
-                    $url_response_code = wp_remote_retrieve_response_code($url_test_response);
-                    if ($url_response_code === 200) {
-                        $url_test_result = '✓ URL is accessible';
-                    } else {
-                        $url_test_result = '✗ URL returned status: ' . $url_response_code;
-                    }
-                }
-            }
-            
-            // Check fallback notice conditions
-            $fallback_notice_status = 'Not applicable (auto-update working)';
-            
-            // Simulate what the fallback notifier checks
-            $update_plugins = get_site_transient('update_plugins');
-            $auto_updater_working = false;
-            
-            if (isset($update_plugins->response)) {
-                foreach ($update_plugins->response as $plugin => $data) {
-                    if (strpos($plugin, 'operaton-dmn') !== false) {
-                        $auto_updater_working = true;
-                        break;
-                    }
-                }
-            }
-            
-            if (!$auto_updater_working && $update_available) {
-                $fallback_notice_status = '✓ Would show fallback notice with manual link';
-            } elseif ($auto_updater_working) {
-                $fallback_notice_status = 'Auto-updater working, fallback notice suppressed';
-            } else {
-                $fallback_notice_status = 'No update available, no notice needed';
-            }
-            
-            wp_send_json_success(array(
-                'api_status' => '✓ GitLab API accessible',
-                'latest_version' => $remote_version,
-                'current_version' => $current_version,
-                'update_available' => $update_available,
-                'manual_download_url' => $manual_download_url,
-                'url_test_result' => $url_test_result,
-                'fallback_notice_status' => $fallback_notice_status,
-                'tag_name' => $tag_name,
-                'auto_updater_working' => $auto_updater_working
-            ));
-            
-        } catch (Exception $e) {
-            wp_send_json_error(array(
-                'message' => 'Exception during fallback link test: ' . $e->getMessage(),
-                'error_details' => $e->getTraceAsString()
-            ));
-        }
     
     /**
      * Initialize debug tools after WordPress is fully loaded
@@ -249,14 +133,6 @@ class OperatonDMNUpdateDebugger {
                 <p>Test the fallback system that shows manual download links when auto-update fails.</p>
                 <button type="button" id="test-fallback-link" class="button button-primary">Test Fallback Link Generation</button>
                 <div id="fallback-link-results" style="margin-top: 15px;"></div>
-            </div>
-
-            <!-- Restructure Test -->
-            <div class="card">
-                <h2>ZIP Restructure Test</h2>
-                <p>Test the complete download and restructure process (simulates the actual update process).</p>
-                <button type="button" id="test-restructure" class="button button-primary">Test Full Restructure Process</button>
-                <div id="restructure-results" style="margin-top: 15px;"></div>
             </div>
 
             <!-- Update Transient Info -->
@@ -407,43 +283,6 @@ class OperatonDMNUpdateDebugger {
                 }).always(function() {
                     button.prop('disabled', false).text('Test GitLab API');
                 });
-
-            // Test Fallback Link Generation - NEW FUNCTION
-            $('#test-fallback-link').click(function() {
-                var button = $(this);
-                var results = $('#fallback-link-results');
-                
-                button.prop('disabled', true).text('Testing Fallback...');
-                results.html('<div class="result-info">Testing fallback link generation system...</div>');
-                
-                $.post(ajaxurl, {
-                    action: 'operaton_test_fallback_link',
-                    _ajax_nonce: '<?php echo wp_create_nonce('operaton_update_debug'); ?>'
-                }, function(response) {
-                    if (response.success) {
-                        var data = response.data;
-                        var html = '<div class="result-success"><h4>Fallback Link Test Results</h4>';
-                        html += '<table class="form-table">';
-                        html += '<tr><th>API Status</th><td>' + data.api_status + '</td></tr>';
-                        html += '<tr><th>Latest Version</th><td>' + data.latest_version + '</td></tr>';
-                        html += '<tr><th>Current Version</th><td>' + data.current_version + '</td></tr>';
-                        html += '<tr><th>Update Available</th><td>' + (data.update_available ? '✓ Yes' : '✗ No') + '</td></tr>';
-                        if (data.manual_download_url) {
-                            html += '<tr><th>Manual Download URL</th><td><a href="' + data.manual_download_url + '" target="_blank">' + data.manual_download_url + '</a></td></tr>';
-                            html += '<tr><th>URL Test</th><td>' + data.url_test_result + '</td></tr>';
-                        }
-                        html += '<tr><th>Fallback Notice</th><td>' + data.fallback_notice_status + '</td></tr>';
-                        html += '</table></div>';
-                        results.html(html);
-                    } else {
-                        results.html('<div class="result-error"><h4>Fallback Link Test Failed</h4><p>' + response.data.message + '</p></div>');
-                    }
-                }).fail(function() {
-                    results.html('<div class="result-error">AJAX request failed</div>');
-                }).always(function() {
-                    button.prop('disabled', false).text('Test Fallback Link Generation');
-                });
-            });
             });
 
             // Test Download Process
@@ -481,38 +320,40 @@ class OperatonDMNUpdateDebugger {
                 });
             });
 
-            // Test Restructure Process
-            $('#test-restructure').click(function() {
+            // Test Fallback Link Generation
+            $('#test-fallback-link').click(function() {
                 var button = $(this);
-                var results = $('#restructure-results');
+                var results = $('#fallback-link-results');
                 
-                button.prop('disabled', true).text('Testing Restructure...');
-                results.html('<div class="result-info">Testing complete download and restructure process...</div>');
+                button.prop('disabled', true).text('Testing Fallback...');
+                results.html('<div class="result-info">Testing fallback link generation system...</div>');
                 
                 $.post(ajaxurl, {
-                    action: 'operaton_test_restructure',
+                    action: 'operaton_test_fallback_link',
                     _ajax_nonce: '<?php echo wp_create_nonce('operaton_update_debug'); ?>'
                 }, function(response) {
                     if (response.success) {
                         var data = response.data;
-                        var html = '<div class="result-success"><h4>Restructure Test Results</h4>';
+                        var html = '<div class="result-success"><h4>Fallback Link Test Results</h4>';
                         html += '<table class="form-table">';
-                        html += '<tr><th>Original Download</th><td>' + data.download_status + '</td></tr>';
-                        html += '<tr><th>Restructure Status</th><td>' + data.restructure_status + '</td></tr>';
-                        html += '<tr><th>Output ZIP Size</th><td>' + data.output_size + '</td></tr>';
-                        html += '<tr><th>Files in New ZIP</th><td>' + data.files_count + '</td></tr>';
-                        if (data.error_details) {
-                            html += '<tr><th>Error Details</th><td style="color: red;">' + data.error_details + '</td></tr>';
+                        html += '<tr><th>API Status</th><td>' + data.api_status + '</td></tr>';
+                        html += '<tr><th>Latest Version</th><td>' + data.latest_version + '</td></tr>';
+                        html += '<tr><th>Current Version</th><td>' + data.current_version + '</td></tr>';
+                        html += '<tr><th>Update Available</th><td>' + (data.update_available ? '✓ Yes' : '✗ No') + '</td></tr>';
+                        if (data.manual_download_url) {
+                            html += '<tr><th>Manual Download URL</th><td><a href="' + data.manual_download_url + '" target="_blank">' + data.manual_download_url + '</a></td></tr>';
+                            html += '<tr><th>URL Test</th><td>' + data.url_test_result + '</td></tr>';
                         }
+                        html += '<tr><th>Fallback Notice</th><td>' + data.fallback_notice_status + '</td></tr>';
                         html += '</table></div>';
                         results.html(html);
                     } else {
-                        results.html('<div class="result-error"><h4>Restructure Test Failed</h4><p>' + response.data.message + '</p></div>');
+                        results.html('<div class="result-error"><h4>Fallback Link Test Failed</h4><p>' + response.data.message + '</p></div>');
                     }
                 }).fail(function() {
                     results.html('<div class="result-error">AJAX request failed</div>');
                 }).always(function() {
-                    button.prop('disabled', false).text('Test Full Restructure Process');
+                    button.prop('disabled', false).text('Test Fallback Link Generation');
                 });
             });
             
@@ -723,113 +564,117 @@ class OperatonDMNUpdateDebugger {
     }
 
     /**
-     * Test the complete restructure process
+     * Test the fallback "Download manually" link system
      */
-    public function ajax_test_restructure() {
+    public function ajax_test_fallback_link() {
         if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
             wp_send_json_error(array('message' => 'Security check failed'));
         }
 
-        // Check if the auto-updater class exists
-        if (!class_exists('OperatonDMNAutoUpdater')) {
-            wp_send_json_error(array('message' => 'OperatonDMNAutoUpdater class not found'));
-        }
-
         $gitlab_url = 'https://git.open-regels.nl';
         $project_id = '39';
+        $repository_url = 'https://git.open-regels.nl/showcases/operaton-dmn-evaluator';
         
         try {
-            // Get latest release
-            $response = wp_remote_get($gitlab_url . '/api/v4/projects/' . $project_id . '/releases');
+            // Test the GitLab API call that the fallback system uses
+            $api_url = $gitlab_url . '/api/v4/projects/' . $project_id . '/releases';
             
-            if (is_wp_error($response)) {
-                wp_send_json_error(array('message' => 'Failed to get releases: ' . $response->get_error_message()));
-            }
-            
-            $releases = json_decode(wp_remote_retrieve_body($response), true);
-            if (empty($releases)) {
-                wp_send_json_error(array('message' => 'No releases found'));
-            }
-            
-            $latest_release = $releases[0];
-            $tag = $latest_release['tag_name'];
-            
-            // Download URL
-            $download_url = $gitlab_url . '/api/v4/projects/' . $project_id . '/repository/archive.zip?sha=' . $tag;
-            
-            // Download the file
-            $temp_file = wp_tempnam('operaton-restructure-test');
-            
-            $download_response = wp_remote_get($download_url, array(
-                'timeout' => 60,
-                'stream' => true,
-                'filename' => $temp_file,
+            $response = wp_remote_get($api_url, array(
+                'timeout' => 10,
                 'headers' => array(
-                    'Accept' => 'application/zip, application/octet-stream',
-                    'User-Agent' => 'WordPress-Plugin-Updater/1.0'
+                    'User-Agent' => 'Operaton-DMN-Plugin/' . OPERATON_DMN_VERSION,
+                    'Accept' => 'application/json'
                 )
             ));
             
-            if (is_wp_error($download_response)) {
-                @unlink($temp_file);
-                wp_send_json_error(array('message' => 'Download failed: ' . $download_response->get_error_message()));
+            if (is_wp_error($response)) {
+                wp_send_json_error(array('message' => 'GitLab API request failed: ' . $response->get_error_message()));
             }
             
-            $response_code = wp_remote_retrieve_response_code($download_response);
+            $response_code = wp_remote_retrieve_response_code($response);
             if ($response_code !== 200) {
-                @unlink($temp_file);
-                wp_send_json_error(array('message' => 'HTTP error: ' . $response_code));
+                wp_send_json_error(array('message' => 'GitLab API returned status: ' . $response_code));
             }
             
-            $download_status = '✓ Downloaded ' . filesize($temp_file) . ' bytes';
+            $body = wp_remote_retrieve_body($response);
+            $releases = json_decode($body, true);
             
-            // Now test the restructure process using reflection to access private methods
-            $updater = new OperatonDMNAutoUpdater(OPERATON_DMN_PLUGIN_PATH . 'operaton-dmn-plugin.php', OPERATON_DMN_VERSION);
+            if (empty($releases)) {
+                wp_send_json_error(array('message' => 'No releases found in GitLab API response'));
+            }
             
-            $reflection = new ReflectionClass($updater);
-            $restructure_method = $reflection->getMethod('restructure_gitlab_zip');
-            $restructure_method->setAccessible(true);
+            $latest_release = $releases[0];
+            $remote_version = ltrim($latest_release['tag_name'], 'v');
+            $tag_name = $latest_release['tag_name'];
+            $current_version = OPERATON_DMN_VERSION;
             
-            // Call the private restructure method
-            $result = $restructure_method->invoke($updater, $temp_file);
+            // Check if update would be available
+            $update_available = version_compare($current_version, $remote_version, '<');
             
-            // Clean up original download
-            @unlink($temp_file);
+            // Generate the manual download URL (same logic as fallback notifier)
+            $manual_download_url = null;
+            $url_test_result = 'N/A';
             
-            if (is_wp_error($result)) {
-                wp_send_json_error(array(
-                    'message' => 'Restructure failed: ' . $result->get_error_message(),
-                    'download_status' => $download_status,
-                    'error_details' => $result->get_error_data()
+            if ($update_available) {
+                $manual_download_url = $repository_url . '/-/releases/' . $tag_name;
+                
+                // Test if the manual download URL actually works
+                $url_test_response = wp_remote_head($manual_download_url, array(
+                    'timeout' => 10,
+                    'redirection' => 5
                 ));
-            }
-            
-            // Check the restructured ZIP
-            $output_size = filesize($result);
-            $files_count = 0;
-            
-            if (class_exists('ZipArchive')) {
-                $zip = new ZipArchive();
-                if ($zip->open($result) === TRUE) {
-                    $files_count = $zip->numFiles;
-                    $zip->close();
+                
+                if (is_wp_error($url_test_response)) {
+                    $url_test_result = '✗ URL test failed: ' . $url_test_response->get_error_message();
+                } else {
+                    $url_response_code = wp_remote_retrieve_response_code($url_test_response);
+                    if ($url_response_code === 200) {
+                        $url_test_result = '✓ URL is accessible';
+                    } else {
+                        $url_test_result = '✗ URL returned status: ' . $url_response_code;
+                    }
                 }
             }
             
-            // Clean up
-            @unlink($result);
+            // Check fallback notice conditions
+            $fallback_notice_status = 'Not applicable (auto-update working)';
+            
+            // Simulate what the fallback notifier checks
+            $update_plugins = get_site_transient('update_plugins');
+            $auto_updater_working = false;
+            
+            if (isset($update_plugins->response)) {
+                foreach ($update_plugins->response as $plugin => $data) {
+                    if (strpos($plugin, 'operaton-dmn') !== false) {
+                        $auto_updater_working = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!$auto_updater_working && $update_available) {
+                $fallback_notice_status = '✓ Would show fallback notice with manual link';
+            } elseif ($auto_updater_working) {
+                $fallback_notice_status = 'Auto-updater working, fallback notice suppressed';
+            } else {
+                $fallback_notice_status = 'No update available, no notice needed';
+            }
             
             wp_send_json_success(array(
-                'download_status' => $download_status,
-                'restructure_status' => '✓ Successfully restructured',
-                'output_size' => number_format($output_size) . ' bytes',
-                'files_count' => $files_count . ' files',
-                'error_details' => null
+                'api_status' => '✓ GitLab API accessible',
+                'latest_version' => $remote_version,
+                'current_version' => $current_version,
+                'update_available' => $update_available,
+                'manual_download_url' => $manual_download_url,
+                'url_test_result' => $url_test_result,
+                'fallback_notice_status' => $fallback_notice_status,
+                'tag_name' => $tag_name,
+                'auto_updater_working' => $auto_updater_working
             ));
             
         } catch (Exception $e) {
             wp_send_json_error(array(
-                'message' => 'Exception during restructure test: ' . $e->getMessage(),
+                'message' => 'Exception during fallback link test: ' . $e->getMessage(),
                 'error_details' => $e->getTraceAsString()
             ));
         }
