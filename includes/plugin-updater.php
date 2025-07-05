@@ -362,12 +362,22 @@ class OperatonDMNAutoUpdater {
         $output_zip = wp_tempnam('operaton-dmn-final') . '.zip';
         
         try {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: Starting ZipArchive restructure');
+                error_log('Operaton DMN: Temp dir: ' . $temp_dir);
+                error_log('Operaton DMN: Output zip: ' . $output_zip);
+            }
+            
             // Extract source ZIP
             $zip = new ZipArchive();
             $result = $zip->open($source_zip);
             
             if ($result !== TRUE) {
                 return new WP_Error('zip_open_failed', 'Failed to open source ZIP: ' . $result);
+            }
+            
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: ZIP opened, extracting to: ' . $temp_dir);
             }
             
             if (!$zip->extractTo($temp_dir)) {
@@ -378,25 +388,70 @@ class OperatonDMNAutoUpdater {
             $zip->close();
             
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: ZIP extracted to: ' . $temp_dir);
+                error_log('Operaton DMN: ZIP extracted successfully');
+                // List contents of temp directory
+                $contents = scandir($temp_dir);
+                error_log('Operaton DMN: Temp dir contents: ' . implode(', ', $contents));
             }
             
-            // Find the extracted folder
-            $extracted_folders = glob($temp_dir . '/*', GLOB_ONLYDIR);
+            // Find the extracted folder - look for any folder starting with 'operaton-dmn-evaluator'
+            $extracted_folders = glob($temp_dir . '/operaton-dmn-evaluator*', GLOB_ONLYDIR);
+            
             if (empty($extracted_folders)) {
-                return new WP_Error('no_folder', 'No extracted folder found');
+                // Fallback: look for any directory
+                $all_folders = glob($temp_dir . '/*', GLOB_ONLYDIR);
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('Operaton DMN: No operaton-dmn-evaluator* folder found. All folders: ' . implode(', ', array_map('basename', $all_folders)));
+                }
+                
+                if (!empty($all_folders)) {
+                    $extracted_folders = array($all_folders[0]);
+                } else {
+                    return new WP_Error('no_folder', 'No extracted folder found in: ' . $temp_dir);
+                }
             }
             
             $source_folder = $extracted_folders[0];
             $plugin_folder = $temp_dir . '/operaton-dmn-evaluator';
             
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Renaming ' . basename($source_folder) . ' to operaton-dmn-evaluator');
+                error_log('Operaton DMN: Source folder: ' . $source_folder);
+                error_log('Operaton DMN: Target folder: ' . $plugin_folder);
+                error_log('Operaton DMN: Source folder exists: ' . (is_dir($source_folder) ? 'YES' : 'NO'));
             }
             
-            // Rename to proper WordPress plugin folder name
-            if (!rename($source_folder, $plugin_folder)) {
-                return new WP_Error('rename_failed', 'Failed to rename extracted folder');
+            // If the folder is already named correctly, no need to rename
+            if (basename($source_folder) !== 'operaton-dmn-evaluator') {
+                // Rename to proper WordPress plugin folder name
+                if (!rename($source_folder, $plugin_folder)) {
+                    $error_msg = 'Failed to rename ' . basename($source_folder) . ' to operaton-dmn-evaluator';
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        error_log('Operaton DMN: ' . $error_msg);
+                        error_log('Operaton DMN: Source exists: ' . (file_exists($source_folder) ? 'YES' : 'NO'));
+                        error_log('Operaton DMN: Target exists: ' . (file_exists($plugin_folder) ? 'YES' : 'NO'));
+                    }
+                    return new WP_Error('rename_failed', $error_msg);
+                }
+                
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('Operaton DMN: Successfully renamed to: ' . $plugin_folder);
+                }
+            } else {
+                $plugin_folder = $source_folder; // Already correctly named
+            }
+            
+            // Verify the plugin folder exists and has content
+            if (!is_dir($plugin_folder)) {
+                return new WP_Error('plugin_folder_missing', 'Plugin folder not found after rename: ' . $plugin_folder);
+            }
+            
+            $folder_contents = scandir($plugin_folder);
+            if (count($folder_contents) <= 2) { // Only . and .. 
+                return new WP_Error('empty_plugin_folder', 'Plugin folder is empty: ' . $plugin_folder);
+            }
+            
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: Plugin folder contents: ' . implode(', ', array_slice($folder_contents, 0, 10))); // Show first 10 items
             }
             
             // Create new ZIP with proper structure
@@ -407,21 +462,36 @@ class OperatonDMNAutoUpdater {
                 return new WP_Error('new_zip_failed', 'Failed to create output ZIP: ' . $result);
             }
             
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: Creating new ZIP archive');
+            }
+            
             // Add files to ZIP recursively
-            $this->add_folder_to_zip($new_zip, $plugin_folder, 'operaton-dmn-evaluator');
+            $files_added = $this->add_folder_to_zip($new_zip, $plugin_folder, 'operaton-dmn-evaluator');
             
             $new_zip->close();
+            
+            // Verify the new ZIP was created successfully
+            if (!file_exists($output_zip) || filesize($output_zip) === 0) {
+                return new WP_Error('output_zip_failed', 'Output ZIP file was not created or is empty');
+            }
             
             // Clean up temp directory
             $this->delete_directory($temp_dir);
             
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: New ZIP created: ' . $output_zip . ' (size: ' . filesize($output_zip) . ' bytes)');
+                error_log('Operaton DMN: New ZIP created successfully: ' . $output_zip . ' (size: ' . filesize($output_zip) . ' bytes)');
+                error_log('Operaton DMN: Files added to ZIP: ' . $files_added);
             }
             
             return $output_zip;
             
         } catch (Exception $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: Exception in restructure_with_ziparchive: ' . $e->getMessage());
+                error_log('Operaton DMN: Exception trace: ' . $e->getTraceAsString());
+            }
+            
             // Clean up on error
             if (is_dir($temp_dir)) {
                 $this->delete_directory($temp_dir);
@@ -435,22 +505,43 @@ class OperatonDMNAutoUpdater {
      * Add folder contents to ZIP recursively
      */
     private function add_folder_to_zip($zip, $folder_path, $zip_folder_name) {
-        $files = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($folder_path),
-            RecursiveIteratorIterator::LEAVES_ONLY
-        );
+        $files_added = 0;
         
-        foreach ($files as $name => $file) {
-            if (!$file->isDir()) {
-                $file_path = $file->getRealPath();
-                $relative_path = $zip_folder_name . '/' . substr($file_path, strlen($folder_path) + 1);
-                
-                // Normalize path separators for Windows compatibility
-                $relative_path = str_replace('\\', '/', $relative_path);
-                
-                $zip->addFile($file_path, $relative_path);
+        try {
+            $files = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($folder_path),
+                RecursiveIteratorIterator::LEAVES_ONLY
+            );
+            
+            foreach ($files as $name => $file) {
+                if (!$file->isDir()) {
+                    $file_path = $file->getRealPath();
+                    $relative_path = $zip_folder_name . '/' . substr($file_path, strlen($folder_path) + 1);
+                    
+                    // Normalize path separators for Windows compatibility
+                    $relative_path = str_replace('\\', '/', $relative_path);
+                    
+                    if ($zip->addFile($file_path, $relative_path)) {
+                        $files_added++;
+                    } else {
+                        if (defined('WP_DEBUG') && WP_DEBUG) {
+                            error_log('Operaton DMN: Failed to add file to ZIP: ' . $relative_path);
+                        }
+                    }
+                }
+            }
+            
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: Added ' . $files_added . ' files to ZIP');
+            }
+            
+        } catch (Exception $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: Exception in add_folder_to_zip: ' . $e->getMessage());
             }
         }
+        
+        return $files_added;
     }
     
     /**
