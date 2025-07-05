@@ -24,6 +24,118 @@ class OperatonDMNUpdateDebugger {
         // Wait for WordPress to be fully loaded before checking user capabilities
         add_action('admin_init', array($this, 'init_debug_tools'));
     }
+
+    /**
+     * Test the complete restructure process
+     */
+    public function ajax_test_restructure() {
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
+            wp_send_json_error(array('message' => 'Security check failed'));
+        }
+
+        // Check if the auto-updater class exists
+        if (!class_exists('OperatonDMNAutoUpdater')) {
+            wp_send_json_error(array('message' => 'OperatonDMNAutoUpdater class not found'));
+        }
+
+        $gitlab_url = 'https://git.open-regels.nl';
+        $project_id = '39';
+        
+        try {
+            // Get latest release
+            $response = wp_remote_get($gitlab_url . '/api/v4/projects/' . $project_id . '/releases');
+            
+            if (is_wp_error($response)) {
+                wp_send_json_error(array('message' => 'Failed to get releases: ' . $response->get_error_message()));
+            }
+            
+            $releases = json_decode(wp_remote_retrieve_body($response), true);
+            if (empty($releases)) {
+                wp_send_json_error(array('message' => 'No releases found'));
+            }
+            
+            $latest_release = $releases[0];
+            $tag = $latest_release['tag_name'];
+            
+            // Download URL
+            $download_url = $gitlab_url . '/api/v4/projects/' . $project_id . '/repository/archive.zip?sha=' . $tag;
+            
+            // Download the file
+            $temp_file = wp_tempnam('operaton-restructure-test');
+            
+            $download_response = wp_remote_get($download_url, array(
+                'timeout' => 60,
+                'stream' => true,
+                'filename' => $temp_file,
+                'headers' => array(
+                    'Accept' => 'application/zip, application/octet-stream',
+                    'User-Agent' => 'WordPress-Plugin-Updater/1.0'
+                )
+            ));
+            
+            if (is_wp_error($download_response)) {
+                @unlink($temp_file);
+                wp_send_json_error(array('message' => 'Download failed: ' . $download_response->get_error_message()));
+            }
+            
+            $response_code = wp_remote_retrieve_response_code($download_response);
+            if ($response_code !== 200) {
+                @unlink($temp_file);
+                wp_send_json_error(array('message' => 'HTTP error: ' . $response_code));
+            }
+            
+            $download_status = '✓ Downloaded ' . filesize($temp_file) . ' bytes';
+            
+            // Now test the restructure process using reflection to access private methods
+            $updater = new OperatonDMNAutoUpdater(OPERATON_DMN_PLUGIN_PATH . 'operaton-dmn-plugin.php', OPERATON_DMN_VERSION);
+            
+            $reflection = new ReflectionClass($updater);
+            $restructure_method = $reflection->getMethod('restructure_gitlab_zip');
+            $restructure_method->setAccessible(true);
+            
+            // Call the private restructure method
+            $result = $restructure_method->invoke($updater, $temp_file);
+            
+            // Clean up original download
+            @unlink($temp_file);
+            
+            if (is_wp_error($result)) {
+                wp_send_json_error(array(
+                    'message' => 'Restructure failed: ' . $result->get_error_message(),
+                    'download_status' => $download_status,
+                    'error_details' => $result->get_error_data()
+                ));
+            }
+            
+            // Check the restructured ZIP
+            $output_size = filesize($result);
+            $files_count = 0;
+            
+            if (class_exists('ZipArchive')) {
+                $zip = new ZipArchive();
+                if ($zip->open($result) === TRUE) {
+                    $files_count = $zip->numFiles;
+                    $zip->close();
+                }
+            }
+            
+            // Clean up
+            @unlink($result);
+            
+            wp_send_json_success(array(
+                'download_status' => $download_status,
+                'restructure_status' => '✓ Successfully restructured',
+                'output_size' => number_format($output_size) . ' bytes',
+                'files_count' => $files_count . ' files',
+                'error_details' => null
+            ));
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => 'Exception during restructure test: ' . $e->getMessage(),
+                'error_details' => $e->getTraceAsString()
+            ));
+        }
     
     /**
      * Initialize debug tools after WordPress is fully loaded
@@ -224,6 +336,14 @@ class OperatonDMNUpdateDebugger {
                 <div id="download-process-results" style="margin-top: 15px;"></div>
             </div>
 
+            <!-- Restructure Test -->
+            <div class="card">
+                <h2>ZIP Restructure Test</h2>
+                <p>Test the complete download and restructure process (simulates the actual update process).</p>
+                <button type="button" id="test-restructure" class="button button-primary">Test Full Restructure Process</button>
+                <div id="restructure-results" style="margin-top: 15px;"></div>
+            </div>
+
             <!-- Update Transient Info -->
             <div class="card">
                 <h2>WordPress Update Transients</h2>
@@ -372,6 +492,41 @@ class OperatonDMNUpdateDebugger {
                 }).always(function() {
                     button.prop('disabled', false).text('Test GitLab API');
                 });
+
+            // Test Restructure Process - NEW FUNCTION
+            $('#test-restructure').click(function() {
+                var button = $(this);
+                var results = $('#restructure-results');
+                
+                button.prop('disabled', true).text('Testing Restructure...');
+                results.html('<div class="result-info">Testing complete download and restructure process...</div>');
+                
+                $.post(ajaxurl, {
+                    action: 'operaton_test_restructure',
+                    _ajax_nonce: '<?php echo wp_create_nonce('operaton_update_debug'); ?>'
+                }, function(response) {
+                    if (response.success) {
+                        var data = response.data;
+                        var html = '<div class="result-success"><h4>Restructure Test Results</h4>';
+                        html += '<table class="form-table">';
+                        html += '<tr><th>Original Download</th><td>' + data.download_status + '</td></tr>';
+                        html += '<tr><th>Restructure Status</th><td>' + data.restructure_status + '</td></tr>';
+                        html += '<tr><th>Output ZIP Size</th><td>' + data.output_size + '</td></tr>';
+                        html += '<tr><th>Files in New ZIP</th><td>' + data.files_count + '</td></tr>';
+                        if (data.error_details) {
+                            html += '<tr><th>Error Details</th><td style="color: red;">' + data.error_details + '</td></tr>';
+                        }
+                        html += '</table></div>';
+                        results.html(html);
+                    } else {
+                        results.html('<div class="result-error"><h4>Restructure Test Failed</h4><p>' + response.data.message + '</p></div>');
+                    }
+                }).fail(function() {
+                    results.html('<div class="result-error">AJAX request failed</div>');
+                }).always(function() {
+                    button.prop('disabled', false).text('Test Full Restructure Process');
+                });
+            });
             });
 
             // Test Download Process - FIXED THIS SECTION
