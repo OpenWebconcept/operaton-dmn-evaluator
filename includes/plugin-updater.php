@@ -390,11 +390,13 @@ class OperatonDMNUpdateNotifier {
     private $plugin_slug;
     private $version;
     private $repository_url;
+    private $gitlab_project_id;
     
     public function __construct() {
         $this->plugin_slug = 'operaton-dmn-evaluator';
         $this->version = OPERATON_DMN_VERSION;
         $this->repository_url = 'https://git.open-regels.nl/showcases/operaton-dmn-evaluator';
+        $this->gitlab_project_id = '39';
         
         // Show manual update notice if auto-update fails
         add_action('admin_notices', array($this, 'show_fallback_notice'));
@@ -425,7 +427,7 @@ class OperatonDMNUpdateNotifier {
         $last_check = get_transient($transient_key);
         
         if ($last_check === false) {
-            $api_url = 'https://git.open-regels.nl/api/v4/projects/39/releases';
+            $api_url = 'https://git.open-regels.nl/api/v4/projects/' . $this->gitlab_project_id . '/releases';
             
             $response = wp_remote_get($api_url, array(
                 'timeout' => 10,
@@ -440,15 +442,20 @@ class OperatonDMNUpdateNotifier {
                 $releases = json_decode($body, true);
                 
                 if (!empty($releases) && isset($releases[0]['tag_name'])) {
-                    $remote_version = ltrim($releases[0]['tag_name'], 'v');
+                    $latest_release = $releases[0];
+                    $remote_version = ltrim($latest_release['tag_name'], 'v');
+                    $tag_name = $latest_release['tag_name'];
                     
                     if (version_compare($this->version, $remote_version, '<')) {
+                        // Create the correct download URL - use the specific release, not "latest"
+                        $download_url = $this->repository_url . '/-/releases/' . $tag_name;
+                        
                         echo '<div class="notice notice-warning is-dismissible">';
                         echo '<p><strong>Operaton DMN Evaluator:</strong> ';
                         echo sprintf(
                             __('Version %s is available. <a href="%s" target="_blank">Download manually</a> or check the plugins page for automatic updates.', 'operaton-dmn'),
                             $remote_version,
-                            $this->repository_url . '/-/releases/latest'
+                            $download_url
                         );
                         echo '</p></div>';
                     }
