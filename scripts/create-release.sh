@@ -140,7 +140,10 @@ elif command -v tar &> /dev/null; then
         echo "Python available - attempting to create ZIP version as well..."
         
         # Go to build dir using absolute path
-        cd "$BUILD_DIR"
+        cd "$BUILD_DIR" 2>/dev/null || {
+            echo "⚠ Could not access build directory for Python conversion (keeping tar.gz)"
+            cd "$RELEASE_DIR"
+        }
         
         # Check if we can actually access the tar file
         if [ -f "$TAR_NAME" ]; then
@@ -178,17 +181,11 @@ except Exception as e:
             if [ $? -eq 0 ]; then
                 echo "✓ Bonus: Also created ZIP version using Python"
                 # Don't change ARCHIVE_NAME/PATH - keep tar.gz as primary
-            else
-                echo "⚠ Python conversion failed (keeping tar.gz - this is fine)"
             fi
-        else
-            echo "⚠ Could not find tar file for Python conversion"
         fi
         
-        # Return to release directory
-        cd "$RELEASE_DIR"
-    else
-        echo "⚠ Python not available (tar.gz is fine for manual deployment)"
+        # Always return to release directory, regardless of what happened above
+        cd "$RELEASE_DIR" 2>/dev/null || true
     fi
 else
     echo "❌ Neither zip nor tar command found!"
@@ -252,6 +249,7 @@ if command -v unzip &> /dev/null && [[ "$ARCHIVE_NAME" == *.zip ]]; then
         echo "✓ Archive integrity test passed"
     else
         echo "✗ Archive integrity test failed"
+        cd "$PROJECT_ROOT"
         exit 1
     fi
 elif command -v tar &> /dev/null && [[ "$ARCHIVE_NAME" == *.tar.gz ]]; then
@@ -259,6 +257,7 @@ elif command -v tar &> /dev/null && [[ "$ARCHIVE_NAME" == *.tar.gz ]]; then
         echo "✓ Archive integrity test passed"
     else
         echo "✗ Archive integrity test failed"
+        cd "$PROJECT_ROOT"
         exit 1
     fi
 fi
