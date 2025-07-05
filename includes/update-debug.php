@@ -26,29 +26,129 @@ class OperatonDMNUpdateDebugger {
     }
     
     /**
- * Initialize debug tools after WordPress is fully loaded
- */
-public function init_debug_tools() {
-    error_log('Operaton DMN: init_debug_tools called');
-    
-    // Now it's safe to check user capabilities
-    if (!current_user_can('manage_options')) {
-        error_log('Operaton DMN: User does not have manage_options capability');
-        return;
+     * Initialize debug tools after WordPress is fully loaded
+     */
+    public function init_debug_tools() {
+        error_log('Operaton DMN: init_debug_tools called');
+        
+        // Now it's safe to check user capabilities
+        if (!current_user_can('manage_options')) {
+            error_log('Operaton DMN: User does not have manage_options capability');
+            return;
+        }
+        
+        error_log('Operaton DMN: User has manage_options, adding debug menu');
+        
+        // Use higher priority to ensure it runs after the main plugin menu
+        add_action('admin_menu', array($this, 'add_debug_menu'), 20);
+        
+        add_action('wp_ajax_operaton_test_update_api', array($this, 'ajax_test_update_api'));
+        add_action('wp_ajax_operaton_force_update_check', array($this, 'ajax_force_update_check'));
+        add_action('wp_ajax_operaton_simulate_update', array($this, 'ajax_simulate_update'));
+        add_action('wp_ajax_operaton_test_download_process', array($this, 'ajax_test_download_process')); // ADDED THIS LINE
+        
+        error_log('Operaton DMN: Debug hooks added with priority 20');
     }
-    
-    error_log('Operaton DMN: User has manage_options, adding debug menu');
-    
-    // Use higher priority to ensure it runs after the main plugin menu
-    add_action('admin_menu', array($this, 'add_debug_menu'), 20);
-    
-    add_action('wp_ajax_operaton_test_update_api', array($this, 'ajax_test_update_api'));
-    add_action('wp_ajax_operaton_force_update_check', array($this, 'ajax_force_update_check'));
-    add_action('wp_ajax_operaton_simulate_update', array($this, 'ajax_simulate_update'));
-    
-    error_log('Operaton DMN: Debug hooks added with priority 20');
-}
-    
+
+    /**
+     * Function to test the download process separately
+     */
+    public function ajax_test_download_process() {
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
+            wp_send_json_error(array('message' => 'Security check failed'));
+        }
+        
+        // Test the actual download and restructure process
+        $gitlab_url = 'https://git.open-regels.nl';
+        $project_id = '39';
+        
+        // Get latest release
+        $response = wp_remote_get($gitlab_url . '/api/v4/projects/' . $project_id . '/releases');
+        
+        if (is_wp_error($response)) {
+            wp_send_json_error(array('message' => 'Failed to get releases: ' . $response->get_error_message()));
+        }
+        
+        $releases = json_decode(wp_remote_retrieve_body($response), true);
+        if (empty($releases)) {
+            wp_send_json_error(array('message' => 'No releases found'));
+        }
+        
+        $latest_release = $releases[0];
+        $tag = $latest_release['tag_name'];
+        
+        // Test download URL
+        $download_url = $gitlab_url . '/api/v4/projects/' . $project_id . '/repository/archive.zip?sha=' . $tag;
+        
+        // Test download
+        $temp_file = wp_tempnam('operaton-test-download');
+        
+        $download_response = wp_remote_get($download_url, array(
+            'timeout' => 60,
+            'stream' => true,
+            'filename' => $temp_file,
+            'headers' => array(
+                'Accept' => 'application/zip, application/octet-stream',
+                'User-Agent' => 'WordPress-Plugin-Updater/1.0'
+            )
+        ));
+        
+        if (is_wp_error($download_response)) {
+            @unlink($temp_file);
+            wp_send_json_error(array('message' => 'Download failed: ' . $download_response->get_error_message()));
+        }
+        
+        $response_code = wp_remote_retrieve_response_code($download_response);
+        if ($response_code !== 200) {
+            @unlink($temp_file);
+            wp_send_json_error(array('message' => 'HTTP error: ' . $response_code));
+        }
+        
+        // Check file size and type
+        $file_size = filesize($temp_file);
+        $file_handle = fopen($temp_file, 'rb');
+        $header = fread($file_handle, 4);
+        fclose($file_handle);
+        
+        $is_zip = (substr($header, 0, 2) === 'PK');
+        
+        // Test ZIP extraction
+        $extraction_test = 'Not tested';
+        if ($is_zip && class_exists('ZipArchive')) {
+            $zip = new ZipArchive();
+            $result = $zip->open($temp_file, ZipArchive::CHECKCONS);
+            
+            if ($result === TRUE) {
+                $num_files = $zip->numFiles;
+                $first_file = $zip->getNameIndex(0);
+                $zip->close();
+                $extraction_test = "✓ Valid ZIP with {$num_files} files. First file: {$first_file}";
+            } else {
+                $extraction_test = "✗ ZIP validation failed with code: {$result}";
+            }
+        } elseif ($is_zip) {
+            $extraction_test = "ZIP detected but ZipArchive not available";
+        }
+        
+        // Clean up
+        @unlink($temp_file);
+        
+        wp_send_json_success(array(
+            'download_url' => $download_url,
+            'response_code' => $response_code,
+            'file_size' => $file_size . ' bytes',
+            'is_zip' => $is_zip,
+            'header' => bin2hex($header),
+            'extraction_test' => $extraction_test,
+            'ziparchive_available' => class_exists('ZipArchive'),
+            'release_info' => array(
+                'tag' => $tag,
+                'name' => $latest_release['name'],
+                'created_at' => $latest_release['created_at']
+            )
+        ));
+    }
+
     /**
      * Add debug menu page
      */
@@ -101,6 +201,10 @@ public function init_debug_tools() {
                         <th>Plugin Basename</th>
                         <td><?php echo plugin_basename(OPERATON_DMN_PLUGIN_PATH . 'operaton-dmn-plugin.php'); ?></td>
                     </tr>
+                    <tr>
+                        <th>ZipArchive Available</th>
+                        <td><?php echo class_exists('ZipArchive') ? '✓ Yes' : '✗ No (will use PclZip fallback)'; ?></td>
+                    </tr>
                 </table>
             </div>
             
@@ -112,6 +216,14 @@ public function init_debug_tools() {
                 <div id="gitlab-api-results" style="margin-top: 15px;"></div>
             </div>
             
+            <!-- Download Test -->
+            <div class="card">
+                <h2>Download Process Test</h2>
+                <p>Test the actual download and ZIP validation process.</p>
+                <button type="button" id="test-download-process" class="button button-primary">Test Download Process</button>
+                <div id="download-process-results" style="margin-top: 15px;"></div>
+            </div>
+
             <!-- Update Transient Info -->
             <div class="card">
                 <h2>WordPress Update Transients</h2>
@@ -261,6 +373,41 @@ public function init_debug_tools() {
                     button.prop('disabled', false).text('Test GitLab API');
                 });
             });
+
+            // Test Download Process - FIXED THIS SECTION
+            $('#test-download-process').click(function() {
+                var button = $(this);
+                var results = $('#download-process-results');
+                
+                button.prop('disabled', true).text('Testing Download...');
+                results.html('<div class="result-info">Testing download process...</div>');
+                
+                $.post(ajaxurl, {
+                    action: 'operaton_test_download_process',
+                    _ajax_nonce: '<?php echo wp_create_nonce('operaton_update_debug'); ?>'
+                }, function(response) {
+                    if (response.success) {
+                        var data = response.data;
+                        var html = '<div class="result-success"><h4>Download Test Results</h4>';
+                        html += '<table class="form-table">';
+                        html += '<tr><th>Download URL</th><td>' + data.download_url + '</td></tr>';
+                        html += '<tr><th>HTTP Response</th><td>' + data.response_code + '</td></tr>';
+                        html += '<tr><th>File Size</th><td>' + data.file_size + '</td></tr>';
+                        html += '<tr><th>Is ZIP</th><td>' + (data.is_zip ? '✓ Yes' : '✗ No') + '</td></tr>';
+                        html += '<tr><th>File Header</th><td>' + data.header + '</td></tr>';
+                        html += '<tr><th>ZIP Test</th><td>' + data.extraction_test + '</td></tr>';
+                        html += '<tr><th>ZipArchive Available</th><td>' + (data.ziparchive_available ? '✓ Yes' : '✗ No') + '</td></tr>';
+                        html += '</table></div>';
+                        results.html(html);
+                    } else {
+                        results.html('<div class="result-error"><h4>Download Test Failed</h4><p>' + response.data.message + '</p></div>');
+                    }
+                }).fail(function() {
+                    results.html('<div class="result-error">AJAX request failed</div>');
+                }).always(function() {
+                    button.prop('disabled', false).text('Test Download Process');
+                });
+            });
             
             // Clear transients
             $('#clear-transients').click(function() {
@@ -380,6 +527,8 @@ public function init_debug_tools() {
             'Adequate memory limit' => $this->check_memory_limit(),
             'Proper file permissions' => is_writable(WP_PLUGIN_DIR),
             'GitLab domain accessible' => $this->check_gitlab_accessibility(),
+            'ZipArchive class available' => class_exists('ZipArchive'),
+            'PclZip class available' => class_exists('PclZip'),
         );
         
         echo '<ul>';
@@ -410,50 +559,50 @@ public function init_debug_tools() {
     /**
      * AJAX: Test update API
      */
-public function ajax_test_update_api() {
-    if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
-        wp_send_json_error(array('message' => 'Security check failed'));
-    }
-    
-    // Test different endpoints to find the issue
-    $endpoints_to_test = array(
-        'project_info' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id,
-        'releases' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id . '/releases',
-        'latest_release' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id . '/releases/latest',
-        'tags' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id . '/repository/tags'
-    );
-    
-    $results = array();
-    
-    foreach ($endpoints_to_test as $name => $url) {
-        $response = wp_remote_get($url, array(
-            'timeout' => 10,
-            'headers' => array('Accept' => 'application/json')
-        ));
-        
-        if (is_wp_error($response)) {
-            $results[$name] = array(
-                'error' => $response->get_error_message(),
-                'url' => $url
-            );
-        } else {
-            $code = wp_remote_retrieve_response_code($response);
-            $body = wp_remote_retrieve_body($response);
-            
-            $results[$name] = array(
-                'url' => $url,
-                'http_code' => $code,
-                'response' => $code === 200 ? substr($body, 0, 500) : $body
-            );
+    public function ajax_test_update_api() {
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
+            wp_send_json_error(array('message' => 'Security check failed'));
         }
+        
+        // Test different endpoints to find the issue
+        $endpoints_to_test = array(
+            'project_info' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id,
+            'releases' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id . '/releases',
+            'latest_release' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id . '/releases/latest',
+            'tags' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id . '/repository/tags'
+        );
+        
+        $results = array();
+        
+        foreach ($endpoints_to_test as $name => $url) {
+            $response = wp_remote_get($url, array(
+                'timeout' => 10,
+                'headers' => array('Accept' => 'application/json')
+            ));
+            
+            if (is_wp_error($response)) {
+                $results[$name] = array(
+                    'error' => $response->get_error_message(),
+                    'url' => $url
+                );
+            } else {
+                $code = wp_remote_retrieve_response_code($response);
+                $body = wp_remote_retrieve_body($response);
+                
+                $results[$name] = array(
+                    'url' => $url,
+                    'http_code' => $code,
+                    'response' => $code === 200 ? substr($body, 0, 500) : $body
+                );
+            }
+        }
+        
+        wp_send_json_success(array(
+            'project_id' => $this->project_id,
+            'test_results' => $results,
+            'current_version' => OPERATON_DMN_VERSION
+        ));
     }
-    
-    wp_send_json_success(array(
-        'project_id' => $this->project_id,
-        'test_results' => $results,
-        'current_version' => OPERATON_DMN_VERSION
-    ));
-}
     
     /**
      * AJAX: Force update check
