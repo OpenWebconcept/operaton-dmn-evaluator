@@ -134,59 +134,7 @@ elif command -v tar &> /dev/null; then
     ARCHIVE_PATH="$BUILD_DIR/$TAR_NAME"
     ARCHIVE_NAME="$TAR_NAME"
     ARCHIVE_CREATED=true
-    
-    # Try to convert tar.gz to zip using Python (if available) - OPTIONAL
-    if command -v python3 &> /dev/null; then
-        echo "Python available - attempting to create ZIP version as well..."
-        
-        # Go to build dir using absolute path
-        cd "$BUILD_DIR" 2>/dev/null || {
-            echo "⚠ Could not access build directory for Python conversion (keeping tar.gz)"
-            cd "$RELEASE_DIR"
-        }
-        
-        # Check if we can actually access the tar file
-        if [ -f "$TAR_NAME" ]; then
-            python3 -c "
-import tarfile
-import zipfile
-import os
-import sys
-
-try:
-    # Extract tar.gz
-    with tarfile.open('$TAR_NAME', 'r:gz') as tar:
-        tar.extractall('temp_extract')
-    
-    # Create zip
-    zip_name = '$PLUGIN_NAME-$VERSION.zip'
-    with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, dirs, files in os.walk('temp_extract'):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arc_name = os.path.relpath(file_path, 'temp_extract')
-                zipf.write(file_path, arc_name)
-    
-    # Cleanup
-    import shutil
-    shutil.rmtree('temp_extract')
-    
-    print('Successfully created ZIP version as well!')
-    sys.exit(0)
-except Exception as e:
-    print(f'Python conversion failed (this is OK): {e}')
-    sys.exit(1)
-" 2>/dev/null
-            
-            if [ $? -eq 0 ]; then
-                echo "✓ Bonus: Also created ZIP version using Python"
-                # Don't change ARCHIVE_NAME/PATH - keep tar.gz as primary
-            fi
-        fi
-        
-        # Always return to release directory, regardless of what happened above
-        cd "$RELEASE_DIR" 2>/dev/null || true
-    fi
+    echo "✓ tar.gz archive created successfully"
 else
     echo "❌ Neither zip nor tar command found!"
     echo ""
