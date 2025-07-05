@@ -22,54 +22,59 @@ class OperatonDMNAutoUpdater {
     private $cache_key;
     private $cache_allowed;
     
-    public function __construct($plugin_file, $version) {
-        $this->plugin_file = $plugin_file;
-        $this->plugin_slug = plugin_basename($plugin_file);
-        $this->version = $version;
-        $this->gitlab_project_id = 'showcases/operaton-dmn-evaluator';
-        $this->gitlab_url = 'https://git.open-regels.nl';
-        $this->cache_key = 'operaton_dmn_updater';
-        $this->cache_allowed = true;
-        
-        add_filter('pre_set_site_transient_update_plugins', array($this, 'modify_transient'));
-        add_filter('plugins_api', array($this, 'plugin_popup'), 10, 3);
-        add_filter('upgrader_pre_download', array($this, 'download_package'), 10, 3);
-    }
+public function __construct($plugin_file, $version) {
+    $this->plugin_file = $plugin_file;
+    $this->plugin_slug = plugin_basename($plugin_file);
+    $this->version = $version;
+    $this->gitlab_project_id = '39'; // Use numeric ID instead of path
+    $this->gitlab_url = 'https://git.open-regels.nl';
+    $this->cache_key = 'operaton_dmn_updater';
+    $this->cache_allowed = true;
     
-    /**
-     * Get information regarding our plugin from GitLab
-     */
-    public function request() {
-        $remote_get = get_transient($this->cache_key);
-        
-        if ($this->cache_allowed && $remote_get !== false) {
-            return $remote_get;
-        }
-        
-        // Get latest release info from GitLab API
-        $request = wp_remote_get(
-            $this->gitlab_url . '/api/v4/projects/' . urlencode($this->gitlab_project_id) . '/releases/latest',
-            array(
-                'timeout' => 10,
-                'headers' => array(
-                    'Accept' => 'application/json'
-                )
-            )
-        );
-        
-        if (!is_wp_error($request) && wp_remote_retrieve_response_code($request) === 200) {
-            $remote_get = json_decode(wp_remote_retrieve_body($request), true);
-        } else {
-            $remote_get = false;
-        }
-        
-        if ($this->cache_allowed) {
-            set_transient($this->cache_key, $remote_get, 6 * HOUR_IN_SECONDS);
-        }
-        
+    add_filter('pre_set_site_transient_update_plugins', array($this, 'modify_transient'));
+    add_filter('plugins_api', array($this, 'plugin_popup'), 10, 3);
+    add_filter('upgrader_pre_download', array($this, 'download_package'), 10, 3);
+}    
+/**
+ * Get information regarding our plugin from GitLab
+ */
+public function request() {
+    $remote_get = get_transient($this->cache_key);
+    
+    if ($this->cache_allowed && $remote_get !== false) {
         return $remote_get;
     }
     
+    // Use the releases endpoint instead of latest (which seems to have issues)
+    $request = wp_remote_get(
+        $this->gitlab_url . '/api/v4/projects/' . $this->gitlab_project_id . '/releases',
+        array(
+            'timeout' => 10,
+            'headers' => array(
+                'Accept' => 'application/json'
+            )
+        )
+    );
+    
+    if (!is_wp_error($request) && wp_remote_retrieve_response_code($request) === 200) {
+        $releases = json_decode(wp_remote_retrieve_body($request), true);
+        
+        // Get the most recent release (first in the array)
+        if (!empty($releases) && is_array($releases)) {
+            $remote_get = $releases[0]; // Most recent release
+        } else {
+            $remote_get = false;
+        }
+    } else {
+        $remote_get = false;
+    }
+    
+    if ($this->cache_allowed) {
+        set_transient($this->cache_key, $remote_get, 6 * HOUR_IN_SECONDS);
+    }
+    
+    return $remote_get;
+}    
     /**
      * Modify the plugin update transient
      */
