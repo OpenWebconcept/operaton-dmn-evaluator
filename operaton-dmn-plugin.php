@@ -59,11 +59,19 @@ if (is_admin()) {
     
     // Load debug tools if in debug mode (remove in production)
     if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN: WP_DEBUG is enabled, attempting to load debug tools');
         $debug_file = OPERATON_DMN_PLUGIN_PATH . 'includes/update-debug.php';
+        error_log('Operaton DMN: Debug file path: ' . $debug_file);
+    
         if (file_exists($debug_file)) {
+            error_log('Operaton DMN: Debug file exists, loading...');
             require_once $debug_file;
+            error_log('Operaton DMN: Debug file loaded successfully');
+        } else {
+            error_log('Operaton DMN: Debug file NOT found at: ' . $debug_file);
         }
     }
+
 }
 
 /**
