@@ -17,8 +17,8 @@ if (!is_admin()) {
 class OperatonDMNUpdateDebugger {
     
     private $gitlab_url = 'https://git.open-regels.nl';
-    private $project_id = 'showcases/operaton-dmn-evaluator';
-    
+    private $project_id = '39'; // Use the numeric ID instead of path
+
     public function __construct() {
         error_log('Operaton DMN: OperatonDMNUpdateDebugger constructor called');
         // Wait for WordPress to be fully loaded before checking user capabilities
@@ -410,43 +410,50 @@ public function init_debug_tools() {
     /**
      * AJAX: Test update API
      */
-    public function ajax_test_update_api() {
-        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
-            wp_send_json_error(array('message' => 'Security check failed'));
-        }
-        
-        $api_url = $this->gitlab_url . '/api/v4/projects/' . urlencode($this->project_id) . '/releases/latest';
-        
-        $response = wp_remote_get($api_url, array(
+public function ajax_test_update_api() {
+    if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
+        wp_send_json_error(array('message' => 'Security check failed'));
+    }
+    
+    // Test different endpoints to find the issue
+    $endpoints_to_test = array(
+        'project_info' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id,
+        'releases' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id . '/releases',
+        'latest_release' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id . '/releases/latest',
+        'tags' => $this->gitlab_url . '/api/v4/projects/' . $this->project_id . '/repository/tags'
+    );
+    
+    $results = array();
+    
+    foreach ($endpoints_to_test as $name => $url) {
+        $response = wp_remote_get($url, array(
             'timeout' => 10,
             'headers' => array('Accept' => 'application/json')
         ));
         
         if (is_wp_error($response)) {
-            wp_send_json_error(array('message' => $response->get_error_message()));
+            $results[$name] = array(
+                'error' => $response->get_error_message(),
+                'url' => $url
+            );
+        } else {
+            $code = wp_remote_retrieve_response_code($response);
+            $body = wp_remote_retrieve_body($response);
+            
+            $results[$name] = array(
+                'url' => $url,
+                'http_code' => $code,
+                'response' => $code === 200 ? substr($body, 0, 500) : $body
+            );
         }
-        
-        $code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        
-        if ($code !== 200) {
-            wp_send_json_error(array('message' => 'HTTP ' . $code . ': ' . $body));
-        }
-        
-        $data = json_decode($body, true);
-        
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            wp_send_json_error(array('message' => 'Invalid JSON response'));
-        }
-        
-        wp_send_json_success(array(
-            'api_url' => $api_url,
-            'http_code' => $code,
-            'release_info' => $data,
-            'current_version' => OPERATON_DMN_VERSION,
-            'latest_version' => isset($data['tag_name']) ? ltrim($data['tag_name'], 'v') : 'unknown'
-        ));
     }
+    
+    wp_send_json_success(array(
+        'project_id' => $this->project_id,
+        'test_results' => $results,
+        'current_version' => OPERATON_DMN_VERSION
+    ));
+}
     
     /**
      * AJAX: Force update check
