@@ -6,8 +6,8 @@
  * File: includes/update-debug.php
  */
 
-// Only load in admin and for authorized users
-if (!is_admin() || !current_user_can('manage_options')) {
+// Only load in admin and for authorized users - but wait for WordPress to be ready
+if (!is_admin()) {
     return;
 }
 
@@ -20,6 +20,24 @@ class OperatonDMNUpdateDebugger {
     private $project_id = 'showcases/operaton-dmn-evaluator';
     
     public function __construct() {
+        error_log('Operaton DMN: OperatonDMNUpdateDebugger constructor called');
+        // Wait for WordPress to be fully loaded before checking user capabilities
+        add_action('admin_init', array($this, 'init_debug_tools'));
+    }
+    
+    /**
+     * Initialize debug tools after WordPress is fully loaded
+     */
+    public function init_debug_tools() {
+        error_log('Operaton DMN: init_debug_tools called');
+        
+        // Now it's safe to check user capabilities
+        if (!current_user_can('manage_options')) {
+            error_log('Operaton DMN: User does not have manage_options capability');
+            return;
+        }
+        
+        error_log('Operaton DMN: User has manage_options, adding debug menu');
         add_action('admin_menu', array($this, 'add_debug_menu'));
         add_action('wp_ajax_operaton_test_update_api', array($this, 'ajax_test_update_api'));
         add_action('wp_ajax_operaton_force_update_check', array($this, 'ajax_force_update_check'));
@@ -30,6 +48,7 @@ class OperatonDMNUpdateDebugger {
      * Add debug menu page
      */
     public function add_debug_menu() {
+        error_log('Operaton DMN: add_debug_menu called');
         add_submenu_page(
             'operaton-dmn',
             __('Update Debug', 'operaton-dmn'),
@@ -38,6 +57,7 @@ class OperatonDMNUpdateDebugger {
             'operaton-dmn-update-debug',
             array($this, 'debug_page')
         );
+        error_log('Operaton DMN: Debug submenu added');
     }
     
     /**
@@ -484,4 +504,6 @@ class OperatonDMNUpdateDebugger {
 }
 
 // Initialize the debugger
+error_log('Operaton DMN: About to create OperatonDMNUpdateDebugger instance');
 new OperatonDMNUpdateDebugger();
+error_log('Operaton DMN: OperatonDMNUpdateDebugger instance created');
