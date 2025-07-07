@@ -1,6 +1,19 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.0.0-beta.5] - 2025-07-07
+
+## Issues
+- [Issue #3](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/3)
+
+### Output improvement
+
+Provides a much better output of the Update Debug Tests.
+
+Example:
+
+![Gitlab Test Output](./assets/images/output-example.png)
+
 ## [1.0.0-beta.4] - 2025-07-07
 
 ## Issues
