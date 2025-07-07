@@ -17,7 +17,6 @@ A flexible WordPress plugin that integrates Gravity Forms with Operaton DMN deci
 | 🐛 **Report Bugs** | GitLab Issues | [Create Issue](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/new) |
 | ✨ **Feature Requests** | GitLab Issues | [Create Issue](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/new) |
 | 💾 **Latest Releases** | GitLab Releases | [View Releases](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/releases) |
-| 📖 **Documentation** | GitLab Wiki | [Read Docs](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/wikis/home) |
 | 🔄 **Auto-Updates** | Configured via GitLab | [Release System](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/releases) |
 
 > **Note**: Active development happens on GitLab. GitHub is a read-only mirror for visibility within the OpenWebconcept ecosystem.
@@ -32,7 +31,10 @@ This plugin is part of the [OpenWebconcept](https://github.com/OpenWebconcept) e
 
 ## Change Log
 
-All notable changes to this project will be documented in the [CHANGELOG.md](./CHANGELOG.md).
+**[1.0.0-beta.4] - 2025-07-07**
+**[1.0.0-beta.3] - 2025-07-01**
+
+All notable changes to this project are documented in the [CHANGELOG.md](./CHANGELOG.md).
 
 ## Plugin Structure
 
@@ -42,11 +44,18 @@ operaton-dmn-evaluator/
 │   └── css/
 │       └── admin.css                    # Admin styles
 │       └── frontend.css                 # Frontend styles
+│   ├── images/                          # Images for README & CHANGELOG
 │   ├── js/
 │   │   └── frontend.js                  # Frontend JavaScript
+├── includes/
+│   ├── plugin-updater.php               # Plugin updater
+│   └── update-debug.php                 # Debug page for update process
+├── scripts/
+│   ├── create-release.sh                # Creates release package for the plugin
 ├── templates/
 │   ├── admin-form.php                   # Configuration form page
 │   └── admin-list.php                   # Configuration list page
+├── vendor/plugin-update-checker         # Custom update checker library
 ├── operaton-dmn-evaluator.php           # Main plugin file
 └── README.md                            # This file
 ```
@@ -60,16 +69,11 @@ operaton-dmn-evaluator/
    cd operaton-dmn-evaluator
    ```
 
-2. **Create Required Directories:**
-   ```bash
-   mkdir -p assets/css assets/js templates
-   ```
+2. **Download source code as zip:**
 
-3. **Add Files:**
-   - Copy the main plugin file as `operaton-dmn-evaluator.php`
-   - Copy the frontend JavaScript to `assets/js/frontend.js`
-   - Create `templates/` directory and add the admin template files
-   - Create `templates/` directory and add the admin configuration page files
+   ![download source code](./assets/images/dowload-source-code.png)
+
+3. **Extract zip in Plugin Directory:**
 
 4. **Activate Plugin:**
    - Go to WordPress Admin → Plugins
