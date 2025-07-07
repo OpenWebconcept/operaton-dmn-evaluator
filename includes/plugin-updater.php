@@ -660,18 +660,80 @@ class OperatonDMNAutoUpdater {
     }
     
     /**
-     * Get changelog from release description
+     * Get changelog from release description with markdown processing
      */
     private function get_changelog($remote_version) {
-        if (isset($remote_version['description']) && !empty($remote_version['description'])) {
+        if (!isset($remote_version['description']) || empty($remote_version['description'])) {
             return '<h4>Version ' . ltrim($remote_version['tag_name'], 'v') . '</h4>' . 
-                   '<p>' . nl2br(esc_html($remote_version['description'])) . '</p>';
+                   '<p>See the <a href="' . $this->gitlab_url . '/showcases/operaton-dmn-evaluator/-/releases" target="_blank">release page</a> for details.</p>';
         }
         
-        return '<h4>Version ' . ltrim($remote_version['tag_name'], 'v') . '</h4>' . 
-               '<p>See the <a href="' . $this->gitlab_url . '/' . $this->gitlab_project_id . '/-/releases" target="_blank">release page</a> for details.</p>';
+        $description = $remote_version['description'];
+        
+        // Process GitLab markdown to HTML
+        $html_content = $this->process_gitlab_markdown($description);
+        
+        return '<h4>Version ' . ltrim($remote_version['tag_name'], 'v') . '</h4>' . $html_content;
     }
-    
+
+    /**
+     * Convert GitLab markdown to WordPress-compatible HTML
+     */
+    private function process_gitlab_markdown($markdown) {
+        // Convert GitLab image syntax to WordPress-compatible HTML
+        // Pattern: ![alt](/uploads/path/to/image.ext){width=X height=Y}
+        $markdown = preg_replace_callback(
+            '/!\[([^\]]*)\]\(([^)]+)\)(?:\{[^}]*width=(\d+)[^}]*height=(\d+)[^}]*\})?/',
+            function($matches) {
+                $alt = esc_attr($matches[1]);
+                $src = $matches[2];
+                $width = isset($matches[3]) ? intval($matches[3]) : '';
+                $height = isset($matches[4]) ? intval($matches[4]) : '';
+                
+                // Convert relative GitLab URLs to absolute URLs
+                // GitLab upload format: /uploads/hash/filename
+                // Becomes: https://git.open-regels.nl/-/project/39/uploads/hash/filename
+                if (strpos($src, '/uploads/') === 0) {
+                    $src = $this->gitlab_url . '/-/project/' . $this->gitlab_project_id . $src;
+                }
+                
+                // Build HTML img tag
+                $img_html = '<img src="' . esc_url($src) . '" alt="' . $alt . '"';
+                
+                if ($width && $height) {
+                    $img_html .= ' width="' . $width . '" height="' . $height . '"';
+                }
+                
+                $img_html .= ' style="max-width: 100%; height: auto; margin: 10px 0;" />';
+                
+                return $img_html;
+            },
+            $markdown
+        );
+        
+        // Convert markdown headers
+        $markdown = preg_replace('/^### (.+)$/m', '<h6>$1</h6>', $markdown);
+        $markdown = preg_replace('/^## (.+)$/m', '<h5>$1</h5>', $markdown);
+        $markdown = preg_replace('/^# (.+)$/m', '<h4>$1</h4>', $markdown);
+        
+        // Convert markdown bold/italic
+        $markdown = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $markdown);
+        $markdown = preg_replace('/\*(.+?)\*/', '<em>$1</em>', $markdown);
+        
+        // Convert markdown links
+        $markdown = preg_replace('/\[([^\]]+)\]\(([^)]+)\)/', '<a href="$2" target="_blank">$1</a>', $markdown);
+        
+        // Convert line breaks to HTML
+        $markdown = nl2br(trim($markdown));
+        
+        // Wrap in paragraph if not already wrapped
+        if (strpos($markdown, '<h') !== 0 && strpos($markdown, '<p') !== 0) {
+            $markdown = '<p>' . $markdown . '</p>';
+        }
+        
+        return $markdown;
+    }
+
     /**
      * V11.5: Download package - simplified since we're doing extraction differently
      */
