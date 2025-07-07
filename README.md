@@ -31,6 +31,7 @@ This plugin is part of the [OpenWebconcept](https://github.com/OpenWebconcept) e
 
 ## Change Log
 
+[[1.0.0-beta.5] - 2025-07-07](./CHANGELOG.md#100-beta5---2025-07-07)<br>
 [[1.0.0-beta.4] - 2025-07-07](./CHANGELOG.md#100-beta4---2025-07-07)<br>
 [[1.0.0-beta.3] - 2025-07-01](./CHANGELOG.md#100-beta3---2025-07-01)<br>
 
