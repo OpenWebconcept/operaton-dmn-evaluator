@@ -3,7 +3,7 @@
  * Plugin Name: Operaton DMN Evaluator
  * Plugin URI: https://git.open-regels.nl/showcases/operaton-dmn-evaluator
  * Description: WordPress plugin to integrate Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.
- * Version: 1.0.0-beta.5
+ * Version: 1.0.0-beta.6
  * Author: Steven Gort
  * License: EU PL v1.2
  * Text Domain: operaton-dmn
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('OPERATON_DMN_VERSION', '1.0.0-beta.5');
+define('OPERATON_DMN_VERSION', '1.0.0-beta.6');
 define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('OPERATON_DMN_PLUGIN_PATH', plugin_dir_path(__FILE__));
 
@@ -102,7 +102,9 @@ class OperatonDMNEvaluator {
         add_action('wp_ajax_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
         add_action('wp_ajax_nopriv_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
         add_action('wp_ajax_operaton_test_full_config', array($this, 'ajax_test_full_config'));
-        
+        // Add manual database update handler
+        add_action('wp_ajax_operaton_manual_db_update', array($this, 'ajax_manual_database_update'));
+    
         // Admin notices and health checks
         add_action('admin_notices', array($this, 'admin_notices'));
         add_action('operaton_dmn_cleanup', array($this, 'cleanup_old_data'));
@@ -116,7 +118,12 @@ class OperatonDMNEvaluator {
         
         // Version check for upgrades
         add_action('admin_init', array($this, 'check_version'));
-        
+    
+        // IMMEDIATE database check on admin pages
+        if (is_admin()) {
+            add_action('admin_init', array($this, 'check_and_update_database'), 5);
+        }
+
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
     }
@@ -192,47 +199,60 @@ class OperatonDMNEvaluator {
         flush_rewrite_rules();
     }
     
-    /**
-     * Enhanced database table creation with better error handling
-     */
-    private function create_database_tables() {
-        global $wpdb;
+/**
+ * Updated database table creation with new fields
+ * Replace the create_database_tables method in your main plugin file
+ */
+private function create_database_tables() {
+    global $wpdb;
+    
+    $table_name = $wpdb->prefix . 'operaton_dmn_configs';
+    
+    // Check if table already exists
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name) {
+        // Check if new columns exist, add them if not
+        $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
         
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        
-        // Check if table already exists
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name) {
-            return;
+        if (!in_array('result_display_field', $columns)) {
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN result_display_field varchar(255) DEFAULT NULL");
         }
         
-        $charset_collate = $wpdb->get_charset_collate();
-        
-        $sql = "CREATE TABLE $table_name (
-            id int(11) NOT NULL AUTO_INCREMENT,
-            name varchar(255) NOT NULL,
-            form_id int(11) NOT NULL,
-            dmn_endpoint varchar(500) NOT NULL,
-            decision_key varchar(255) NOT NULL,
-            field_mappings longtext NOT NULL,
-            result_field varchar(255) NOT NULL,
-            button_text varchar(255) DEFAULT 'Evaluate',
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY unique_form_id (form_id),
-            KEY idx_form_id (form_id)
-        ) $charset_collate;";
-        
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        $result = dbDelta($sql);
-        
-        // Log any errors
-        if (!empty($wpdb->last_error)) {
-            error_log('Operaton DMN: Database table creation error: ' . $wpdb->last_error);
+        if (!in_array('evaluation_step', $columns)) {
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN evaluation_step varchar(10) DEFAULT 'auto'");
         }
         
-        return $result;
+        return;
     }
+    
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    $sql = "CREATE TABLE $table_name (
+        id int(11) NOT NULL AUTO_INCREMENT,
+        name varchar(255) NOT NULL,
+        form_id int(11) NOT NULL,
+        dmn_endpoint varchar(500) NOT NULL,
+        decision_key varchar(255) NOT NULL,
+        field_mappings longtext NOT NULL,
+        result_field varchar(255) NOT NULL,
+        result_display_field varchar(255) DEFAULT NULL,
+        evaluation_step varchar(10) DEFAULT 'auto',
+        button_text varchar(255) DEFAULT 'Evaluate',
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY unique_form_id (form_id),
+        KEY idx_form_id (form_id)
+    ) $charset_collate;";
+    
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    $result = dbDelta($sql);
+    
+    if (!empty($wpdb->last_error)) {
+        error_log('Operaton DMN: Database table creation error: ' . $wpdb->last_error);
+    }
+    
+    return $result;
+}
     
 public function add_admin_menu() {
     add_menu_page(
@@ -307,19 +327,43 @@ public function temp_debug_page() {
     echo '<p>If the class exists, the full debug interface should work.</p>';
     echo '</div>';
 }
-    public function admin_page() {
-        if (isset($_POST['delete_config']) && wp_verify_nonce($_POST['_wpnonce'], 'delete_config')) {
-            $this->delete_config($_POST['config_id']);
-        }
-        
-        $configs = $this->get_all_configurations();
-        
-        // Show update management section
-        $this->show_update_management_section();
-        
-        include OPERATON_DMN_PLUGIN_PATH . 'templates/admin-list.php';
+    
+public function admin_page() {
+    // Check for database update success message
+    if (isset($_GET['database_updated'])) {
+        echo '<div class="notice notice-success is-dismissible"><p>' . __('Database schema updated successfully!', 'operaton-dmn') . '</p></div>';
     }
     
+    // Check if database needs updating
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'operaton_dmn_configs';
+    $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
+    $needs_update = !in_array('result_display_field', $columns) || !in_array('evaluation_step', $columns);
+    
+    if ($needs_update) {
+        echo '<div class="notice notice-warning">';
+        echo '<p><strong>' . __('Database Update Required', 'operaton-dmn') . '</strong></p>';
+        echo '<p>' . __('Your database schema needs to be updated to support the latest features.', 'operaton-dmn') . '</p>';
+        echo '<p>';
+        echo '<a href="' . wp_nonce_url(admin_url('admin-ajax.php?action=operaton_manual_db_update'), 'operaton_manual_db_update') . '" class="button button-primary">';
+        echo __('Update Database Now', 'operaton-dmn');
+        echo '</a>';
+        echo '</p>';
+        echo '</div>';
+    }
+    
+    if (isset($_POST['delete_config']) && wp_verify_nonce($_POST['_wpnonce'], 'delete_config')) {
+        $this->delete_config($_POST['config_id']);
+    }
+    
+    $configs = $this->get_all_configurations();
+    
+    // Show update management section
+    $this->show_update_management_section();
+    
+    include OPERATON_DMN_PLUGIN_PATH . 'templates/admin-list.php';
+}
+
     public function add_config_page() {
         if (isset($_POST['save_config']) && wp_verify_nonce($_POST['_wpnonce'], 'save_config')) {
             $this->save_configuration($_POST);
@@ -573,108 +617,172 @@ public function temp_debug_page() {
         return $errors;
     }
     
-    /**
-     * Enhanced configuration saving with validation
-     */
-    private function save_configuration($data) {
-        // Validate data
-        $validation_errors = $this->validate_configuration_data($data);
+/**
+ * Updated configuration saving with new fields
+ * Update the save_configuration method
+ */
+private function save_configuration($data) {
+    // Validate data (existing validation code...)
+    $validation_errors = $this->validate_configuration_data($data);
+    
+    if (!empty($validation_errors)) {
+        echo '<div class="notice notice-error"><ul>';
+        foreach ($validation_errors as $error) {
+            echo '<li>' . esc_html($error) . '</li>';
+        }
+        echo '</ul></div>';
+        return false;
+    }
+    
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'operaton_dmn_configs';
+    
+    // Process field mappings (existing code...)
+    $field_mappings = array();
+    
+    if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
+        $dmn_variables = $data['field_mappings_dmn_variable'];
+        $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
+        $types = isset($data['field_mappings_type']) ? $data['field_mappings_type'] : array();
         
-        if (!empty($validation_errors)) {
-            echo '<div class="notice notice-error"><ul>';
-            foreach ($validation_errors as $error) {
-                echo '<li>' . esc_html($error) . '</li>';
+        for ($i = 0; $i < count($dmn_variables); $i++) {
+            $dmn_var = sanitize_text_field(trim($dmn_variables[$i]));
+            $field_id = isset($field_ids[$i]) ? sanitize_text_field(trim($field_ids[$i])) : '';
+            $type = isset($types[$i]) ? sanitize_text_field($types[$i]) : 'String';
+            
+            if (!empty($dmn_var) && !empty($field_id)) {
+                $field_mappings[$dmn_var] = array(
+                    'field_id' => $field_id,
+                    'type' => $type
+                );
             }
-            echo '</ul></div>';
+        }
+    }
+    
+    $config_data = array(
+        'name' => sanitize_text_field($data['name']),
+        'form_id' => intval($data['form_id']),
+        'dmn_endpoint' => esc_url_raw($data['dmn_endpoint']),
+        'decision_key' => sanitize_text_field($data['decision_key']),
+        'field_mappings' => wp_json_encode($field_mappings),
+        'result_field' => sanitize_text_field($data['result_field']),
+        'result_display_field' => isset($data['result_display_field']) ? sanitize_text_field($data['result_display_field']) : '',
+        'evaluation_step' => isset($data['evaluation_step']) ? sanitize_text_field($data['evaluation_step']) : 'auto',
+        'button_text' => sanitize_text_field($data['button_text'] ?: 'Evaluate')
+    );
+    
+    $config_id = isset($data['config_id']) ? intval($data['config_id']) : 0;
+    
+    if ($config_id > 0) {
+        // Update existing configuration
+        $result = $wpdb->update(
+            $table_name, 
+            $config_data, 
+            array('id' => $config_id),
+            array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s'),
+            array('%d')
+        );
+        
+        if ($result !== false) {
+            $message = __('Configuration updated successfully!', 'operaton-dmn');
+            $this->clear_config_cache();
+        } else {
+            echo '<div class="notice notice-error"><p>' . __('Error updating configuration: ', 'operaton-dmn') . $wpdb->last_error . '</p></div>';
+            return false;
+        }
+    } else {
+        // Check for duplicate form_id
+        $existing = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM $table_name WHERE form_id = %d", 
+            $config_data['form_id']
+        ));
+        
+        if ($existing) {
+            echo '<div class="notice notice-error"><p>' . __('A configuration for this form already exists. Please edit the existing configuration or choose a different form.', 'operaton-dmn') . '</p></div>';
             return false;
         }
         
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        
-        // Process field mappings
-        $field_mappings = array();
-        
-        if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
-            $dmn_variables = $data['field_mappings_dmn_variable'];
-            $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
-            $types = isset($data['field_mappings_type']) ? $data['field_mappings_type'] : array();
-            
-            for ($i = 0; $i < count($dmn_variables); $i++) {
-                $dmn_var = sanitize_text_field(trim($dmn_variables[$i]));
-                $field_id = isset($field_ids[$i]) ? sanitize_text_field(trim($field_ids[$i])) : '';
-                $type = isset($types[$i]) ? sanitize_text_field($types[$i]) : 'String';
-                
-                if (!empty($dmn_var) && !empty($field_id)) {
-                    $field_mappings[$dmn_var] = array(
-                        'field_id' => $field_id,
-                        'type' => $type
-                    );
-                }
-            }
-        }
-        
-        $config_data = array(
-            'name' => sanitize_text_field($data['name']),
-            'form_id' => intval($data['form_id']),
-            'dmn_endpoint' => esc_url_raw($data['dmn_endpoint']),
-            'decision_key' => sanitize_text_field($data['decision_key']),
-            'field_mappings' => wp_json_encode($field_mappings),
-            'result_field' => sanitize_text_field($data['result_field']),
-            'button_text' => sanitize_text_field($data['button_text'] ?: 'Evaluate')
+        // Insert new configuration
+        $result = $wpdb->insert(
+            $table_name, 
+            $config_data,
+            array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
         );
         
-        $config_id = isset($data['config_id']) ? intval($data['config_id']) : 0;
-        
-        if ($config_id > 0) {
-            // Update existing configuration
-            $result = $wpdb->update(
-                $table_name, 
-                $config_data, 
-                array('id' => $config_id),
-                array('%s', '%d', '%s', '%s', '%s', '%s', '%s'),
-                array('%d')
-            );
-            
-            if ($result !== false) {
-                $message = __('Configuration updated successfully!', 'operaton-dmn');
-                $this->clear_config_cache();
-            } else {
-                echo '<div class="notice notice-error"><p>' . __('Error updating configuration: ', 'operaton-dmn') . $wpdb->last_error . '</p></div>';
-                return false;
-            }
+        if ($result !== false) {
+            $message = __('Configuration saved successfully!', 'operaton-dmn');
+            $this->clear_config_cache();
         } else {
-            // Check for duplicate form_id
-            $existing = $wpdb->get_var($wpdb->prepare(
-                "SELECT id FROM $table_name WHERE form_id = %d", 
-                $config_data['form_id']
-            ));
-            
-            if ($existing) {
-                echo '<div class="notice notice-error"><p>' . __('A configuration for this form already exists. Please edit the existing configuration or choose a different form.', 'operaton-dmn') . '</p></div>';
-                return false;
-            }
-            
-            // Insert new configuration
-            $result = $wpdb->insert(
-                $table_name, 
-                $config_data,
-                array('%s', '%d', '%s', '%s', '%s', '%s', '%s')
-            );
-            
-            if ($result !== false) {
-                $message = __('Configuration saved successfully!', 'operaton-dmn');
-                $this->clear_config_cache();
-            } else {
-                echo '<div class="notice notice-error"><p>' . __('Error saving configuration: ', 'operaton-dmn') . $wpdb->last_error . '</p></div>';
-                return false;
-            }
+            echo '<div class="notice notice-error"><p>' . __('Error saving configuration: ', 'operaton-dmn') . $wpdb->last_error . '</p></div>';
+            return false;
         }
-        
-        echo '<div class="notice notice-success"><p>' . $message . '</p></div>';
-        return true;
     }
     
+    echo '<div class="notice notice-success"><p>' . $message . '</p></div>';
+    return true;
+}
+
+/**
+ * Check and update database schema
+ */
+public function check_and_update_database() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'operaton_dmn_configs';
+    
+    // Check if table exists
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") !== $table_name) {
+        // Table doesn't exist, create it
+        $this->create_database_tables();
+        return;
+    }
+    
+    // Get current columns
+    $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
+    
+    // Add missing columns
+    if (!in_array('result_display_field', $columns)) {
+        $wpdb->query("ALTER TABLE $table_name ADD COLUMN result_display_field varchar(255) DEFAULT NULL AFTER result_field");
+        error_log('Operaton DMN: Added result_display_field column');
+    }
+    
+    if (!in_array('evaluation_step', $columns)) {
+        $wpdb->query("ALTER TABLE $table_name ADD COLUMN evaluation_step varchar(10) DEFAULT 'auto' AFTER result_display_field");
+        error_log('Operaton DMN: Added evaluation_step column');
+    }
+    
+    // Check for any errors
+    if (!empty($wpdb->last_error)) {
+        error_log('Operaton DMN: Database update error: ' . $wpdb->last_error);
+    } else {
+        error_log('Operaton DMN: Database schema updated successfully');
+    }
+}
+
+/**
+ * AJAX handler for manual database update
+ */
+public function ajax_manual_database_update() {
+    // Verify nonce
+    if (!wp_verify_nonce($_GET['_wpnonce'], 'operaton_manual_db_update')) {
+        wp_die('Security check failed');
+    }
+    
+    // Check user permissions
+    if (!current_user_can('manage_options')) {
+        wp_die('Insufficient permissions');
+    }
+    
+    // Perform database update
+    $this->check_and_update_database();
+    
+    // Redirect back with success message
+    wp_redirect(add_query_arg(array(
+        'page' => 'operaton-dmn',
+        'database_updated' => '1'
+    ), admin_url('admin.php')));
+    exit;
+}
+
     private function get_all_configurations() {
         global $wpdb;
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
@@ -766,92 +874,145 @@ public function temp_debug_page() {
         }
     }
     
-    /**
-     * Enhanced script enqueuing with proper dependencies
-     */
-    public function enqueue_gravity_scripts($form, $is_ajax) {
-        $config = $this->get_config_by_form_id($form['id']);
-        if (!$config) {
-            return;
-        }
-        
-        // Ensure jQuery is loaded
-        wp_enqueue_script('jquery');
-        
-        // Enqueue our frontend script with proper dependencies
-        wp_enqueue_script(
-            'operaton-dmn-frontend',
-            OPERATON_DMN_PLUGIN_URL . 'assets/js/frontend.js',
-            array('jquery', 'gform_gravityforms'),
-            OPERATON_DMN_VERSION,
-            true
-        );
-        
-        // Enqueue styles
-        wp_enqueue_style(
-            'operaton-dmn-frontend',
-            OPERATON_DMN_PLUGIN_URL . 'assets/css/frontend.css',
-            array(),
-            OPERATON_DMN_VERSION
-        );
-        
-        // Localize script with better error handling
-        wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
-            'url' => rest_url('operaton-dmn/v1/evaluate'),
-            'nonce' => wp_create_nonce('wp_rest'),
-            'debug' => defined('WP_DEBUG') && WP_DEBUG
-        ));
-        
-        // Form-specific configuration
-        $field_mappings = json_decode($config->field_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $field_mappings = array();
-        }
-        
-        wp_localize_script('operaton-dmn-frontend', 'operaton_config_' . $form['id'], array(
-            'config_id' => $config->id,
-            'button_text' => $config->button_text,
-            'field_mappings' => $field_mappings,
-            'form_id' => $form['id']
-        ));
+/**
+ * Enhanced script enqueuing with result field configuration
+ * Replace the enqueue_gravity_scripts method in your main plugin file
+ */
+public function enqueue_gravity_scripts($form, $is_ajax) {
+    $config = $this->get_config_by_form_id($form['id']);
+    if (!$config) {
+        return;
     }
     
-    /**
-     * Improved button rendering with better form state detection
-     */
-    public function add_evaluate_button($button, $form) {
-        // Don't add button in admin/editor context
-        if (is_admin() || (defined('DOING_AJAX') && DOING_AJAX)) {
-            return $button;
+    // Ensure jQuery is loaded
+    wp_enqueue_script('jquery');
+    
+    // Enqueue our frontend script with proper dependencies
+    wp_enqueue_script(
+        'operaton-dmn-frontend',
+        OPERATON_DMN_PLUGIN_URL . 'assets/js/frontend.js',
+        array('jquery', 'gform_gravityforms'),
+        OPERATON_DMN_VERSION,
+        true
+    );
+    
+    // Enqueue styles
+    wp_enqueue_style(
+        'operaton-dmn-frontend',
+        OPERATON_DMN_PLUGIN_URL . 'assets/css/frontend.css',
+        array(),
+        OPERATON_DMN_VERSION
+    );
+    
+    // Localize script with better error handling
+    wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
+        'url' => rest_url('operaton-dmn/v1/evaluate'),
+        'nonce' => wp_create_nonce('wp_rest'),
+        'debug' => defined('WP_DEBUG') && WP_DEBUG
+    ));
+    
+    // Form-specific configuration with new fields
+    $field_mappings = json_decode($config->field_mappings, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        $field_mappings = array();
+    }
+    
+    wp_localize_script('operaton-dmn-frontend', 'operaton_config_' . $form['id'], array(
+        'config_id' => $config->id,
+        'button_text' => $config->button_text,
+        'field_mappings' => $field_mappings,
+        'form_id' => $form['id'],
+        'result_display_field' => isset($config->result_display_field) ? $config->result_display_field : '',
+        'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto',
+        'result_field_name' => $config->result_field
+    ));
+}
+
+/**
+ * Fixed button rendering for multi-page forms
+ * Replace the add_evaluate_button method in your main plugin file
+ */
+public function add_evaluate_button($button, $form) {
+    // Don't add button in admin/editor context
+    if (is_admin() || (defined('DOING_AJAX') && DOING_AJAX)) {
+        return $button;
+    }
+    
+    $config = $this->get_config_by_form_id($form['id']);
+    if (!$config) {
+        return $button;
+    }
+    
+    // Get current page and total pages
+    $current_page = isset($_GET['gf_page']) ? intval($_GET['gf_page']) : 1;
+    $total_pages = 1;
+    
+    // Count total pages by looking for page break fields
+    if (isset($form['fields'])) {
+        foreach ($form['fields'] as $field) {
+            if ($field->type === 'page') {
+                $total_pages++;
+            }
         }
-        
-        $config = $this->get_config_by_form_id($form['id']);
-        if (!$config) {
-            return $button;
-        }
-        
-        // Create a more robust button implementation
-        $evaluate_button = sprintf(
-            '<input type="button" id="operaton-evaluate-%1$d" value="%2$s" class="gform_button button operaton-evaluate-btn" data-form-id="%1$d" data-config-id="%3$d" style="margin-left: 10px;">',
-            $form['id'],
-            esc_attr($config->button_text),
-            $config->id
-        );
-        
-        $result_container = sprintf(
-            '<div class="gfield gfield_operaton_result">
-                <div id="operaton-result-%1$d" class="ginput_container operaton-result" style="display: none;">
-                    <h4>%2$s</h4>
-                    <div class="result-content"></div>
+    }
+    
+    // Determine which page should have the evaluate button
+    $evaluation_step = isset($config->evaluation_step) ? $config->evaluation_step : 'auto';
+    
+    if ($evaluation_step === 'auto') {
+        // Auto-detect: put evaluate button on the second-to-last page
+        $evaluate_page = max(1, $total_pages - 1);
+    } else {
+        $evaluate_page = intval($evaluation_step);
+    }
+    
+    // Create the evaluate button
+    $evaluate_button = sprintf(
+        '<input type="button" id="operaton-evaluate-%1$d" value="%2$s" class="gform_button gform-theme-button operaton-evaluate-btn" data-form-id="%1$d" data-config-id="%3$d" style="margin-right: 10px;">',
+        $form['id'],
+        esc_attr($config->button_text),
+        $config->id
+    );
+    
+    // For single page forms
+    if ($total_pages <= 1) {
+        return sprintf(
+            '<div class="gform_footer top_label">
+                <div class="gform_button_wrapper gform_button_select_wrapper">
+                    %s
+                    %s
                 </div>
             </div>',
-            $form['id'],
-            __('Result:', 'operaton-dmn')
+            $evaluate_button,
+            $button
         );
-        
-        return $button . $evaluate_button . $result_container;
     }
     
+    // For multi-page forms - add evaluate button on the appropriate page
+    if ($current_page == $evaluate_page) {
+        // This is the page that should have the evaluate button
+        // Add it alongside the existing Next button
+        return sprintf(
+            '%s
+            <div style="margin-top: 10px;">
+                %s
+            </div>
+            <style>
+                .operaton-evaluate-btn { 
+                    background-color: #007ba7 !important;
+                    border-color: #007ba7 !important;
+                    margin-top: 10px !important;
+                }
+            </style>',
+            $button,  // Original button (Next/Previous)
+            $evaluate_button
+        );
+    } else {
+        // Other pages should show normal buttons
+        return $button;
+    }
+}
+
     /**
      * Enhanced configuration retrieval with caching
      */
