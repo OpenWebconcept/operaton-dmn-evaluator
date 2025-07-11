@@ -279,45 +279,67 @@ function handleEvaluateClick($button) {
         },
         success: function(response) {
             console.log('AJAX success:', response);
-            
-            if (response.success && response.result !== undefined && response.result !== null) {
-                // Store evaluation metadata
-                var currentPage = getCurrentPage(formId);
-                var evalData = {
-                    result: response.result,
-                    page: currentPage,
-                    timestamp: Date.now(),
-                    formData: formData // Store the input data used for this evaluation
-                };
-                
-                sessionStorage.setItem('operaton_dmn_eval_data_' + formId, JSON.stringify(evalData));
-                console.log('Stored evaluation data:', evalData);
-                
-                // Try to populate result field on current page
-                var $resultField = findResultFieldOnCurrentPage(formId);
-                
-                if ($resultField && $resultField.length > 0) {
-                    console.log('Found result field on current page, populating immediately');
-                    
-                    // Populate the field
-                    $resultField.val(response.result);
-                    $resultField.trigger('change');
-                    $resultField.trigger('input');
-                    
-                    // Show success notification
-                    showSuccessNotification('✅ Result populated: ' + response.result);
-                    
-                    // Highlight the field briefly
-                    highlightField($resultField);
-                    
-                } else {
-                    console.log('No result field found on current page');
-                    showError('No result field found on this page. Please add a field to receive the evaluation result.');
-                }
-                
-            } else {
-                showError('No result received from evaluation.');
-            }
+console.log('=== DEBUG: Starting result population ===');
+console.log('Response success:', response.success);
+console.log('Response result:', response.result);
+console.log('Result defined?', response.result !== undefined);
+console.log('Result not null?', response.result !== null);
+
+if (response.success && response.result !== undefined && response.result !== null) {
+    console.log('=== DEBUG: Conditions met, proceeding ===');
+    
+    // Store evaluation metadata
+    var currentPage = getCurrentPage(formId);
+    console.log('Current page:', currentPage);
+    
+    var evalData = {
+        result: response.result,
+        page: currentPage,
+        timestamp: Date.now(),
+        formData: formData
+    };
+    
+    sessionStorage.setItem('operaton_dmn_eval_data_' + formId, JSON.stringify(evalData));
+    console.log('Stored evaluation data:', evalData);
+    
+    // Try to populate result field on current page
+    console.log('=== DEBUG: About to search for result field ===');
+    var $resultField = findResultFieldOnCurrentPage(formId);
+    console.log('=== DEBUG: Result field search returned:', $resultField);
+    console.log('=== DEBUG: Result field length:', $resultField ? $resultField.length : 'null/undefined');
+    
+    if ($resultField && $resultField.length > 0) {
+        console.log('=== DEBUG: Found result field, populating ===');
+        console.log('Field element:', $resultField[0]);
+        console.log('Field current value before population:', $resultField.val());
+        
+        // Populate the field
+        $resultField.val(response.result);
+        console.log('Field value after setting:', $resultField.val());
+        
+        $resultField.trigger('change');
+        $resultField.trigger('input');
+        console.log('Triggers fired');
+        
+        // Show success notification
+        console.log('=== DEBUG: About to show notification ===');
+        showSuccessNotification('✅ Result populated: ' + response.result);
+        
+        // Highlight the field briefly
+        console.log('=== DEBUG: About to highlight field ===');
+        highlightField($resultField);
+        
+    } else {
+        console.log('=== DEBUG: No result field found ===');
+        showError('No result field found on this page. Please add a field to receive the evaluation result.');
+    }
+    
+} else {
+    console.log('=== DEBUG: Conditions NOT met ===');
+    console.log('response.success:', response.success);
+    console.log('response.result:', response.result);
+    showError('No result received from evaluation.');
+}
         },
 
                 error: function(xhr, status, error) {
