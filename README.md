@@ -88,6 +88,11 @@ operaton-dmn-evaluator/
    - Go to WordPress Admin → Plugins
    - Find "Operaton DMN Evaluator" and activate it
 
+# Demo
+
+The familiar [Dish example configured as demo](https://owc-gemeente.open-regels.nl/operaton-dmn-evaluator-2/) shows a multi-step form with a DMN evaluation at the end. The result is displayed in a short popup in the top-right corner of your screen, and the designated field on the form is populated.  
+
+![Form step 2](./assets/images/Screenshot%202025-07-11%20164610.png)
 
 # Configuration Guide
 
