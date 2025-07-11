@@ -1,37 +1,77 @@
-/* assets/css/frontend.css - IMPROVED VERSION */
+/* assets/css/frontend.css - ENHANCED VERSION with Gravity Forms Integration */
 
-/* Main evaluation button styling */
+/* Main evaluation button styling - Enhanced to match Gravity Forms */
 .operaton-evaluate-btn {
-    background: #0073aa !important;
-    color: white !important;
-    border: 1px solid #0073aa !important;
-    border-radius: 4px !important;
-    padding: 8px 16px !important;
+    /* Use Gravity Forms CSS variables when available, fallback to custom colors */
+    background: var(--gf-ctrl-btn-bg-color, #204ce5) !important;
+    color: var(--gf-ctrl-btn-text-color, #ffffff) !important;
+    border: 1px solid var(--gf-ctrl-btn-border-color, #204ce5) !important;
+    border-radius: var(--gf-ctrl-border-radius, 3px) !important;
+    
+    /* Improved sizing and spacing */
+    padding: 12px 24px !important;
     margin-left: 10px !important;
-    cursor: pointer !important;
     font-size: 14px !important;
-    transition: all 0.2s ease !important;
-    text-decoration: none !important;
+    font-weight: 600 !important;
+    line-height: 1.2 !important;
+    
+    /* Better positioning and display */
+    cursor: pointer !important;
     display: inline-block !important;
+    vertical-align: middle !important;
+    text-decoration: none !important;
+    
+    /* Smooth transitions */
+    transition: all 0.2s ease !important;
+    
+    /* Remove default button styles */
+    outline: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    
+    /* Ensure consistent height with other buttons */
+    min-height: 44px !important;
+    box-sizing: border-box !important;
 }
 
 .operaton-evaluate-btn:hover {
-    background: #005a87 !important;
-    border-color: #005a87 !important;
-    color: white !important;
+    background: var(--gf-ctrl-btn-bg-color-hover, #1a3bb8) !important;
+    border-color: var(--gf-ctrl-btn-border-color-hover, #1a3bb8) !important;
+    color: var(--gf-ctrl-btn-text-color-hover, #ffffff) !important;
+    transform: translateY(-1px) !important;
+}
+
+.operaton-evaluate-btn:active,
+.operaton-evaluate-btn:focus {
+    background: var(--gf-ctrl-btn-bg-color-active, #15338a) !important;
+    border-color: var(--gf-ctrl-btn-border-color-active, #15338a) !important;
+    transform: translateY(0) !important;
+    outline: 2px solid #005fcc !important;
+    outline-offset: 2px !important;
 }
 
 .operaton-evaluate-btn:disabled {
-    background: #ccc !important;
-    border-color: #ccc !important;
+    background: #cccccc !important;
+    border-color: #cccccc !important;
+    color: #666666 !important;
     cursor: not-allowed !important;
     opacity: 0.7 !important;
+    transform: none !important;
+}
+
+/* 2. UPDATE the button container section */
+.gform_footer .gform_button_wrapper {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
 }
 
 /* Result container styling */
 .operaton-result {
     display: block;
-    margin: 16px 0;
+    margin: 20px 0;
     padding: 16px;
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
@@ -61,14 +101,14 @@
     width: 16px;
     height: 16px;
     border: 2px solid #f3f3f3;
-    border-top: 2px solid #0073aa;
+    border-top: 2px solid var(--gf-ctrl-btn-bg-color, #204ce5);
     border-radius: 50%;
-    animation: spin 1s linear infinite;
+    animation: operaton-spin 1s linear infinite;
     margin-right: 8px;
     vertical-align: middle;
 }
 
-@keyframes spin {
+@keyframes operaton-spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
@@ -130,8 +170,43 @@
     color: #856404 !important;
 }
 
+/* Button loading state */
+.operaton-evaluate-btn.loading {
+    position: relative;
+    color: transparent !important;
+}
+
+.operaton-evaluate-btn.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid transparent;
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: operaton-spin 1s linear infinite;
+}
+
+/* Loading state for the entire result area */
+.operaton-result.loading {
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+
+.operaton-result.loading .result-content {
+    color: #6c757d !important;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
+    .gform_footer .gform_button_wrapper {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+    
     .operaton-evaluate-btn {
         display: block !important;
         width: 100% !important;
@@ -214,6 +289,14 @@
     .operaton-evaluate-btn {
         transition: none !important;
     }
+    
+    .operaton-evaluate-btn:hover {
+        transform: none !important;
+    }
+    
+    .operaton-evaluate-btn:active {
+        transform: none !important;
+    }
 }
 
 /* Print styles */
@@ -234,10 +317,28 @@
     }
 }
 
-/* Focus states for accessibility */
-.operaton-evaluate-btn:focus {
-    outline: 2px solid #005fcc !important;
-    outline-offset: 2px !important;
+/* Responsive design - maintain consistent heights */
+@media (max-width: 768px) {
+    .gform_footer .gform_button_wrapper {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+    
+    .operaton-evaluate-btn {
+        display: block !important;
+        width: 100% !important;
+        margin: 10px 0 !important;
+        text-align: center !important;
+    }
+    
+    /* KEEP consistent heights even on mobile */
+    .gform_wrapper .gform_footer input[type="submit"],
+    .gform_wrapper .gform_footer input[type="button"],
+    .gform_wrapper .gform_footer .operaton-evaluate-btn {
+        height: 44px !important;
+        min-height: 44px !important;
+        max-height: 44px !important;
+    }
 }
 
 /* Better integration with common themes */
@@ -258,44 +359,110 @@
     display: none !important;
 }
 
-/* Loading state for the entire result area */
-.operaton-result.loading {
-    background-color: #f8f9fa;
-    color: #6c757d;
+/* Force consistent button heights with more specific selectors */
+.gform_wrapper .gform_footer input[type="submit"],
+.gform_wrapper .gform_footer input[type="button"],
+.gform_wrapper .gform_footer .operaton-evaluate-btn,
+.gform_wrapper .gform_previous_button input,
+.gform_wrapper .gform_next_button input,
+.gform_wrapper .gform_footer .gform_previous_button input[type="button"],
+.gform_wrapper .gform_footer .gform_next_button input[type="button"],
+.gform_wrapper .gform_footer .gform_previous_button input[type="submit"],
+.gform_wrapper .gform_footer .gform_next_button input[type="submit"] {
+    min-height: 44px !important;
+    max-height: 44px !important;
+    height: 44px !important;
+    padding: 12px 24px !important;
+    line-height: 1.2 !important;
+    box-sizing: border-box !important;
+    font-size: 14px !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    vertical-align: middle !important;
 }
 
-.operaton-result.loading .result-content {
-    color: #6c757d !important;
+/* Override any flex height expansion */
+.gform_wrapper .gform_footer .gform_button_wrapper {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
 }
 
-/* Button states */
-.operaton-evaluate-btn.loading {
-    position: relative;
-    color: transparent !important;
+/* Ensure button containers don't expand */
+.gform_wrapper .gform_footer .gform_button_wrapper > * {
+    height: 44px !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
 }
 
-.operaton-evaluate-btn.loading::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 16px;
-    height: 16px;
-    margin: -8px 0 0 -8px;
-    border: 2px solid transparent;
-    border-top: 2px solid white;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
+/* More specific targeting for Previous/Next buttons */
+.gform_wrapper .gform_footer .gform_previous_button,
+.gform_wrapper .gform_footer .gform_next_button {
+    height: 44px !important;
+    display: inline-block !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
 }
 
-/* Ensure proper spacing in Gravity Forms */
-.gform_footer .operaton-evaluate-btn {
+/* Target the specific button containers */
+.gform_wrapper .gform_previous_button input[type="button"],
+.gform_wrapper .gform_next_button input[type="button"] {
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
     vertical-align: top !important;
 }
 
-/* Override any theme button resets */
-.operaton-evaluate-btn {
-    -webkit-appearance: none !important;
-    -moz-appearance: none !important;
-    appearance: none !important;
+/* Additional specificity for stubborn Previous buttons */
+.gform_wrapper form .gform_footer .gform_previous_button input,
+.gform_wrapper form .gform_footer .gform_previous_button input[type="button"],
+.gform_wrapper form .gform_footer .gform_previous_button input[type="submit"],
+body .gform_wrapper .gform_footer .gform_previous_button input {
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 12px 24px !important;
+    box-sizing: border-box !important;
+    line-height: 1.2 !important;
+    font-size: 14px !important;
+}
+
+/* Theme compatibility - works with most Gravity Forms themes */
+.gform_wrapper.gravity-theme .operaton-evaluate-btn,
+.gform_wrapper.gf_browser_chrome .operaton-evaluate-btn,
+.gform_wrapper.gf_browser_safari .operaton-evaluate-btn {
+    font-family: inherit !important;
+}
+
+/* Orbital theme specific adjustments */
+.gform_wrapper.gf-orbital-theme .operaton-evaluate-btn {
+    background: var(--gf-color-primary, #204ce5) !important;
+    border-color: var(--gf-color-primary, #204ce5) !important;
+}
+
+.gform_wrapper.gf-orbital-theme .operaton-evaluate-btn:hover {
+    background: var(--gf-color-primary-darker, #1a3bb8) !important;
+    border-color: var(--gf-color-primary-darker, #1a3bb8) !important;
+}
+
+/* Legacy theme support */
+.gform_wrapper.gf_browser_unknown .operaton-evaluate-btn {
+    background: #0073aa !important;
+    border-color: #0073aa !important;
+}
+
+.gform_wrapper.gf_browser_unknown .operaton-evaluate-btn:hover {
+    background: #005a87 !important;
+    border-color: #005a87 !important;
+}
+
+@keyframes operaton-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }

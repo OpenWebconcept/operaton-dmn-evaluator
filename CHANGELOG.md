@@ -1,6 +1,97 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.0.0-beta.6] - 2025-07-11
+
+## Issues
+- [Issue #5](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/5)
+
+## 🆕 New Features Added
+
+### 1. **Current Page Result Population**
+- **Before**: Results were displayed in a separate result container below the form
+- **After**: Results are automatically populated into designated form fields on the same page
+- **Benefit**: Immediate feedback without navigation, cleaner UX
+
+### 2. **Enhanced Admin Configuration**
+- **Added**: Result Display Field (Optional) dropdown
+- **Added**: Evaluation Step selector  
+- **Added**: Database schema auto-migration
+- **Benefit**: More control over result placement and form behavior
+
+### 3. **Smart Field Detection**
+- **Added**: Automatic detection of result fields by label ("Desired Dish", "Result")
+- **Added**: Configurable field mapping via admin dropdown
+- **Added**: Multiple detection strategies with fallback options
+- **Benefit**: Flexible setup - works with auto-detection or manual configuration
+
+### 4. **Clean State Management**
+- **Added**: Automatic result clearing when form inputs change
+- **Added**: Result clearing on form navigation (Previous/Next)
+- **Added**: Prevention of stale data display
+- **Benefit**: Users always get fresh, relevant results
+
+### 5. **Enhanced Visual Feedback**
+- **Added**: Green success notifications with auto-dismiss
+- **Added**: Field highlighting when populated with results
+- **Added**: Smooth scrolling to result field
+- **Benefit**: Clear visual confirmation of evaluation success
+
+## 🔧 Technical Improvements
+
+### Database Enhancements
+- **Added**: `result_display_field` column for specific field targeting
+- **Added**: `evaluation_step` column for step control
+- **Added**: Automatic schema migration on plugin updates
+
+### Frontend JavaScript Improvements
+- **Replaced**: Complex multi-step navigation with simple current-page population
+- **Added**: Input change monitoring for automatic result clearing
+- **Added**: Enhanced field detection with multiple strategies
+- **Improved**: Error handling and user feedback
+
+### Admin Interface Updates
+- **Added**: Form field visualization with clickable field tags
+- **Added**: Real-time endpoint URL preview
+- **Enhanced**: Field mapping interface with better field selection
+- **Added**: Configuration validation with detailed error messages
+
+## 📋 Workflow Changes
+
+### Previous Workflow
+1. Fill form → Click Evaluate → See result in container → Continue form
+
+### New Workflow  
+1. Fill form → Click Evaluate → Result populates field immediately → Continue form
+2. Change input → Result automatically clears → Evaluate again for fresh result
+
+## 🎯 User Experience Improvements
+
+| Aspect | Before | After |
+|--------|--------|-------|
+| **Result Display** | Separate container | Direct field population |
+| **Navigation** | Required manual progression | Immediate feedback |
+| **State Management** | Manual result clearing | Automatic cleanup |
+| **Visual Feedback** | Basic container display | Notifications + highlighting |
+| **Configuration** | Basic field mapping | Advanced field selection + auto-detection |
+
+## 🔒 Maintained Compatibility
+
+- ✅ All existing configurations continue to work
+- ✅ Same DMN API integration
+- ✅ Same field mapping concepts
+- ✅ Same admin interface structure
+- ✅ Backward compatible database schema
+
+## 📈 Benefits Summary
+
+1. **Simpler Setup**: Auto-detection reduces configuration complexity
+2. **Better UX**: Immediate result feedback without navigation
+3. **Cleaner State**: No stale data confusion
+4. **More Control**: Optional manual field specification
+5. **Enhanced Feedback**: Clear visual confirmation of actions
+6. **Reliable Operation**: Automatic cleanup prevents user confusion
+
 ## [1.0.0-beta.5] - 2025-07-07
 
 ## Issues
