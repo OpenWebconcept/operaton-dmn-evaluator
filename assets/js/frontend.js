@@ -203,8 +203,62 @@ function clearStoredResults(formId) {
         
         console.log('Event handler bound for form:', formId);
     }
+
+// Add this helper function to convert date formats
+function convertDateFormat(dateStr, fieldName) {
+    if (!dateStr || dateStr === null) {
+        return null;
+    }
     
-// Update the success handler to better track evaluation state
+    console.log('Converting date for field:', fieldName, 'Input:', dateStr);
+    
+    // Check if it's already in YYYY-MM-DD format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        console.log('Date already in ISO format:', dateStr);
+        return dateStr;
+    }
+    
+    // Check if it's in DD-MM-YYYY format (from Gravity Forms date picker)
+    if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+        var parts = dateStr.split('-');
+        var day = parts[0];
+        var month = parts[1];
+        var year = parts[2];
+        var isoDate = year + '-' + month + '-' + day;
+        console.log('Converted DD-MM-YYYY to ISO:', dateStr, '->', isoDate);
+        return isoDate;
+    }
+    
+    // Check if it's in MM/DD/YYYY format
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+        var parts = dateStr.split('/');
+        var month = parts[0];
+        var day = parts[1];
+        var year = parts[2];
+        var isoDate = year + '-' + month + '-' + day;
+        console.log('Converted MM/DD/YYYY to ISO:', dateStr, '->', isoDate);
+        return isoDate;
+    }
+    
+    // Try to parse with JavaScript Date and convert
+    try {
+        var date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+            var isoDate = date.getFullYear() + '-' + 
+                         String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+                         String(date.getDate()).padStart(2, '0');
+            console.log('Converted via Date parsing:', dateStr, '->', isoDate);
+            return isoDate;
+        }
+    } catch (e) {
+        console.error('Error parsing date:', dateStr, e);
+    }
+    
+    console.warn('Could not convert date format for:', dateStr);
+    return dateStr; // Return as-is if we can't convert
+}
+    
+// Replace the data collection and processing section in handleEvaluateClick
 function handleEvaluateClick($button) {
     var formId = $button.data('form-id');
     var configId = $button.data('config-id');
@@ -234,26 +288,70 @@ function handleEvaluateClick($button) {
     var hasRequiredData = true;
     var missingFields = [];
     
+    // First, collect all available data for ALL mapped fields
     $.each(fieldMappings, function(dmnVariable, mapping) {
         var fieldId = mapping.field_id;
         console.log('Processing DMN variable:', dmnVariable, 'Field ID:', fieldId);
         
         var value = getGravityFieldValue(formId, fieldId);
-        console.log('Found value for field', fieldId + ':', value);
+        console.log('Found raw value for field', fieldId + ':', value);
         
+        // Handle date field conversions
+        if (dmnVariable.toLowerCase().indexOf('datum') !== -1 || 
+            dmnVariable.toLowerCase().indexOf('date') !== -1 ||
+            dmnVariable === 'dagVanAanvraag' ||
+            dmnVariable === 'geboortedatumAanvrager' ||
+            dmnVariable === 'geboortedatumPartner') {
+            
+            if (value !== null && value !== '' && value !== undefined) {
+                value = convertDateFormat(value, dmnVariable);
+            }
+        }
+        
+        console.log('Processed value for', dmnVariable + ':', value);
+        
+        // Add the value to formData (including null/empty values)
+        formData[dmnVariable] = value;
+    });
+    
+    console.log('Collected raw form data:', formData);
+    
+    // Now apply conditional logic for partner-related fields
+    var isAlleenstaand = formData['aanvragerAlleenstaand'];
+    console.log('User is single (alleenstaand):', isAlleenstaand);
+    
+    // If user is single, set partner birth date to null
+    if (isAlleenstaand === 'true' || isAlleenstaand === true) {
+        console.log('User is single, setting geboortedatumPartner to null');
+        formData['geboortedatumPartner'] = null;
+    }
+    
+    // Validate required fields (excluding conditionally optional ones)
+    $.each(fieldMappings, function(dmnVariable, mapping) {
+        var value = formData[dmnVariable];
+        
+        // Skip validation for partner fields when user is single
+        if (isAlleenstaand === 'true' || isAlleenstaand === true) {
+            if (dmnVariable === 'geboortedatumPartner') {
+                console.log('Skipping validation for geboortedatumPartner (user is single)');
+                return true; // continue to next iteration
+            }
+        }
+        
+        // Check if this field is actually required
         if (value === null || value === '' || value === undefined) {
+            // You can add more conditional logic here for other optional fields
             hasRequiredData = false;
-            missingFields.push(dmnVariable + ' (field ID: ' + fieldId + ')');
+            missingFields.push(dmnVariable + ' (field ID: ' + mapping.field_id + ')');
         } else {
             if (!validateFieldType(value, mapping.type)) {
                 showError('Invalid data type for field ' + dmnVariable + '. Expected: ' + mapping.type);
                 return false;
             }
-            formData[dmnVariable] = value;
         }
     });
     
-    console.log('Collected form data:', formData);
+    console.log('Final form data after conditional logic:', formData);
     
     if (!hasRequiredData) {
         showError('Please fill in all required fields: ' + missingFields.join(', '));
@@ -279,98 +377,107 @@ function handleEvaluateClick($button) {
         },
         success: function(response) {
             console.log('AJAX success:', response);
-console.log('=== DEBUG: Starting result population ===');
-console.log('Response success:', response.success);
-console.log('Response result:', response.result);
-console.log('Result defined?', response.result !== undefined);
-console.log('Result not null?', response.result !== null);
+            console.log('=== DEBUG: Starting result population ===');
+            console.log('Response success:', response.success);
+            console.log('Response result:', response.result);
+            console.log('Result defined?', response.result !== undefined);
+            console.log('Result not null?', response.result !== null);
 
-if (response.success && response.result !== undefined && response.result !== null) {
-    console.log('=== DEBUG: Conditions met, proceeding ===');
-    
-    // Store evaluation metadata
-    var currentPage = getCurrentPage(formId);
-    console.log('Current page:', currentPage);
-    
-    var evalData = {
-        result: response.result,
-        page: currentPage,
-        timestamp: Date.now(),
-        formData: formData
-    };
-    
-    sessionStorage.setItem('operaton_dmn_eval_data_' + formId, JSON.stringify(evalData));
-    console.log('Stored evaluation data:', evalData);
-    
-    // Try to populate result field on current page
-    console.log('=== DEBUG: About to search for result field ===');
-    var $resultField = findResultFieldOnCurrentPage(formId);
-    console.log('=== DEBUG: Result field search returned:', $resultField);
-    console.log('=== DEBUG: Result field length:', $resultField ? $resultField.length : 'null/undefined');
-    
-    if ($resultField && $resultField.length > 0) {
-        console.log('=== DEBUG: Found result field, populating ===');
-        console.log('Field element:', $resultField[0]);
-        console.log('Field current value before population:', $resultField.val());
-        
-        // Populate the field
-        $resultField.val(response.result);
-        console.log('Field value after setting:', $resultField.val());
-        
-        $resultField.trigger('change');
-        $resultField.trigger('input');
-        console.log('Triggers fired');
-        
-        // Show success notification
-        console.log('=== DEBUG: About to show notification ===');
-        showSuccessNotification('✅ Result populated: ' + response.result);
-        
-        // Highlight the field briefly
-        console.log('=== DEBUG: About to highlight field ===');
-        highlightField($resultField);
-        
-    } else {
-        console.log('=== DEBUG: No result field found ===');
-        showError('No result field found on this page. Please add a field to receive the evaluation result.');
-    }
-    
-} else {
-    console.log('=== DEBUG: Conditions NOT met ===');
-    console.log('response.success:', response.success);
-    console.log('response.result:', response.result);
-    showError('No result received from evaluation.');
-}
-        },
-
-                error: function(xhr, status, error) {
-                console.error('AJAX Error:', error);
-                console.error('Status:', status);
-                console.error('Response:', xhr.responseText);
+            if (response.success && response.result !== undefined && response.result !== null) {
+                console.log('=== DEBUG: Conditions met, proceeding ===');
                 
-                var errorMessage = 'Error during evaluation. Please try again.';
-                
-                try {
-                    var errorResponse = JSON.parse(xhr.responseText);
-                    if (errorResponse.message) {
-                        errorMessage = errorResponse.message;
-                    }
-                } catch (e) {
-                    if (xhr.status === 0) {
-                        errorMessage = 'Connection error. Please check your internet connection.';
-                    } else if (xhr.status === 404) {
-                        errorMessage = 'Evaluation service not found.';
-                    } else if (xhr.status === 500) {
-                        errorMessage = 'Server error occurred during evaluation.';
-                    }
+                // Extract the actual result value
+                var resultValue;
+                if (typeof response.result === 'object' && response.result.value !== undefined) {
+                    resultValue = response.result.value;
+                } else {
+                    resultValue = response.result;
                 }
                 
-                showError(errorMessage);
-            },
-            complete: function() {
-                $button.val(originalText).prop('disabled', false);
+                console.log('Extracted result value:', resultValue);
+                
+                // Store evaluation metadata
+                var currentPage = getCurrentPage(formId);
+                console.log('Current page:', currentPage);
+                
+                var evalData = {
+                    result: resultValue,
+                    page: currentPage,
+                    timestamp: Date.now(),
+                    formData: formData
+                };
+                
+                sessionStorage.setItem('operaton_dmn_eval_data_' + formId, JSON.stringify(evalData));
+                console.log('Stored evaluation data:', evalData);
+                
+                // Try to populate result field on current page
+                console.log('=== DEBUG: About to search for result field ===');
+                var $resultField = findResultFieldOnCurrentPage(formId);
+                console.log('=== DEBUG: Result field search returned:', $resultField);
+                console.log('=== DEBUG: Result field length:', $resultField ? $resultField.length : 'null/undefined');
+                
+                if ($resultField && $resultField.length > 0) {
+                    console.log('=== DEBUG: Found result field, populating ===');
+                    console.log('Field element:', $resultField[0]);
+                    console.log('Field current value before population:', $resultField.val());
+                    
+                    // Populate the field with the extracted value
+                    $resultField.val(resultValue);
+                    console.log('Field value after setting:', $resultField.val());
+                    
+                    $resultField.trigger('change');
+                    $resultField.trigger('input');
+                    console.log('Triggers fired');
+                    
+                    // Show success notification
+                    console.log('=== DEBUG: About to show notification ===');
+                    showSuccessNotification('✅ Result populated: ' + resultValue);
+                    
+                    // Highlight the field briefly
+                    console.log('=== DEBUG: About to highlight field ===');
+                    highlightField($resultField);
+                    
+                } else {
+                    console.log('=== DEBUG: No result field found ===');
+                    showError('No result field found on this page. Please add a field to receive the evaluation result.');
+                }
+                
+            } else {
+                console.log('=== DEBUG: Conditions NOT met ===');
+                console.log('response.success:', response.success);
+                console.log('response.result:', response.result);
+                showError('No result received from evaluation.');
             }
-        });
-    }
+        },
+        error: function(xhr, status, error) {
+            console.error('AJAX Error:', error);
+            console.error('Status:', status);
+            console.error('Response:', xhr.responseText);
+            
+            var errorMessage = 'Error during evaluation. Please try again.';
+            
+            try {
+                var errorResponse = JSON.parse(xhr.responseText);
+                if (errorResponse.message) {
+                    errorMessage = errorResponse.message;
+                }
+            } catch (e) {
+                if (xhr.status === 0) {
+                    errorMessage = 'Connection error. Please check your internet connection.';
+                } else if (xhr.status === 404) {
+                    errorMessage = 'Evaluation service not found.';
+                } else if (xhr.status === 500) {
+                    errorMessage = 'Server error occurred during evaluation.';
+                }
+            }
+            
+            showError(errorMessage);
+        },
+        complete: function() {
+            $button.val(originalText).prop('disabled', false);
+        }
+    });
+}
     
     // Simplified result field finder for current page only
     function findResultFieldOnCurrentPage(formId) {

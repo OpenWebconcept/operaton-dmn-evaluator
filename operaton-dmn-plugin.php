@@ -1097,47 +1097,74 @@ public function add_evaluate_button($button, $form) {
                 return new WP_Error('invalid_mappings', 'Invalid field mappings configuration', array('status' => 500));
             }
             
-            $variables = array();
-            
-            foreach ($field_mappings as $dmn_variable => $form_field) {
-                if (isset($params['form_data'][$dmn_variable])) {
-                    $value = $params['form_data'][$dmn_variable];
-                    
-                    // Enhanced type conversion with validation
-                    switch ($form_field['type']) {
-                        case 'Integer':
-                            if (!is_numeric($value)) {
-                                return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
-                            }
-                            $value = intval($value);
-                            break;
-                        case 'Double':
-                            if (!is_numeric($value)) {
-                                return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
-                            }
-                            $value = floatval($value);
-                            break;
-                        case 'Boolean':
-                            $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-                            if ($value === null) {
-                                return new WP_Error('invalid_type', sprintf('Value for %s must be boolean', $dmn_variable), array('status' => 400));
-                            }
-                            break;
-                        default:
-                            $value = sanitize_text_field($value);
+// Replace the variable processing section in your handle_evaluation method:
+
+$variables = array();
+
+// Process ALL mapped fields, ensuring each one is included
+foreach ($field_mappings as $dmn_variable => $form_field) {
+    $value = null; // Default to null
+    
+    // Check if data was provided for this variable
+    if (isset($params['form_data'][$dmn_variable])) {
+        $value = $params['form_data'][$dmn_variable];
+    }
+    
+    // Handle explicit null values
+    if ($value === null || $value === 'null' || $value === '') {
+        $variables[$dmn_variable] = array(
+            'value' => null,
+            'type' => $form_field['type']
+        );
+        continue;
+    }
+    
+    // Enhanced type conversion with validation
+    switch ($form_field['type']) {
+        case 'Integer':
+            if (!is_numeric($value)) {
+                return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
+            }
+            $value = intval($value);
+            break;
+        case 'Double':
+            if (!is_numeric($value)) {
+                return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
+            }
+            $value = floatval($value);
+            break;
+        case 'Boolean':
+            // Handle string boolean values
+            if (is_string($value)) {
+                $value = strtolower($value);
+                if ($value === 'true' || $value === '1') {
+                    $value = true;
+                } elseif ($value === 'false' || $value === '0') {
+                    $value = false;
+                } else {
+                    $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                    if ($value === null) {
+                        return new WP_Error('invalid_type', sprintf('Value for %s must be boolean', $dmn_variable), array('status' => 400));
                     }
-                    
-                    $variables[$dmn_variable] = array(
-                        'value' => $value,
-                        'type' => $form_field['type']
-                    );
                 }
             }
-            
-            if (empty($variables)) {
-                return new WP_Error('no_data', 'No valid form data provided', array('status' => 400));
-            }
-            
+            break;
+        default:
+            $value = sanitize_text_field($value);
+    }
+    
+    $variables[$dmn_variable] = array(
+        'value' => $value,
+        'type' => $form_field['type']
+    );
+}
+
+// Log the variables being sent for debugging
+error_log('Operaton DMN: Variables being sent to DMN engine: ' . print_r($variables, true));
+
+if (empty($variables)) {
+    return new WP_Error('no_data', 'No valid form data provided', array('status' => 400));
+}            
             // Build the full evaluation endpoint
             $evaluation_endpoint = $this->build_evaluation_endpoint($config->dmn_endpoint, $config->decision_key);
             
