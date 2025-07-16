@@ -1,6 +1,17 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.0.0-beta.7] - 2025-07-11
+
+## Issues
+- [Issue #5](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/5)
+
+## The key fixes that resolved the issue were:
+
+- Date Format Conversion: Converting Gravity Forms' DD-MM-YYYY format to ISO YYYY-MM-DD format that the DMN engine expects
+- Including All Mapped Fields: Ensuring that all configured field mappings are sent to the DMN engine, even when they're null
+- Conditional Field Validation: Properly handling optional fields like partner birth date when the user is single
+
 ## [1.0.0-beta.6] - 2025-07-11
 
 ## Issues
