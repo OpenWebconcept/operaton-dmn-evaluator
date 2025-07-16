@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 ## Issues
 - [Issue #5](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/5)
 
-## The key fixes that resolved the issue were:
+## The key fixes in this release:
 
 - Date Format Conversion: Converting Gravity Forms' DD-MM-YYYY format to ISO YYYY-MM-DD format that the DMN engine expects
 - Including All Mapped Fields: Ensuring that all configured field mappings are sent to the DMN engine, even when they're null
