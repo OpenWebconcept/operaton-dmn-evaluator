@@ -258,7 +258,6 @@ function convertDateFormat(dateStr, fieldName) {
     return dateStr; // Return as-is if we can't convert
 }
     
-// Replace the data collection and processing section in handleEvaluateClick
 function handleEvaluateClick($button) {
     var formId = $button.data('form-id');
     var configId = $button.data('config-id');
@@ -278,207 +277,181 @@ function handleEvaluateClick($button) {
     
     console.log('Field mappings:', fieldMappings);
     
-    if (!validateForm(formId)) {
-        showError('Please fill in all required fields before evaluation.');
-        return;
-    }
+    // FORCE RADIO BUTTON SYNCHRONIZATION BEFORE VALIDATION
+    forceSyncRadioButtons(formId);
     
-    // Collect form data
-    var formData = {};
-    var hasRequiredData = true;
-    var missingFields = [];
+    // Small delay to ensure sync is complete
+    setTimeout(function() {
+        continueEvaluation();
+    }, 100);
     
-    // First, collect all available data for ALL mapped fields
-    $.each(fieldMappings, function(dmnVariable, mapping) {
-        var fieldId = mapping.field_id;
-        console.log('Processing DMN variable:', dmnVariable, 'Field ID:', fieldId);
-        
-        var value = getGravityFieldValue(formId, fieldId);
-        console.log('Found raw value for field', fieldId + ':', value);
-        
-        // Handle date field conversions
-        if (dmnVariable.toLowerCase().indexOf('datum') !== -1 || 
-            dmnVariable.toLowerCase().indexOf('date') !== -1 ||
-            dmnVariable === 'dagVanAanvraag' ||
-            dmnVariable === 'geboortedatumAanvrager' ||
-            dmnVariable === 'geboortedatumPartner') {
-            
-            if (value !== null && value !== '' && value !== undefined) {
-                value = convertDateFormat(value, dmnVariable);
-            }
+    function continueEvaluation() {
+        if (!validateForm(formId)) {
+            showError('Please fill in all required fields before evaluation.');
+            return;
         }
         
-        console.log('Processed value for', dmnVariable + ':', value);
+        // Collect form data
+        var formData = {};
+        var hasRequiredData = true;
+        var missingFields = [];
         
-        // Add the value to formData (including null/empty values)
-        formData[dmnVariable] = value;
-    });
-    
-    console.log('Collected raw form data:', formData);
-    
-    // Now apply conditional logic for partner-related fields
-    var isAlleenstaand = formData['aanvragerAlleenstaand'];
-    console.log('User is single (alleenstaand):', isAlleenstaand);
-    
-    // If user is single, set partner birth date to null
-    if (isAlleenstaand === 'true' || isAlleenstaand === true) {
-        console.log('User is single, setting geboortedatumPartner to null');
-        formData['geboortedatumPartner'] = null;
-    }
-    
-    // Validate required fields (excluding conditionally optional ones)
-    $.each(fieldMappings, function(dmnVariable, mapping) {
-        var value = formData[dmnVariable];
+        // First, collect all available data for ALL mapped fields
+        $.each(fieldMappings, function(dmnVariable, mapping) {
+            var fieldId = mapping.field_id;
+            console.log('Processing DMN variable:', dmnVariable, 'Field ID:', fieldId);
+            
+            var value = getGravityFieldValue(formId, fieldId);
+            console.log('Found raw value for field', fieldId + ':', value);
+            
+            // Handle date field conversions
+            if (dmnVariable.toLowerCase().indexOf('datum') !== -1 || 
+                dmnVariable.toLowerCase().indexOf('date') !== -1 ||
+                dmnVariable === 'dagVanAanvraag' ||
+                dmnVariable === 'geboortedatumAanvrager' ||
+                dmnVariable === 'geboortedatumPartner') {
+                
+                if (value !== null && value !== '' && value !== undefined) {
+                    value = convertDateFormat(value, dmnVariable);
+                }
+            }
+            
+            console.log('Processed value for', dmnVariable + ':', value);
+            
+            // Add the value to formData (including null/empty values)
+            formData[dmnVariable] = value;
+        });
         
-        // Skip validation for partner fields when user is single
+        console.log('Collected raw form data:', formData);
+        
+        // Now apply conditional logic for partner-related fields
+        var isAlleenstaand = formData['aanvragerAlleenstaand'];
+        console.log('User is single (alleenstaand):', isAlleenstaand);
+        
+        // If user is single, set partner birth date to null
         if (isAlleenstaand === 'true' || isAlleenstaand === true) {
-            if (dmnVariable === 'geboortedatumPartner') {
-                console.log('Skipping validation for geboortedatumPartner (user is single)');
-                return true; // continue to next iteration
-            }
+            console.log('User is single, setting geboortedatumPartner to null');
+            formData['geboortedatumPartner'] = null;
         }
         
-        // Check if this field is actually required
-        if (value === null || value === '' || value === undefined) {
-            // You can add more conditional logic here for other optional fields
-            hasRequiredData = false;
-            missingFields.push(dmnVariable + ' (field ID: ' + mapping.field_id + ')');
-        } else {
-            if (!validateFieldType(value, mapping.type)) {
-                showError('Invalid data type for field ' + dmnVariable + '. Expected: ' + mapping.type);
-                return false;
+        // Validate required fields (excluding conditionally optional ones)
+        $.each(fieldMappings, function(dmnVariable, mapping) {
+            var value = formData[dmnVariable];
+            
+            // Skip validation for partner fields when user is single
+            if (isAlleenstaand === 'true' || isAlleenstaand === true) {
+                if (dmnVariable === 'geboortedatumPartner') {
+                    console.log('Skipping validation for geboortedatumPartner (user is single)');
+                    return true; // continue to next iteration
+                }
             }
-        }
-    });
-    
-    console.log('Final form data after conditional logic:', formData);
-    
-    if (!hasRequiredData) {
-        showError('Please fill in all required fields: ' + missingFields.join(', '));
-        return;
-    }
-    
-    // Show loading state
-    $button.val('Evaluating...').prop('disabled', true);
-    
-    console.log('Making AJAX call to:', operaton_ajax.url);
-    
-    // Make AJAX call to evaluate
-    $.ajax({
-        url: operaton_ajax.url,
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({
-            config_id: configId,
-            form_data: formData
-        }),
-        beforeSend: function(xhr) {
-            xhr.setRequestHeader('X-WP-Nonce', operaton_ajax.nonce);
-        },
-        success: function(response) {
-            console.log('AJAX success:', response);
-            console.log('=== DEBUG: Starting result population ===');
-            console.log('Response success:', response.success);
-            console.log('Response result:', response.result);
-            console.log('Result defined?', response.result !== undefined);
-            console.log('Result not null?', response.result !== null);
-
-            if (response.success && response.result !== undefined && response.result !== null) {
-                console.log('=== DEBUG: Conditions met, proceeding ===');
-                
-                // Extract the actual result value
-                var resultValue;
-                if (typeof response.result === 'object' && response.result.value !== undefined) {
-                    resultValue = response.result.value;
-                } else {
-                    resultValue = response.result;
-                }
-                
-                console.log('Extracted result value:', resultValue);
-                
-                // Store evaluation metadata
-                var currentPage = getCurrentPage(formId);
-                console.log('Current page:', currentPage);
-                
-                var evalData = {
-                    result: resultValue,
-                    page: currentPage,
-                    timestamp: Date.now(),
-                    formData: formData
-                };
-                
-                sessionStorage.setItem('operaton_dmn_eval_data_' + formId, JSON.stringify(evalData));
-                console.log('Stored evaluation data:', evalData);
-                
-                // Try to populate result field on current page
-                console.log('=== DEBUG: About to search for result field ===');
-                var $resultField = findResultFieldOnCurrentPage(formId);
-                console.log('=== DEBUG: Result field search returned:', $resultField);
-                console.log('=== DEBUG: Result field length:', $resultField ? $resultField.length : 'null/undefined');
-                
-                if ($resultField && $resultField.length > 0) {
-                    console.log('=== DEBUG: Found result field, populating ===');
-                    console.log('Field element:', $resultField[0]);
-                    console.log('Field current value before population:', $resultField.val());
-                    
-                    // Populate the field with the extracted value
-                    $resultField.val(resultValue);
-                    console.log('Field value after setting:', $resultField.val());
-                    
-                    $resultField.trigger('change');
-                    $resultField.trigger('input');
-                    console.log('Triggers fired');
-                    
-                    // Show success notification
-                    console.log('=== DEBUG: About to show notification ===');
-                    showSuccessNotification('✅ Result populated: ' + resultValue);
-                    
-                    // Highlight the field briefly
-                    console.log('=== DEBUG: About to highlight field ===');
-                    highlightField($resultField);
-                    
-                } else {
-                    console.log('=== DEBUG: No result field found ===');
-                    showError('No result field found on this page. Please add a field to receive the evaluation result.');
-                }
-                
+            
+            // Check if this field is actually required
+            if (value === null || value === '' || value === undefined) {
+                hasRequiredData = false;
+                missingFields.push(dmnVariable + ' (field ID: ' + mapping.field_id + ')');
             } else {
-                console.log('=== DEBUG: Conditions NOT met ===');
-                console.log('response.success:', response.success);
-                console.log('response.result:', response.result);
-                showError('No result received from evaluation.');
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('AJAX Error:', error);
-            console.error('Status:', status);
-            console.error('Response:', xhr.responseText);
-            
-            var errorMessage = 'Error during evaluation. Please try again.';
-            
-            try {
-                var errorResponse = JSON.parse(xhr.responseText);
-                if (errorResponse.message) {
-                    errorMessage = errorResponse.message;
-                }
-            } catch (e) {
-                if (xhr.status === 0) {
-                    errorMessage = 'Connection error. Please check your internet connection.';
-                } else if (xhr.status === 404) {
-                    errorMessage = 'Evaluation service not found.';
-                } else if (xhr.status === 500) {
-                    errorMessage = 'Server error occurred during evaluation.';
+                if (!validateFieldType(value, mapping.type)) {
+                    showError('Invalid data type for field ' + dmnVariable + '. Expected: ' + mapping.type);
+                    return false;
                 }
             }
-            
-            showError(errorMessage);
-        },
-        complete: function() {
-            $button.val(originalText).prop('disabled', false);
+        });
+        
+        console.log('Final form data after conditional logic:', formData);
+        
+        if (!hasRequiredData) {
+            showError('Please fill in all required fields: ' + missingFields.join(', '));
+            return;
         }
-    });
+        
+        // Show loading state
+        $button.val('Evaluating...').prop('disabled', true);
+        
+        console.log('Making AJAX call to:', operaton_ajax.url);
+        
+        // Make AJAX call to evaluate
+        $.ajax({
+            url: operaton_ajax.url,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                config_id: configId,
+                form_data: formData
+            }),
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', operaton_ajax.nonce);
+            },
+            success: function(response) {
+                console.log('AJAX success:', response);
+                
+                if (response.success && response.result !== undefined && response.result !== null) {
+                    // Extract the actual result value
+                    var resultValue;
+                    if (typeof response.result === 'object' && response.result.value !== undefined) {
+                        resultValue = response.result.value;
+                    } else {
+                        resultValue = response.result;
+                    }
+                    
+                    console.log('Extracted result value:', resultValue);
+                    
+                    // Store evaluation metadata
+                    var currentPage = getCurrentPage(formId);
+                    var evalData = {
+                        result: resultValue,
+                        page: currentPage,
+                        timestamp: Date.now(),
+                        formData: formData
+                    };
+                    
+                    sessionStorage.setItem('operaton_dmn_eval_data_' + formId, JSON.stringify(evalData));
+                    
+                    // Try to populate result field on current page
+                    var $resultField = findResultFieldOnCurrentPage(formId);
+                    
+                    if ($resultField && $resultField.length > 0) {
+                        $resultField.val(resultValue);
+                        $resultField.trigger('change');
+                        $resultField.trigger('input');
+                        
+                        showSuccessNotification('✅ Result populated: ' + resultValue);
+                        highlightField($resultField);
+                    } else {
+                        showError('No result field found on this page. Please add a field to receive the evaluation result.');
+                    }
+                } else {
+                    showError('No result received from evaluation.');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
+                var errorMessage = 'Error during evaluation. Please try again.';
+                
+                try {
+                    var errorResponse = JSON.parse(xhr.responseText);
+                    if (errorResponse.message) {
+                        errorMessage = errorResponse.message;
+                    }
+                } catch (e) {
+                    if (xhr.status === 0) {
+                        errorMessage = 'Connection error. Please check your internet connection.';
+                    } else if (xhr.status === 404) {
+                        errorMessage = 'Evaluation service not found.';
+                    } else if (xhr.status === 500) {
+                        errorMessage = 'Server error occurred during evaluation.';
+                    }
+                }
+                
+                showError(errorMessage);
+            },
+            complete: function() {
+                $button.val(originalText).prop('disabled', false);
+            }
+        });
+    }
 }
-    
+
     // Simplified result field finder for current page only
     function findResultFieldOnCurrentPage(formId) {
         console.log('Searching for result field on current page of form:', formId);
@@ -556,57 +529,242 @@ function handleEvaluateClick($button) {
         console.log('No result field found on current page');
         return null;
     }
+
+// Generic function to find custom radio button values
+function findCustomRadioValue(formId, fieldId) {
+    var $form = $('#gform_' + formId);
     
-    // Enhanced field detection for Gravity Forms
-    function getGravityFieldValue(formId, fieldId) {
-        console.log('Getting value for form:', formId, 'field:', fieldId);
-        
-        var $form = $('#gform_' + formId);
-        var value = null;
-        
-        // Handle radio buttons
-        var $radioChecked = $form.find('input[name="input_' + fieldId + '"]:checked');
-        if ($radioChecked.length > 0) {
-            value = $radioChecked.val();
-            console.log('Found radio button value:', value);
-            return value;
-        }
-        
-        // Handle checkboxes
-        var $checkboxChecked = $form.find('input[name^="input_' + fieldId + '"]:checked');
-        if ($checkboxChecked.length > 0) {
-            var checkboxValues = [];
-            $checkboxChecked.each(function() {
-                checkboxValues.push($(this).val());
-            });
-            value = checkboxValues.length === 1 ? checkboxValues[0] : checkboxValues.join(',');
-            console.log('Found checkbox value(s):', value);
-            return value;
-        }
-        
-        // Direct field selectors
-        var selectors = [
-            '#input_' + formId + '_' + fieldId,
-            'input[name="input_' + formId + '_' + fieldId + '"]',
-            'select[name="input_' + formId + '_' + fieldId + '"]',
-            'textarea[name="input_' + formId + '_' + fieldId + '"]'
-        ];
-        
-        for (var i = 0; i < selectors.length; i++) {
-            var $field = $form.find(selectors[i]);
-            if ($field.length > 0) {
-                value = getFieldValue($field);
-                if (value !== null && value !== '') {
-                    console.log('Found value using selector:', selectors[i], 'Value:', value);
+    // Strategy 1: Look for radio buttons whose name might be derived from field label or admin label
+    var $hiddenField = $form.find('#input_' + formId + '_' + fieldId);
+    if ($hiddenField.length > 0) {
+        // Try to find the field label from the form structure
+        var $fieldContainer = $hiddenField.closest('.gfield');
+        if ($fieldContainer.length > 0) {
+            var fieldLabel = $fieldContainer.find('label').first().text().toLowerCase();
+            
+            // Look for radio buttons that might match this field
+            var possibleRadioNames = generatePossibleRadioNames(fieldLabel, fieldId);
+            
+            for (var i = 0; i < possibleRadioNames.length; i++) {
+                var radioName = possibleRadioNames[i];
+                var $radioChecked = $('input[name="' + radioName + '"]:checked');
+                if ($radioChecked.length > 0) {
+                    var value = $radioChecked.val();
+                    console.log('Found custom radio value for field', fieldId, 'using name', radioName + ':', value);
+                    
+                    // Sync the value back to the hidden field
+                    if ($hiddenField.val() !== value) {
+                        console.log('Syncing custom radio value to hidden field');
+                        $hiddenField.val(value);
+                        $hiddenField.trigger('change');
+                    }
+                    
                     return value;
                 }
             }
         }
-        
-        console.log('No value found for field:', fieldId);
-        return null;
     }
     
+    // Strategy 2: Look in the current form's configuration for field mappings
+    var configVar = 'operaton_config_' + formId;
+    if (typeof window[configVar] !== 'undefined') {
+        var config = window[configVar];
+        if (config.field_mappings) {
+            // Find the DMN variable name for this field ID
+            var targetDmnVariable = null;
+            $.each(config.field_mappings, function(dmnVariable, mapping) {
+                if (mapping.field_id == fieldId) {
+                    targetDmnVariable = dmnVariable;
+                    return false; // break
+                }
+            });
+            
+            if (targetDmnVariable) {
+                // Look for radio buttons with this DMN variable name
+                var $radioChecked = $('input[name="' + targetDmnVariable + '"]:checked');
+                if ($radioChecked.length > 0) {
+                    var value = $radioChecked.val();
+                    console.log('Found custom radio value using DMN variable name', targetDmnVariable + ':', value);
+                    
+                    // Sync back to hidden field
+                    var $hiddenField = $form.find('#input_' + formId + '_' + fieldId);
+                    if ($hiddenField.length > 0 && $hiddenField.val() !== value) {
+                        console.log('Syncing DMN variable radio value to hidden field');
+                        $hiddenField.val(value);
+                        $hiddenField.trigger('change');
+                    }
+                    
+                    return value;
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
+// Generate possible radio button names based on field information
+function generatePossibleRadioNames(fieldLabel, fieldId) {
+    var possibilities = [];
+    
+    if (fieldLabel) {
+        // Convert label to possible variable names
+        var cleanLabel = fieldLabel
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+            .replace(/\s+/g, '') // Remove spaces
+            .trim();
+        
+        if (cleanLabel) {
+            possibilities.push(cleanLabel);
+            possibilities.push('aanvrager' + cleanLabel.charAt(0).toUpperCase() + cleanLabel.slice(1));
+        }
+    }
+    
+    // Add field ID based possibilities
+    possibilities.push('field_' + fieldId);
+    possibilities.push('input_' + fieldId);
+    
+    return possibilities;
+}
+
+// Generic radio button detection and synchronization
+function getGravityFieldValue(formId, fieldId) {
+    console.log('Getting value for form:', formId, 'field:', fieldId);
+    
+    var $form = $('#gform_' + formId);
+    var value = null;
+    
+    // Strategy 1: Try standard Gravity Forms field selectors first
+    var standardSelectors = [
+        '#input_' + formId + '_' + fieldId,
+        'input[name="input_' + formId + '_' + fieldId + '"]',
+        'select[name="input_' + formId + '_' + fieldId + '"]',
+        'textarea[name="input_' + formId + '_' + fieldId + '"]'
+    ];
+    
+    for (var i = 0; i < standardSelectors.length; i++) {
+        var $field = $form.find(standardSelectors[i]);
+        if ($field.length > 0) {
+            value = getFieldValue($field);
+            if (value !== null && value !== '') {
+                console.log('Found value using standard selector:', standardSelectors[i], 'Value:', value);
+                return value;
+            }
+        }
+    }
+    
+    // Strategy 2: If no standard field found, try to find custom radio buttons
+    // Look for radio buttons that might be associated with this field
+    value = findCustomRadioValue(formId, fieldId);
+    if (value !== null) {
+        console.log('Found value from custom radio detection:', value);
+        return value;
+    }
+    
+    // Strategy 3: Handle standard Gravity Forms radio buttons
+    var $radioChecked = $form.find('input[name="input_' + fieldId + '"]:checked');
+    if ($radioChecked.length > 0) {
+        value = $radioChecked.val();
+        console.log('Found standard radio button value:', value);
+        return value;
+    }
+    
+    // Strategy 4: Handle checkboxes
+    var $checkboxChecked = $form.find('input[name^="input_' + fieldId + '"]:checked');
+    if ($checkboxChecked.length > 0) {
+        var checkboxValues = [];
+        $checkboxChecked.each(function() {
+            checkboxValues.push($(this).val());
+        });
+        value = checkboxValues.length === 1 ? checkboxValues[0] : checkboxValues.join(',');
+        console.log('Found checkbox value(s):', value);
+        return value;
+    }
+    
+    console.log('No value found for field:', fieldId);
+    return null;
+}
+
+// Generic function to sync all radio buttons for a form
+function forceSyncRadioButtons(formId) {
+    console.log('Forcing generic radio button synchronization for form:', formId);
+    
+    var $form = $('#gform_' + formId);
+    var configVar = 'operaton_config_' + formId;
+    
+    // Only sync if we have a configuration
+    if (typeof window[configVar] === 'undefined') {
+        console.log('No configuration found, skipping radio sync');
+        return;
+    }
+    
+    var config = window[configVar];
+    if (!config.field_mappings) {
+        console.log('No field mappings found, skipping radio sync');
+        return;
+    }
+    
+    // For each mapped field, try to find and sync custom radio buttons
+    $.each(config.field_mappings, function(dmnVariable, mapping) {
+        var fieldId = mapping.field_id;
+        var $hiddenField = $form.find('#input_' + formId + '_' + fieldId);
+        
+        if ($hiddenField.length > 0) {
+            // Look for radio buttons with the DMN variable name
+            var $radioChecked = $('input[name="' + dmnVariable + '"]:checked');
+            if ($radioChecked.length > 0) {
+                var radioValue = $radioChecked.val();
+                var hiddenValue = $hiddenField.val();
+                
+                if (radioValue !== hiddenValue) {
+                    console.log('Syncing radio to hidden for DMN variable', dmnVariable + ':', radioValue, '-> field', fieldId);
+                    $hiddenField.val(radioValue);
+                    $hiddenField.trigger('change');
+                }
+            }
+        }
+    });
+    
+    // Also look for any radio buttons in the form and try to sync them
+    $form.find('input[type="radio"]:checked').each(function() {
+        var $radio = $(this);
+        var radioName = $radio.attr('name');
+        var radioValue = $radio.val();
+        
+        // Skip standard Gravity Forms radio buttons (they handle themselves)
+        if (radioName && radioName.indexOf('input_') !== 0) {
+            console.log('Found custom radio button:', radioName, '=', radioValue);
+            
+            // Try to find a corresponding hidden field
+            var correspondingFieldId = findFieldIdForRadioName(formId, radioName);
+            if (correspondingFieldId) {
+                var $hiddenField = $form.find('#input_' + formId + '_' + correspondingFieldId);
+                if ($hiddenField.length > 0 && $hiddenField.val() !== radioValue) {
+                    console.log('Syncing custom radio', radioName, 'to hidden field', correspondingFieldId);
+                    $hiddenField.val(radioValue);
+                    $hiddenField.trigger('change');
+                }
+            }
+        }
+    });
+}
+
+// Helper function to find field ID for a radio name
+function findFieldIdForRadioName(formId, radioName) {
+    var configVar = 'operaton_config_' + formId;
+    if (typeof window[configVar] !== 'undefined') {
+        var config = window[configVar];
+        if (config.field_mappings) {
+            // Check if this radio name matches any DMN variable
+            if (config.field_mappings[radioName]) {
+                return config.field_mappings[radioName].field_id;
+            }
+        }
+    }
+    return null;
+}
+
     function getFieldValue($field) {
         if ($field.length === 0) return null;
         

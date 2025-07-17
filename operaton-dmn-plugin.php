@@ -637,23 +637,26 @@ private function save_configuration($data) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'operaton_dmn_configs';
     
-    // Process field mappings (existing code...)
+    // Process field mappings with radio button names
     $field_mappings = array();
     
     if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
         $dmn_variables = $data['field_mappings_dmn_variable'];
         $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
         $types = isset($data['field_mappings_type']) ? $data['field_mappings_type'] : array();
+        $radio_names = isset($data['field_mappings_radio_name']) ? $data['field_mappings_radio_name'] : array();
         
         for ($i = 0; $i < count($dmn_variables); $i++) {
             $dmn_var = sanitize_text_field(trim($dmn_variables[$i]));
             $field_id = isset($field_ids[$i]) ? sanitize_text_field(trim($field_ids[$i])) : '';
             $type = isset($types[$i]) ? sanitize_text_field($types[$i]) : 'String';
+            $radio_name = isset($radio_names[$i]) ? sanitize_text_field(trim($radio_names[$i])) : '';
             
             if (!empty($dmn_var) && !empty($field_id)) {
                 $field_mappings[$dmn_var] = array(
                     'field_id' => $field_id,
-                    'type' => $type
+                    'type' => $type,
+                    'radio_name' => $radio_name // Store the custom radio button name
                 );
             }
         }
