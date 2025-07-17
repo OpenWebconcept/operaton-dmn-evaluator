@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.0.0-beta.7] - 2025-07-11
+## [1.0.0-beta.7] - 2025-07-17
 
 ## Issues
 - [Issue #5](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/5)
