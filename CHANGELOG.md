@@ -11,6 +11,14 @@ All notable changes to this project will be documented in this file.
 - Date Format Conversion: Converting Gravity Forms' DD-MM-YYYY format to ISO YYYY-MM-DD format that the DMN engine expects
 - Including All Mapped Fields: Ensuring that all configured field mappings are sent to the DMN engine, even when they're null
 - Conditional Field Validation: Properly handling optional fields like partner birth date when the user is single
+- Added Radio Button Support: Included the radio button name field with auto-detection
+- Improved UX:
+    - Auto-suggests data types based on field type
+    - Shows placeholder for radio button names based on DMN variable
+    - Better responsive design for smaller screens
+    - Clear visual hierarchy with grid layout
+- Fixed Validation: The form validation now properly checks for duplicates without false positives
+- Streamlined Interface: Single, clean field mapping section that's both functional and visually appealing
 
 ## [1.0.0-beta.6] - 2025-07-11
 
