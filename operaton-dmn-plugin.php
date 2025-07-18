@@ -90,6 +90,22 @@ class OperatonDMNEvaluator {
         }
         return self::$instance;
     }
+
+public function ajax_clear_update_cache() {
+    if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce')) {
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    }
+    
+    // Clear WordPress update transients
+    delete_site_transient('update_plugins');
+    delete_transient('operaton_dmn_updater');
+    delete_transient('operaton_dmn_fallback_check');
+    
+    // Force WordPress to check for updates
+    wp_update_plugins();
+    
+    wp_send_json_success(array('message' => 'Update cache cleared'));
+}
     
 /**
  * Updated constructor - add database check on every admin page load
@@ -109,10 +125,11 @@ private function __construct() {
     // Version check for upgrades
     add_action('admin_init', array($this, 'check_version'), 5);
         
-        // Add AJAX handlers
-        add_action('wp_ajax_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
-        add_action('wp_ajax_nopriv_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
-        add_action('wp_ajax_operaton_test_full_config', array($this, 'ajax_test_full_config'));
+    // Add AJAX handlers
+    add_action('wp_ajax_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
+    add_action('wp_ajax_nopriv_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
+    add_action('wp_ajax_operaton_test_full_config', array($this, 'ajax_test_full_config'));
+    add_action('wp_ajax_operaton_clear_update_cache', array($this, 'ajax_clear_update_cache')); // ADD THIS LINE
         // Add manual database update handler
         add_action('wp_ajax_operaton_manual_db_update', array($this, 'ajax_manual_database_update'));
     
@@ -367,12 +384,21 @@ public function admin_page() {
         return;
     }
     
-    // Rest of existing admin_page method...
+    // Check for database update success message
+    if (isset($_GET['database_updated'])) {
+        echo '<div class="notice notice-success is-dismissible"><p>' . __('Database schema updated successfully!', 'operaton-dmn') . '</p></div>';
+    }
+    
+    // Handle configuration deletion
     if (isset($_POST['delete_config']) && wp_verify_nonce($_POST['_wpnonce'], 'delete_config')) {
         $this->delete_config($_POST['config_id']);
     }
     
     $configs = $this->get_all_configurations();
+    
+    // Show update management section
+    $this->show_update_management_section();
+    
     include OPERATON_DMN_PLUGIN_PATH . 'templates/admin-list.php';
 }
 
@@ -410,87 +436,87 @@ public function add_config_page() {
     /**
      * Show update management section in admin
      */
-    private function show_update_management_section() {
-        if (!current_user_can('manage_options')) {
-            return;
-        }
-        
-        $current_version = OPERATON_DMN_VERSION;
-        $update_plugins = get_site_transient('update_plugins');
-        $has_update = false;
-        $new_version = '';
-        
-        if (isset($update_plugins->response)) {
-            foreach ($update_plugins->response as $plugin => $data) {
-                if (strpos($plugin, 'operaton-dmn') !== false) {
-                    $has_update = true;
-                    $new_version = $data->new_version;
-                    break;
-                }
-            }
-        }
-        
-        ?>
-        <div class="operaton-update-section" style="background: #f9f9f9; padding: 15px; margin: 20px 0; border-left: 4px solid #0073aa;">
-            <h3><?php _e('Plugin Updates', 'operaton-dmn'); ?></h3>
-            
-            <p><strong><?php _e('Current Version:', 'operaton-dmn'); ?></strong> <?php echo esc_html($current_version); ?></p>
-            
-            <?php if ($has_update): ?>
-                <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px 0;">
-                    <p><strong><?php _e('Update Available:', 'operaton-dmn'); ?></strong> <?php echo esc_html($new_version); ?></p>
-                    <p>
-                        <a href="<?php echo admin_url('plugins.php'); ?>" class="button button-primary">
-                            <?php _e('Go to Plugins Page to Update', 'operaton-dmn'); ?>
-                        </a>
-                    </p>
-                </div>
-            <?php else: ?>
-                <p style="color: #46b450;">✓ <?php _e('You are running the latest version', 'operaton-dmn'); ?></p>
-            <?php endif; ?>
-            
-            <p>
-                <button type="button" id="operaton-check-updates" class="button">
-                    <?php _e('Check for Updates Now', 'operaton-dmn'); ?>
-                </button>
-                <span id="operaton-update-status" style="margin-left: 10px;"></span>
-            </p>
-            
-            <script>
-            jQuery(document).ready(function($) {
-                $('#operaton-check-updates').click(function() {
-                    var button = $(this);
-                    var status = $('#operaton-update-status');
-                    
-                    button.prop('disabled', true).text('<?php _e('Checking...', 'operaton-dmn'); ?>');
-                    status.html('<span style="color: #666;">⏳ Checking for updates...</span>');
-                    
-                    // Clear update transients to force fresh check
-                    $.post(ajaxurl, {
-                        action: 'operaton_clear_update_cache',
-                        _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
-                    }, function(response) {
-                        if (response.success) {
-                            // Reload page to show updated status
-                            setTimeout(function() {
-                                location.reload();
-                            }, 1000);
-                            status.html('<span style="color: #46b450;">✓ Update check completed</span>');
-                        } else {
-                            status.html('<span style="color: #dc3232;">✗ Update check failed</span>');
-                            button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
-                        }
-                    }).fail(function() {
-                        status.html('<span style="color: #dc3232;">✗ Update check failed</span>');
-                        button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
-                    });
-                });
-            });
-            </script>
-        </div>
-        <?php
+private function show_update_management_section() {
+    if (!current_user_can('manage_options')) {
+        return;
     }
     
+    $current_version = OPERATON_DMN_VERSION;
+    $update_plugins = get_site_transient('update_plugins');
+    $has_update = false;
+    $new_version = '';
+    
+    if (isset($update_plugins->response)) {
+        foreach ($update_plugins->response as $plugin => $data) {
+            if (strpos($plugin, 'operaton-dmn') !== false) {
+                $has_update = true;
+                $new_version = $data->new_version;
+                break;
+            }
+        }
+    }
+    
+    ?>
+    <div class="operaton-update-section" style="background: #f9f9f9; padding: 15px; margin: 20px 0; border-left: 4px solid #0073aa;">
+        <h3><?php _e('Plugin Updates', 'operaton-dmn'); ?></h3>
+        
+        <p><strong><?php _e('Current Version:', 'operaton-dmn'); ?></strong> <?php echo esc_html($current_version); ?></p>
+        
+        <?php if ($has_update): ?>
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px 0;">
+                <p><strong><?php _e('Update Available:', 'operaton-dmn'); ?></strong> <?php echo esc_html($new_version); ?></p>
+                <p>
+                    <a href="<?php echo admin_url('plugins.php'); ?>" class="button button-primary">
+                        <?php _e('Go to Plugins Page to Update', 'operaton-dmn'); ?>
+                    </a>
+                </p>
+            </div>
+        <?php else: ?>
+            <p style="color: #46b450;">✓ <?php _e('You are running the latest version', 'operaton-dmn'); ?></p>
+        <?php endif; ?>
+        
+        <p>
+            <button type="button" id="operaton-check-updates" class="button">
+                <?php _e('Check for Updates Now', 'operaton-dmn'); ?>
+            </button>
+            <span id="operaton-update-status" style="margin-left: 10px;"></span>
+        </p>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            $('#operaton-check-updates').click(function() {
+                var button = $(this);
+                var status = $('#operaton-update-status');
+                
+                button.prop('disabled', true).text('<?php _e('Checking...', 'operaton-dmn'); ?>');
+                status.html('<span style="color: #666;">⏳ Checking for updates...</span>');
+                
+                // Clear update transients to force fresh check
+                $.post(ajaxurl, {
+                    action: 'operaton_clear_update_cache',
+                    _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+                }, function(response) {
+                    if (response.success) {
+                        // Reload page to show updated status
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                        status.html('<span style="color: #46b450;">✓ Update check completed</span>');
+                    } else {
+                        status.html('<span style="color: #dc3232;">✗ Update check failed</span>');
+                        button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
+                    }
+                }).fail(function() {
+                    status.html('<span style="color: #dc3232;">✗ Update check failed</span>');
+                    button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
+                });
+            });
+        });
+        </script>
+    </div>
+    <?php
+}
+
     /**
      * Improved Gravity Forms retrieval with field information
      */
