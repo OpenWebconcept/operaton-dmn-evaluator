@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.0.0-beta.8.1] - 2025-07-18
+
+## Issues
+- [Issue #6](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/6)
+
+#### Fixes breaking change of 1.0.0-beta.8
+Provides solution for automatic database migration
+
+#### For New Installations
+- Plugin activation automatically creates the table with the correct schema
+- No manual intervention needed
+
+#### For Existing Installations
+- First admin page visit triggers automatic migration
+- Missing columns are added automatically
+- Users see success without knowing migration happened
+
+#### For Failed Migrations
+- Admin shows clear error message
+- Instructs user to deactivate/reactivate plugin
+- Form editing is disabled until migration succeeds
+
 ## [1.0.0-beta.8] - 2025-07-18
 
 ## Issues
