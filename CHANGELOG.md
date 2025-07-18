@@ -1,6 +1,186 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+# Changelog
+All notable changes to this project will be documented in this file.
+
+## [1.0.0-beta.8.1] - 2025-07-18
+
+## Issues
+- [Issue #6](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/6)
+
+#### Fixes breaking change of 1.0.0-beta.8
+Provides solution for automatic database migration
+
+#### For New Installations
+- Plugin activation automatically creates the table with the correct schema
+- No manual intervention needed
+
+#### For Existing Installations
+- First admin page visit triggers automatic migration
+- Missing columns are added automatically
+- Users see success without knowing migration happened
+
+#### For Failed Migrations
+- Admin shows clear error message
+- Instructs user to deactivate/reactivate plugin
+- Form editing is disabled until migration succeeds
+
+## [1.0.0-beta.8] - 2025-07-18
+
+## Issues
+- [Issue #6](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/6)
+
+
+### 🆕 Major Feature: Multiple Result Fields Support
+
+#### Key Features Added
+
+##### 1. **Multiple Result Field Mapping**
+- **Before**: Limited to one result field per configuration
+- **After**: Support for mapping unlimited DMN result fields to different form fields
+- **Benefit**: Single evaluation can populate multiple form fields simultaneously
+- **Example**: `aanmerkingHeusdenPas` → Field 35, `aanmerkingKindPakket` → Field 36
+
+##### 2. **Enhanced Admin Configuration Interface**
+- **Added**: Dedicated "Result Field Mappings" section in admin form
+- **Added**: Dynamic result mapping rows with add/remove functionality
+- **Added**: Separate validation for input mappings vs result mappings
+- **Added**: Real-time field validation and duplicate prevention
+- **Benefit**: Clear separation between input variables and output results
+
+##### 3. **Improved Database Schema**
+- **Added**: `result_mappings` column for storing multiple result field configurations
+- **Structure**: JSON format storing DMN result field names with corresponding form field IDs
+- **Migration**: Automatic database schema updates with manual migration support
+- **Cleanup**: Removed legacy single-result columns for cleaner schema
+
+##### 4. **Advanced Result Processing**
+- **Enhanced**: API response handling for multiple simultaneous results
+- **Added**: Individual result field population with error handling per field
+- **Added**: Comprehensive success notifications showing all populated results
+- **Added**: Visual field highlighting for each populated result field
+- **Benefit**: Users see exactly which results were populated and their values
+
+##### 5. **Streamlined User Experience**
+- **Enhanced**: Success notifications now show all results: "✅ Results populated (2): aanmerkingHeusdenPas: false, aanmerkingKindPakket: true"
+- **Added**: Individual field highlighting for each result
+- **Added**: Automatic scrolling to result fields
+- **Added**: Clear error messages if specific result fields cannot be found
+- **Benefit**: Immediate visual confirmation of all evaluation results
+
+## 🔧 Technical Improvements
+
+### Backend Enhancements
+- **Updated**: `save_configuration()` method to handle multiple result mappings
+- **Updated**: `handle_evaluation()` method to process multiple API results
+- **Enhanced**: Configuration validation to require both input and result mappings
+- **Added**: Result field existence validation in selected Gravity Form
+- **Improved**: Error handling with specific messaging for missing result fields
+
+### Frontend JavaScript Improvements
+- **Replaced**: Single result detection with multiple result field processing
+- **Added**: `findFieldOnCurrentPage()` function for precise field targeting
+- **Enhanced**: Result population logic to handle multiple simultaneous results
+- **Added**: Per-field error handling and success reporting
+- **Improved**: Visual feedback system for multiple result confirmations
+
+### Database Architecture
+- **Schema**: Simplified structure without backward compatibility
+- **Columns**: `result_mappings` (longtext) for multiple result storage
+- **Validation**: Both input and result mappings required for configuration
+- **Migration**: Manual database update with SQL script for clean deployment
+
+### Admin Interface Updates
+- **Added**: Result Field Mappings section with grid layout
+- **Enhanced**: Form field selection with real-time validation
+- **Added**: Duplicate result field prevention
+- **Improved**: Visual separation between input mappings and result mappings
+- **Added**: Dynamic row management (add/remove result mappings)
+
+## 📋 Workflow Changes
+
+### Previous Workflow (Single Result)
+1. Configure one DMN result field mapping
+2. Evaluation populates single form field
+3. User sees one result value
+
+### New Workflow (Multiple Results)
+1. Configure multiple DMN result field mappings
+2. Single evaluation populates multiple form fields simultaneously
+3. User sees comprehensive success notification with all results
+4. Visual highlighting confirms each populated field
+
+## 🎯 Use Case Examples
+
+### Heusdenpas en Kindpakket (Dutch Social Services)
+```json
+Input Variables:
+- geboortedatumAanvrager: "1987-12-20"
+- aanvragerAlleenstaand: true
+- maandelijksBrutoInkomenAanvrager: 1200
+- aanvragerHeeftKind4Tm17: true
+
+DMN Evaluation Results:
+- aanmerkingHeusdenPas: false (Field 35)
+- aanmerkingKindPakket: true (Field 36)
+
+User Experience:
+✅ Results populated (2): aanmerkingHeusdenPas: false, aanmerkingKindPakket: true
+```
+
+### Multi-Decision Loan Processing
+```json
+Input Variables:
+- income: 75000
+- creditScore: 720
+- loanAmount: 250000
+
+DMN Evaluation Results:
+- loanApproved: true (Field 10)
+- interestRate: 3.5 (Field 11)
+- loanTerm: 30 (Field 12)
+- monthlyPayment: 1123.29 (Field 13)
+```
+
+## 🔒 Migration & Compatibility
+
+### Database Migration
+- **Manual SQL Update**: Simple ALTER TABLE command for existing installations
+- **No Data Loss**: Existing configurations continue to work
+- **Clean Schema**: Removed legacy columns for streamlined structure
+
+### Configuration Migration
+- **Backward Compatibility**: Removed for cleaner codebase
+- **Simple Migration**: One-time configuration update required
+- **Clear Instructions**: Step-by-step migration guide provided
+
+## 📈 Benefits Summary
+
+1. **Comprehensive Results**: Single evaluation provides complete decision outcomes
+2. **Improved Efficiency**: Eliminate multiple API calls for related decisions
+3. **Better UX**: Users see all relevant results immediately
+4. **Flexible Configuration**: Support for any number of result fields
+5. **Enhanced Feedback**: Visual confirmation of each populated result
+6. **Cleaner Architecture**: Simplified, purpose-built database schema
+7. **Scalable Design**: Easily extensible for future enhancements
+
+## 🚀 Developer Notes
+
+### Key Methods Updated
+- `save_configuration()`: Multiple result mapping storage
+- `handle_evaluation()`: Multi-result API response processing
+- `enqueue_gravity_scripts()`: Enhanced frontend configuration
+- Database schema: Streamlined without backward compatibility
+
+### JavaScript Enhancements
+- Enhanced AJAX success handling for multiple results
+- Individual field targeting and population
+- Comprehensive error handling per result field
+- Visual feedback system for multiple confirmations
+
+---
+
 ## [1.0.0-beta.7] - 2025-07-17
 
 ## Issues

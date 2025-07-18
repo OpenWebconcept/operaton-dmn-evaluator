@@ -257,7 +257,32 @@ function convertDateFormat(dateStr, fieldName) {
     console.warn('Could not convert date format for:', dateStr);
     return dateStr; // Return as-is if we can't convert
 }
+
+// Generic function to find a field on the current page by field ID
+function findFieldOnCurrentPage(formId, fieldId) {
+    console.log('Searching for field ID', fieldId, 'on current page of form:', formId);
     
+    var $form = $('#gform_' + formId);
+    
+    var selectors = [
+        '#input_' + formId + '_' + fieldId,
+        'input[name="input_' + formId + '_' + fieldId + '"]',
+        'select[name="input_' + formId + '_' + fieldId + '"]',
+        'textarea[name="input_' + formId + '_' + fieldId + '"]'
+    ];
+    
+    for (var i = 0; i < selectors.length; i++) {
+        var $field = $form.find(selectors[i] + ':visible');
+        if ($field.length > 0) {
+            console.log('Found field using selector:', selectors[i]);
+            return $field.first();
+        }
+    }
+    
+    console.log('No field found with ID:', fieldId);
+    return null;
+}
+
 function handleEvaluateClick($button) {
     var formId = $button.data('form-id');
     var configId = $button.data('config-id');
@@ -382,48 +407,70 @@ function handleEvaluateClick($button) {
             beforeSend: function(xhr) {
                 xhr.setRequestHeader('X-WP-Nonce', operaton_ajax.nonce);
             },
-            success: function(response) {
-                console.log('AJAX success:', response);
+success: function(response) {
+    console.log('AJAX success:', response);
+    
+    if (response.success && response.results) {
+        console.log('Multiple results received:', response.results);
+        
+        var populatedCount = 0;
+        var resultSummary = [];
+        
+        // Process each result
+        $.each(response.results, function(dmnResultField, resultData) {
+            var resultValue = resultData.value;
+            var fieldId = resultData.field_id;
+            
+            console.log('Processing result:', dmnResultField, 'Value:', resultValue, 'Field ID:', fieldId);
+            
+            var $resultField = null;
+            
+            // Find the target field
+            if (fieldId) {
+                $resultField = findFieldOnCurrentPage(formId, fieldId);
+            } else {
+                // Legacy fallback - try to auto-detect
+                $resultField = findResultFieldOnCurrentPage(formId);
+            }
+            
+            if ($resultField && $resultField.length > 0) {
+                $resultField.val(resultValue);
+                $resultField.trigger('change');
+                $resultField.trigger('input');
                 
-                if (response.success && response.result !== undefined && response.result !== null) {
-                    // Extract the actual result value
-                    var resultValue;
-                    if (typeof response.result === 'object' && response.result.value !== undefined) {
-                        resultValue = response.result.value;
-                    } else {
-                        resultValue = response.result;
-                    }
-                    
-                    console.log('Extracted result value:', resultValue);
-                    
-                    // Store evaluation metadata
-                    var currentPage = getCurrentPage(formId);
-                    var evalData = {
-                        result: resultValue,
-                        page: currentPage,
-                        timestamp: Date.now(),
-                        formData: formData
-                    };
-                    
-                    sessionStorage.setItem('operaton_dmn_eval_data_' + formId, JSON.stringify(evalData));
-                    
-                    // Try to populate result field on current page
-                    var $resultField = findResultFieldOnCurrentPage(formId);
-                    
-                    if ($resultField && $resultField.length > 0) {
-                        $resultField.val(resultValue);
-                        $resultField.trigger('change');
-                        $resultField.trigger('input');
-                        
-                        showSuccessNotification('✅ Result populated: ' + resultValue);
-                        highlightField($resultField);
-                    } else {
-                        showError('No result field found on this page. Please add a field to receive the evaluation result.');
-                    }
-                } else {
-                    showError('No result received from evaluation.');
-                }
-            },
+                populatedCount++;
+                resultSummary.push(dmnResultField + ': ' + resultValue);
+                
+                highlightField($resultField);
+                
+                console.log('Populated field', fieldId, 'with result:', resultValue);
+            } else {
+                console.warn('No field found for result:', dmnResultField, 'Field ID:', fieldId);
+            }
+        });
+        
+        if (populatedCount > 0) {
+            showSuccessNotification('✅ Results populated (' + populatedCount + '): ' + resultSummary.join(', '));
+        } else {
+            showError('No result fields found on this page to populate.');
+        }
+        
+        // Store evaluation metadata
+        var currentPage = getCurrentPage(formId);
+        var evalData = {
+            results: response.results,
+            page: currentPage,
+            timestamp: Date.now(),
+            formData: formData
+        };
+        
+        sessionStorage.setItem('operaton_dmn_eval_data_' + formId, JSON.stringify(evalData));
+        
+    } else {
+        console.error('Invalid response structure:', response);
+        showError('No results received from evaluation.');
+    }
+},
             error: function(xhr, status, error) {
                 console.error('AJAX Error:', error);
                 var errorMessage = 'Error during evaluation. Please try again.';

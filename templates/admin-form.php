@@ -1,10 +1,22 @@
 <?php
-// Clean admin-form.php with single, enhanced field mapping section
+// Safe admin-form.php with automatic migration handling
 
 $editing = isset($config) && $config;
 $field_mappings = $editing ? json_decode($config->field_mappings, true) : array();
 
-// Get form fields for the selected form to show available options
+// SAFE handling of result_mappings - check if property exists
+$result_mappings = array();
+if ($editing) {
+    // Check if the property exists before accessing it
+    if (property_exists($config, 'result_mappings') && !empty($config->result_mappings)) {
+        $result_mappings = json_decode($config->result_mappings, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $result_mappings = array();
+        }
+    }
+}
+
+// Get form fields for the selected form
 $selected_form_fields = array();
 if ($editing && $config->form_id) {
     if (class_exists('GFAPI')) {
@@ -20,6 +32,12 @@ if ($editing && $config->form_id) {
         }
     }
 }
+
+// Check if database migration is needed
+global $wpdb;
+$table_name = $wpdb->prefix . 'operaton_dmn_configs';
+$columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
+$needs_migration = !in_array('result_mappings', $columns);
 ?>
 <div class="wrap">
     <h1><?php echo $editing ? __('Edit Configuration', 'operaton-dmn') : __('Add New Configuration', 'operaton-dmn'); ?></h1>
@@ -28,6 +46,24 @@ if ($editing && $config->form_id) {
         <div class="notice notice-error">
             <p><?php _e('Gravity Forms is required for this plugin to work. Please install and activate Gravity Forms.', 'operaton-dmn'); ?></p>
         </div>
+    <?php endif; ?>
+    
+    <?php if ($needs_migration): ?>
+        <div class="notice notice-error">
+            <p><strong><?php _e('Database Update Required', 'operaton-dmn'); ?></strong></p>
+            <p><?php _e('The plugin database needs to be updated. Please deactivate and reactivate the plugin to complete the update.', 'operaton-dmn'); ?></p>
+            <p>
+                <a href="<?php echo admin_url('plugins.php'); ?>" class="button button-primary">
+                    <?php _e('Go to Plugins Page', 'operaton-dmn'); ?>
+                </a>
+            </p>
+        </div>
+        
+        <div style="opacity: 0.5; pointer-events: none;">
+            <p><em><?php _e('Configuration editing is disabled until database update is complete.', 'operaton-dmn'); ?></em></p>
+        </div>
+        
+        <?php return; // Stop rendering the form ?>
     <?php endif; ?>
     
     <form method="post" id="operaton-config-form">
@@ -68,7 +104,7 @@ if ($editing && $config->form_id) {
                                 <option value="" disabled><?php _e('No Gravity Forms found', 'operaton-dmn'); ?></option>
                             <?php endif; ?>
                         </select>
-                        <p class="description"><?php _e('Select the Gravity Form to integrate with. Field mappings will be available after selecting a form.', 'operaton-dmn'); ?></p>
+                        <p class="description"><?php _e('Select the Gravity Form to integrate with.', 'operaton-dmn'); ?></p>
                     </td>
                 </tr>
                 
@@ -81,7 +117,6 @@ if ($editing && $config->form_id) {
                                value="<?php echo $editing ? esc_attr($config->dmn_endpoint) : ''; ?>" required>
                         <p class="description"><?php _e('Base URL to your Operaton DMN engine (without the decision key).', 'operaton-dmn'); ?></p>
                         <p class="description"><strong><?php _e('Example:', 'operaton-dmn'); ?></strong> https://operatondev.open-regels.nl/engine-rest/decision-definition/key/</p>
-                        <p class="description"><em><?php _e('The decision key will be automatically appended to create the full evaluation URL.', 'operaton-dmn'); ?></em></p>
                         <button type="button" id="test-endpoint" class="button button-secondary"><?php _e('Test Connection', 'operaton-dmn'); ?></button>
                         <div id="endpoint-test-result"></div>
                     </td>
@@ -94,7 +129,7 @@ if ($editing && $config->form_id) {
                     <td>
                         <input type="text" name="decision_key" id="decision_key" class="regular-text" 
                                value="<?php echo $editing ? esc_attr($config->decision_key) : ''; ?>" required>
-                        <p class="description"><?php _e('The key/ID of your DMN decision table (e.g., "dish", "loan-approval").', 'operaton-dmn'); ?></p>
+                        <p class="description"><?php _e('The key/ID of your DMN decision table (e.g., "HeusdenpasAanvraagEindresultaat").', 'operaton-dmn'); ?></p>
                         <div id="full-endpoint-preview" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 12px; color: #666; display: none;">
                             <strong><?php _e('Full Evaluation URL:', 'operaton-dmn'); ?></strong><br>
                             <span id="preview-url"></span>
@@ -104,46 +139,19 @@ if ($editing && $config->form_id) {
                 
                 <tr>
                     <th scope="row">
-                        <label for="result_field"><?php _e('Result Field Name', 'operaton-dmn'); ?> <span class="required">*</span></label>
-                    </th>
-                    <td>
-                        <input type="text" name="result_field" id="result_field" class="regular-text" 
-                               value="<?php echo $editing ? esc_attr($config->result_field) : ''; ?>" required>
-                        <p class="description"><?php _e('The name of the output field from your DMN table (e.g., "desiredDish", "approved").', 'operaton-dmn'); ?></p>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <th scope="row">
-                        <label for="result_display_field"><?php _e('Result Display Field (Optional)', 'operaton-dmn'); ?></label>
-                    </th>
-                    <td>
-                        <select name="result_display_field" id="result_display_field" class="regular-text">
-                            <option value=""><?php _e('Select field to populate with result...', 'operaton-dmn'); ?></option>
-                        </select>
-                        <p class="description"><?php _e('Choose a field to automatically populate with the evaluation result. Leave empty to use automatic field detection.', 'operaton-dmn'); ?></p>
-                        
-                        <?php if ($editing && !empty($config->result_display_field)): ?>
-                        <p class="description" style="color: #666; font-style: italic;">
-                            <strong><?php _e('Currently configured:', 'operaton-dmn'); ?></strong> 
-                            Field ID <?php echo esc_html($config->result_display_field); ?>
-                        </p>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <th scope="row">
                         <label for="evaluation_step"><?php _e('Evaluation Step', 'operaton-dmn'); ?></label>
                     </th>
                     <td>
                         <select name="evaluation_step" id="evaluation_step" class="regular-text">
-                            <option value="auto" <?php selected($editing && isset($config->evaluation_step) ? $config->evaluation_step : 'auto', 'auto'); ?>><?php _e('Auto-detect (recommended)', 'operaton-dmn'); ?></option>
-                            <option value="1" <?php selected($editing && isset($config->evaluation_step) ? $config->evaluation_step : '', '1'); ?>>Step 1</option>
-                            <option value="2" <?php selected($editing && isset($config->evaluation_step) ? $config->evaluation_step : '', '2'); ?>>Step 2</option>
-                            <option value="3" <?php selected($editing && isset($config->evaluation_step) ? $config->evaluation_step : '', '3'); ?>>Step 3</option>
+                            <?php 
+                            $current_step = ($editing && property_exists($config, 'evaluation_step')) ? $config->evaluation_step : 'auto';
+                            ?>
+                            <option value="auto" <?php selected($current_step, 'auto'); ?>><?php _e('Auto-detect (recommended)', 'operaton-dmn'); ?></option>
+                            <option value="1" <?php selected($current_step, '1'); ?>>Step 1</option>
+                            <option value="2" <?php selected($current_step, '2'); ?>>Step 2</option>
+                            <option value="3" <?php selected($current_step, '3'); ?>>Step 3</option>
                         </select>
-                        <p class="description"><?php _e('Choose which step of the form should show the evaluate button. Auto-detect will place it appropriately.', 'operaton-dmn'); ?></p>
+                        <p class="description"><?php _e('Choose which step of the form should show the evaluate button.', 'operaton-dmn'); ?></p>
                     </td>
                 </tr>
 
@@ -160,10 +168,10 @@ if ($editing && $config->form_id) {
             </tbody>
         </table>
         
-        <!-- SINGLE FIELD MAPPING SECTION -->
+        <!-- INPUT FIELD MAPPINGS SECTION -->
         <div class="field-mapping-section">
-            <h2><?php _e('Field Mappings', 'operaton-dmn'); ?> <span class="required">*</span></h2>
-            <p><?php _e('Map your Gravity Form fields to DMN variables. The system will automatically detect custom radio buttons using the DMN variable names.', 'operaton-dmn'); ?></p>
+            <h2><?php _e('Input Field Mappings', 'operaton-dmn'); ?> <span class="required">*</span></h2>
+            <p><?php _e('Map your Gravity Form fields to DMN input variables.', 'operaton-dmn'); ?></p>
             
             <div id="form-not-selected-notice" style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; margin: 15px 0; border-radius: 4px;">
                 <p><strong><?php _e('Please select a Gravity Form first to enable field mapping.', 'operaton-dmn'); ?></strong></p>
@@ -216,8 +224,7 @@ if ($editing && $config->form_id) {
                                            name="field_mappings_radio_name[]" 
                                            value="<?php echo esc_attr(isset($mapping['radio_name']) ? $mapping['radio_name'] : ''); ?>" 
                                            placeholder="Auto: <?php echo esc_attr($dmn_var); ?>"
-                                           class="radio-name-input"
-                                           title="<?php _e('If this field uses custom radio buttons, enter the radio button name attribute. Leave empty to use the DMN variable name.', 'operaton-dmn'); ?>" />
+                                           class="radio-name-input" />
                                 </div>
                                 <div class="column">
                                     <button type="button" class="button remove-mapping"><?php _e('Remove', 'operaton-dmn'); ?></button>
@@ -228,19 +235,58 @@ if ($editing && $config->form_id) {
                 </div>
                 
                 <button type="button" id="add-field-mapping" class="button" disabled>
-                    <?php _e('Add Field Mapping', 'operaton-dmn'); ?>
+                    <?php _e('Add Input Field Mapping', 'operaton-dmn'); ?>
                 </button>
             </div>
+        </div>
+
+        <!-- RESULT MAPPINGS SECTION -->
+        <div class="result-mapping-section">
+            <h2><?php _e('Result Field Mappings', 'operaton-dmn'); ?> <span class="required">*</span></h2>
+            <p><?php _e('Map DMN result fields to Gravity Form fields where results should be displayed.', 'operaton-dmn'); ?></p>
             
-            <div class="radio-detection-help">
-                <h4><?php _e('Radio Button Detection', 'operaton-dmn'); ?></h4>
-                <p><?php _e('The system will automatically try to detect custom radio buttons using these methods:', 'operaton-dmn'); ?></p>
-                <ol>
-                    <li><?php _e('Radio buttons with the same name as the DMN variable', 'operaton-dmn'); ?></li>
-                    <li><?php _e('Radio buttons specified in the "Radio Button Name" field above', 'operaton-dmn'); ?></li>
-                    <li><?php _e('Radio buttons derived from the Gravity Forms field label', 'operaton-dmn'); ?></li>
-                </ol>
-                <p><?php _e('For best results, use the DMN variable name as the radio button name attribute.', 'operaton-dmn'); ?></p>
+            <div id="result-mappings-container" style="display: none;">
+                <div class="mapping-header">
+                    <div class="column header-col"><?php _e('DMN Result Field Name', 'operaton-dmn'); ?></div>
+                    <div class="column header-col"><?php _e('Gravity Form Field', 'operaton-dmn'); ?></div>
+                    <div class="column header-col"><?php _e('Actions', 'operaton-dmn'); ?></div>
+                </div>
+                
+                <div id="result-mappings">
+                    <?php if (!empty($result_mappings)): ?>
+                        <?php $index = 0; foreach ($result_mappings as $dmn_result => $mapping): ?>
+                            <div class="result-mapping-row" data-index="<?php echo $index; ?>">
+                                <div class="column">
+                                    <input type="text" 
+                                           name="result_mappings_dmn_result[]" 
+                                           value="<?php echo esc_attr($dmn_result); ?>" 
+                                           placeholder="e.g., aanmerkingHeusdenPas"
+                                           class="dmn-result-input" required />
+                                </div>
+                                <div class="column">
+                                    <select name="result_mappings_field_id[]" class="result-field-id-select" required>
+                                        <option value=""><?php _e('Select Field', 'operaton-dmn'); ?></option>
+                                        <?php if (!empty($selected_form_fields)): ?>
+                                            <?php foreach ($selected_form_fields as $field): ?>
+                                                <option value="<?php echo esc_attr($field['id']); ?>" 
+                                                        <?php selected($field['id'], isset($mapping['field_id']) ? $mapping['field_id'] : ''); ?>>
+                                                    <?php echo esc_html($field['id'] . ' - ' . $field['label'] . ' (' . $field['type'] . ')'); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </select>
+                                </div>
+                                <div class="column">
+                                    <button type="button" class="button remove-result-mapping"><?php _e('Remove', 'operaton-dmn'); ?></button>
+                                </div>
+                            </div>
+                        <?php $index++; endforeach; ?>
+                    <?php endif; ?>
+                </div>
+                
+                <button type="button" id="add-result-mapping" class="button" disabled>
+                    <?php _e('Add Result Field Mapping', 'operaton-dmn'); ?>
+                </button>
             </div>
         </div>
 
@@ -266,46 +312,6 @@ jQuery(document).ready(function($) {
         return html;
     }
     
-    // Function to suggest data type based on field type
-    function suggestDataType(fieldType) {
-        var suggestions = {
-            'text': 'String',
-            'textarea': 'String',
-            'select': 'String',
-            'radio': 'Boolean',
-            'checkbox': 'Boolean',
-            'number': 'Integer',
-            'date': 'String',
-            'hidden': 'String'
-        };
-        
-        return suggestions[fieldType] || 'String';
-    }
-    
-    // Update result display fields dropdown
-    function updateResultDisplayFields() {
-        var $resultSelect = $('#result_display_field');
-        var currentValue = $resultSelect.val();
-        var configuredValue = '<?php echo $editing && !empty($config->result_display_field) ? esc_js($config->result_display_field) : ''; ?>';
-        
-        $resultSelect.find('option:not(:first)').remove();
-        
-        if (currentFormFields.length > 0) {
-            $.each(currentFormFields, function(index, field) {
-                if (['text', 'textarea', 'hidden', 'number'].indexOf(field.type) !== -1) {
-                    var optionText = field.id + ' - ' + field.label + ' (' + field.type + ')';
-                    var $option = $('<option value="' + field.id + '">' + optionText + '</option>');
-                    $resultSelect.append($option);
-                }
-            });
-            
-            var valueToSet = configuredValue || currentValue;
-            if (valueToSet) {
-                $resultSelect.val(valueToSet);
-            }
-        }
-    }
-    
     // Form selection change handler
     $('#form_id').change(function() {
         var selectedOption = $(this).find('option:selected');
@@ -315,27 +321,24 @@ jQuery(document).ready(function($) {
             currentFormFields = fields;
             
             $('#form-not-selected-notice').hide();
-            $('#field-mappings-container').show();
-            $('#add-field-mapping').prop('disabled', false);
+            $('#field-mappings-container, #result-mappings-container').show();
+            $('#add-field-mapping, #add-result-mapping').prop('disabled', false);
             
             // Update all existing field dropdowns
-            $('.field-id-select').each(function() {
+            $('.field-id-select, .result-field-id-select').each(function() {
                 var currentValue = $(this).val();
                 $(this).html(getFieldOptionsHtml());
                 $(this).val(currentValue);
             });
-            
-            updateResultDisplayFields();
         } else {
             currentFormFields = [];
             $('#form-not-selected-notice').show();
-            $('#field-mappings-container').hide();
-            $('#add-field-mapping').prop('disabled', true);
-            $('#result_display_field').find('option:not(:first)').remove();
+            $('#field-mappings-container, #result-mappings-container').hide();
+            $('#add-field-mapping, #add-result-mapping').prop('disabled', true);
         }
     });
     
-    // Add new field mapping row
+    // Add new input field mapping row
     $('#add-field-mapping').click(function() {
         var $container = $('#field-mappings');
         var index = $container.find('.field-mapping-row').length;
@@ -370,9 +373,38 @@ jQuery(document).ready(function($) {
         $container.append(newRow);
     });
     
+    // Add new result mapping row
+    $('#add-result-mapping').click(function() {
+        var $container = $('#result-mappings');
+        var index = $container.find('.result-mapping-row').length;
+        
+        var newRow = $(`
+            <div class="result-mapping-row" data-index="${index}">
+                <div class="column">
+                    <input type="text" name="result_mappings_dmn_result[]" placeholder="e.g., aanmerkingHeusdenPas" class="dmn-result-input" required />
+                </div>
+                <div class="column">
+                    <select name="result_mappings_field_id[]" class="result-field-id-select" required>
+                        ${getFieldOptionsHtml()}
+                    </select>
+                </div>
+                <div class="column">
+                    <button type="button" class="button remove-result-mapping"><?php _e('Remove', 'operaton-dmn'); ?></button>
+                </div>
+            </div>
+        `);
+        
+        $container.append(newRow);
+    });
+    
     // Remove field mapping row
     $(document).on('click', '.remove-mapping', function() {
         $(this).closest('.field-mapping-row').remove();
+    });
+    
+    // Remove result mapping row
+    $(document).on('click', '.remove-result-mapping', function() {
+        $(this).closest('.result-mapping-row').remove();
     });
     
     // Auto-suggest data type when field is selected
@@ -386,6 +418,22 @@ jQuery(document).ready(function($) {
             dataTypeSelect.val(suggestedType);
         }
     });
+    
+    // Function to suggest data type based on field type
+    function suggestDataType(fieldType) {
+        var suggestions = {
+            'text': 'String',
+            'textarea': 'String',
+            'select': 'String',
+            'radio': 'Boolean',
+            'checkbox': 'Boolean',
+            'number': 'Integer',
+            'date': 'String',
+            'hidden': 'String'
+        };
+        
+        return suggestions[fieldType] || 'String';
+    }
     
     // Auto-fill radio button name placeholder when DMN variable is entered
     $(document).on('input', '.dmn-variable-input', function() {
@@ -478,14 +526,22 @@ jQuery(document).ready(function($) {
             return false;
         }
         
-        var mappings = $('.field-mapping-row').length;
-        if (mappings === 0) {
-            alert('<?php _e('At least one field mapping is required.', 'operaton-dmn'); ?>');
+        var inputMappings = $('.field-mapping-row').length;
+        if (inputMappings === 0) {
+            alert('<?php _e('At least one input field mapping is required.', 'operaton-dmn'); ?>');
             e.preventDefault();
             return false;
         }
         
-        var hasEmpty = false;
+        var resultMappings = $('.result-mapping-row').length;
+        if (resultMappings === 0) {
+            alert('<?php _e('At least one result field mapping is required.', 'operaton-dmn'); ?>');
+            e.preventDefault();
+            return false;
+        }
+        
+        // Validate input mappings
+        var hasEmptyInput = false;
         var hasDuplicateFields = false;
         var usedFields = [];
         
@@ -494,7 +550,7 @@ jQuery(document).ready(function($) {
             var fieldId = $(this).find('.field-id-select').val();
             
             if (dmnVar === '' || fieldId === '') {
-                hasEmpty = true;
+                hasEmptyInput = true;
                 return false;
             }
             
@@ -505,14 +561,47 @@ jQuery(document).ready(function($) {
             usedFields.push(fieldId);
         });
         
-        if (hasEmpty) {
-            alert('<?php _e('All field mapping entries must be complete.', 'operaton-dmn'); ?>');
+        if (hasEmptyInput) {
+            alert('<?php _e('All input field mapping entries must be complete.', 'operaton-dmn'); ?>');
             e.preventDefault();
             return false;
         }
         
         if (hasDuplicateFields) {
-            alert('<?php _e('Each form field can only be mapped once.', 'operaton-dmn'); ?>');
+            alert('<?php _e('Each form field can only be mapped once in input mappings.', 'operaton-dmn'); ?>');
+            e.preventDefault();
+            return false;
+        }
+        
+        // Validate result mappings
+        var hasEmptyResult = false;
+        var hasDuplicateResultFields = false;
+        var usedResultFields = [];
+        
+        $('.result-mapping-row').each(function() {
+            var dmnResult = $(this).find('.dmn-result-input').val().trim();
+            var fieldId = $(this).find('.result-field-id-select').val();
+            
+            if (dmnResult === '' || fieldId === '') {
+                hasEmptyResult = true;
+                return false;
+            }
+            
+            if (usedResultFields.indexOf(fieldId) !== -1) {
+                hasDuplicateResultFields = true;
+                return false;
+            }
+            usedResultFields.push(fieldId);
+        });
+        
+        if (hasEmptyResult) {
+            alert('<?php _e('All result field mapping entries must be complete.', 'operaton-dmn'); ?>');
+            e.preventDefault();
+            return false;
+        }
+        
+        if (hasDuplicateResultFields) {
+            alert('<?php _e('Each form field can only be mapped once in result mappings.', 'operaton-dmn'); ?>');
             e.preventDefault();
             return false;
         }
@@ -540,7 +629,8 @@ jQuery(document).ready(function($) {
     color: #d63638;
 }
 
-.field-mapping-section {
+.field-mapping-section,
+.result-mapping-section {
     margin-top: 30px;
 }
 
@@ -553,7 +643,11 @@ jQuery(document).ready(function($) {
     border-bottom: 2px solid #ddd;
     font-weight: bold;
     margin-bottom: 10px;
-    border-radius: 4px 4px 0 0;
+    border-radius: 4px;
+}
+
+.result-mapping-section .mapping-header {
+    grid-template-columns: 2fr 2fr 1fr;
 }
 
 .header-col {
@@ -571,28 +665,26 @@ jQuery(document).ready(function($) {
     background: #fafafa;
 }
 
-.field-mapping-row:hover {
+.result-mapping-row {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr;
+    gap: 15px;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    background: #fafafa;
+}
+
+.field-mapping-row:hover,
+.result-mapping-row:hover {
     background: #f0f0f0;
 }
 
 .field-mapping-row input,
-.field-mapping-row select {
+.field-mapping-row select,
+.result-mapping-row input,
+.result-mapping-row select {
     width: 100%;
-}
-
-.radio-detection-help {
-    background: #f0f0f1;
-    padding: 20px;
-    border-radius: 4px;
-    margin: 20px 0;
-}
-
-.radio-detection-help ol {
-    margin: 10px 0;
-}
-
-.radio-detection-help li {
-    margin-bottom: 8px;
 }
 
 #endpoint-test-result {
@@ -608,25 +700,23 @@ jQuery(document).ready(function($) {
     word-break: break-all;
 }
 
-#add-field-mapping {
+#add-field-mapping,
+#add-result-mapping {
     margin-top: 15px;
 }
 
-#add-field-mapping:disabled {
+#add-field-mapping:disabled,
+#add-result-mapping:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
 
 @media (max-width: 1200px) {
     .mapping-header,
-    .field-mapping-row {
+    .field-mapping-row,
+    .result-mapping-row {
         grid-template-columns: 1fr;
         gap: 10px;
-    }
-    
-    .header-col::before {
-        content: attr(data-label) ": ";
-        font-weight: bold;
     }
 }
 </style>

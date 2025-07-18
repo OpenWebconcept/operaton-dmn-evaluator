@@ -95,6 +95,7 @@ The familiar [Dish example configured as demo](https://owc-gemeente.open-regels.
 
 ### Core Capabilities
 - **Real-time DMN Evaluation**: Execute DMN decisions directly from Gravity Forms
+- **Multiple Result Fields**: **NEW in v1.0.0-beta.8** - Map multiple DMN result fields to different form fields in a single evaluation
 - **Flexible Field Mapping**: Map form fields to DMN variables with type validation
 - **Multiple Data Types**: Support for String, Integer, Double, and Boolean types
 - **Result Population**: Automatically populate form fields with evaluation results
@@ -183,24 +184,33 @@ Field mappings connect Gravity Form fields to DMN decision table inputs.
 - Data type compatibility is checked
 - Duplicate field usage is prevented
 
-### Result Configuration
+### Result Field Mappings ✨ NEW
+
+#### Multiple Result Configuration
+**NEW in v1.0.0-beta.8**: Configure multiple DMN result fields to populate different form fields simultaneously.
 
 ![Result Configuration](./assets/images/ResultConfig.png)
 
-#### Result Field Name
-- **Purpose**: Name of the output variable from your DMN decision table
-- **Required**: Yes
-- **Examples**: `desiredDish`, `approved`, `riskLevel`
-- **Note**: Must match exactly with DMN table output variable name
+#### Result Field Mappings
+- **Purpose**: Map multiple DMN output variables to specific form fields
+- **Required**: At least one result mapping is required
+- **Format**: DMN Result Field Name → Gravity Form Field
+- **Examples**: 
+  - `aanmerkingHeusdenPas` → Field ID 35
+  - `aanmerkingKindPakket` → Field ID 36
+  - `loanApproved` → Field ID 10
+  - `interestRate` → Field ID 11
 
-#### Result Display Field (Optional)
-- **Purpose**: Specify which form field should receive the evaluation result
-- **Options**: Auto-populated from available text, textarea, number, and hidden fields
-- **Auto-detection**: If not specified, system will automatically detect suitable fields
-- **Detection Priority**:
-  1. Fields with labels containing "desired dish", "result"
-  2. Fields with "dish" or "result" in name/ID
-  3. Visible text fields on current page
+**Configuration Benefits**:
+- **Single Evaluation**: One DMN call populates multiple result fields
+- **Comprehensive Results**: Users see all related decision outcomes immediately
+- **Visual Confirmation**: Success notification shows all populated results
+- **Individual Targeting**: Each result goes to its specifically configured field
+
+**Example Success Notification**:
+```
+✅ Results populated (2): aanmerkingHeusdenPas: false, aanmerkingKindPakket: true
+```
 
 ### Form Behavior Settings
 
@@ -238,6 +248,12 @@ Field mappings connect Gravity Form fields to DMN decision table inputs.
 
 ## Advanced Features
 
+### Multiple Result Processing ✨ NEW
+- **Simultaneous Population**: Single evaluation populates multiple form fields
+- **Individual Error Handling**: Each result field is processed independently
+- **Comprehensive Feedback**: Success notification lists all populated results
+- **Visual Highlighting**: Each populated field is highlighted individually
+
 ### Connection Testing
 - **Endpoint Validation**: Test connectivity to DMN engine
 - **Full Configuration Test**: Validate complete endpoint with decision key
@@ -257,19 +273,22 @@ Field mappings connect Gravity Form fields to DMN decision table inputs.
 ## Form Design Best Practices
 
 ### Result Field Placement
-- **Same Page**: Place result field on same page as evaluate button for immediate feedback
-- **Clear Labeling**: Use descriptive labels like "Recommended Dish" or "Approval Result"
+- **Same Page**: Place result fields on same page as evaluate button for immediate feedback
+- **Clear Labeling**: Use descriptive labels like "Heusdenpas Eligibility" or "Kindpakket Approval"
 - **Field Type**: Use text fields for most results, select fields for predefined options
+- **Multiple Results**: **NEW** - Group related result fields together for better UX
 
 ### Field Mapping Strategy
 - **Required Fields**: Ensure all mapped fields are marked as required in Gravity Forms
 - **Data Types**: Choose appropriate data types matching your DMN table expectations
-- **Field Order**: Logical flow from input fields to evaluate button to result field
+- **Field Order**: Logical flow from input fields to evaluate button to result fields
+- **Result Organization**: **NEW** - Organize multiple result fields logically
 
 ### User Experience
 - **Clear Instructions**: Provide clear form instructions about the evaluation process
 - **Progress Indication**: Use form progress bars for multi-step forms
 - **Error Messages**: Customize error messages for better user guidance
+- **Result Explanation**: **NEW** - Provide context for multiple results when needed
 
 ## Troubleshooting
 
@@ -279,21 +298,31 @@ Field mappings connect Gravity Form fields to DMN decision table inputs.
 - Check that configuration exists for the form
 - Verify form ID matches configuration
 
-**"No result field found on this page."**
-- Add a text field to receive results
-- Configure specific result display field
-- Check field labeling for auto-detection
+**"No result fields found on this page to populate."**
+- Add text fields to receive results
+- Configure specific result field mappings
+- Check field visibility on current page
 
 **"Connection failed" or "Endpoint not found (404)"**
 - Verify DMN base endpoint URL format
 - Check decision key matches deployed DMN model
 - Test network connectivity to DMN engine
 
+### Multiple Result Issues ✨ NEW
+**"No field found for result: [field_name]"**
+- Verify result field mapping is configured correctly
+- Check that target form field exists and is visible
+- Ensure field ID matches exactly
+
+**"At least one result field mapping is required"**
+- Add at least one result field mapping in admin configuration
+- Verify both DMN result field name and target form field are specified
+
 ### Field Detection Issues
 - Use browser console to debug field detection
 - Check field visibility on current page
-- Verify field naming conventions for auto-detection
-- Configure specific field ID if auto-detection fails
+- Verify field ID mapping in result configuration
+- Configure specific field IDs if auto-detection fails
 
 ### API Connection Issues
 - Verify DMN engine is running and accessible
@@ -303,7 +332,28 @@ Field mappings connect Gravity Form fields to DMN decision table inputs.
 
 ## Example Configurations
 
-### Dish Recommendation System
+### Heusdenpas en Kindpakket (Multiple Results) ✨ NEW
+```
+Configuration Name: Heusdenpas en Kindpakket
+Gravity Form: Social Services Application (ID: 8)
+DMN Base Endpoint: https://operatondev.open-regels.nl/engine-rest/decision-definition/key/
+Decision Key: HeusdenpasAanvraagEindresultaat
+Button Text: Evaluate
+
+Input Field Mappings:
+- geboortedatumAanvrager (String) → Birth Date (Field ID: 5)
+- aanvragerAlleenstaand (Boolean) → Single Status (Field ID: 33)
+- maandelijksBrutoInkomenAanvrager (Integer) → Monthly Income (Field ID: 24)
+- aanvragerHeeftKind4Tm17 (Boolean) → Has Children 4-17 (Field ID: 31)
+
+Result Field Mappings:
+- aanmerkingHeusdenPas → Heusdenpas Eligibility (Field ID: 35)
+- aanmerkingKindPakket → Kindpakket Eligibility (Field ID: 36)
+
+Expected Result: ✅ Results populated (2): aanmerkingHeusdenPas: false, aanmerkingKindPakket: true
+```
+
+### Dish Recommendation System (Single Result)
 ```
 Configuration Name: Dish Example
 Gravity Form: Dish Selection Form (ID: 2)
@@ -312,29 +362,36 @@ Decision Key: dish
 Result Field Name: desiredDish
 Button Text: Get Recommendation
 
-Field Mappings:
+Input Field Mappings:
 - season (String) → Season dropdown (Field ID: 1)
 - guestCount (Integer) → Guest Count number field (Field ID: 3)
 
-Result Display Field: Desired Dish text field (Field ID: 7)
+Result Field Mappings:
+- desiredDish → Desired Dish text field (Field ID: 7)
 ```
 
-### Loan Approval System
+### Multi-Decision Loan Processing ✨ NEW
 ```
-Configuration Name: Loan Approval
+Configuration Name: Comprehensive Loan Analysis
 Gravity Form: Loan Application (ID: 5)
 DMN Base Endpoint: https://your-bank.operaton.cloud/engine-rest/decision-definition/key/
-Decision Key: loan-approval
-Result Field Name: approved
-Button Text: Check Eligibility
+Decision Key: comprehensive-loan-evaluation
+Button Text: Analyze Loan Application
 
-Field Mappings:
+Input Field Mappings:
 - income (Double) → Annual Income (Field ID: 2)
 - creditScore (Integer) → Credit Score (Field ID: 3)
 - loanAmount (Double) → Requested Amount (Field ID: 4)
 - hasCollateral (Boolean) → Collateral Available (Field ID: 5)
 
-Result Display Field: Approval Status (Field ID: 6)
+Result Field Mappings:
+- loanApproved → Approval Status (Field ID: 10)
+- interestRate → Interest Rate (Field ID: 11)
+- loanTerm → Loan Term Years (Field ID: 12)
+- monthlyPayment → Monthly Payment (Field ID: 13)
+- riskLevel → Risk Assessment (Field ID: 14)
+
+Expected Result: ✅ Results populated (5): loanApproved: true, interestRate: 3.5, loanTerm: 30, monthlyPayment: 1123.29, riskLevel: medium
 ```
 
 ## Version Information
