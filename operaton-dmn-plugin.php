@@ -200,7 +200,7 @@ class OperatonDMNEvaluator {
     }
     
 /**
- * Updated database table creation with new fields
+ * Simplified database table creation - no backward compatibility
  * Replace the create_database_tables method in your main plugin file
  */
 private function create_database_tables() {
@@ -213,12 +213,21 @@ private function create_database_tables() {
         // Check if new columns exist, add them if not
         $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
         
-        if (!in_array('result_display_field', $columns)) {
-            $wpdb->query("ALTER TABLE $table_name ADD COLUMN result_display_field varchar(255) DEFAULT NULL");
+        if (!in_array('result_mappings', $columns)) {
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN result_mappings longtext NOT NULL");
         }
         
         if (!in_array('evaluation_step', $columns)) {
             $wpdb->query("ALTER TABLE $table_name ADD COLUMN evaluation_step varchar(10) DEFAULT 'auto'");
+        }
+        
+        // Remove old columns if they exist
+        if (in_array('result_field', $columns)) {
+            $wpdb->query("ALTER TABLE $table_name DROP COLUMN result_field");
+        }
+        
+        if (in_array('result_display_field', $columns)) {
+            $wpdb->query("ALTER TABLE $table_name DROP COLUMN result_display_field");
         }
         
         return;
@@ -233,8 +242,7 @@ private function create_database_tables() {
         dmn_endpoint varchar(500) NOT NULL,
         decision_key varchar(255) NOT NULL,
         field_mappings longtext NOT NULL,
-        result_field varchar(255) NOT NULL,
-        result_display_field varchar(255) DEFAULT NULL,
+        result_mappings longtext NOT NULL,
         evaluation_step varchar(10) DEFAULT 'auto',
         button_text varchar(255) DEFAULT 'Evaluate',
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
@@ -253,7 +261,7 @@ private function create_database_tables() {
     
     return $result;
 }
-    
+
 public function add_admin_menu() {
     add_menu_page(
         __('Operaton DMN', 'operaton-dmn'),
@@ -500,129 +508,146 @@ public function admin_page() {
         return $base_endpoint . $decision_key . '/evaluate';
     }
     
-    /**
-     * Enhanced form validation for separated URL components
-     */
-    private function validate_configuration_data($data) {
-        $errors = array();
+/**
+ * Simplified form validation - no backward compatibility
+ * Replace the validate_configuration_data method in your main plugin file
+ */
+private function validate_configuration_data($data) {
+    $errors = array();
+    
+    // Required field validation
+    $required_fields = array(
+        'name' => __('Configuration Name', 'operaton-dmn'),
+        'form_id' => __('Gravity Form', 'operaton-dmn'),
+        'dmn_endpoint' => __('DMN Base Endpoint URL', 'operaton-dmn'),
+        'decision_key' => __('Decision Key', 'operaton-dmn')
+    );
+    
+    foreach ($required_fields as $field => $label) {
+        if (empty($data[$field])) {
+            $errors[] = sprintf(__('%s is required.', 'operaton-dmn'), $label);
+        }
+    }
+    
+    // URL validation
+    if (!empty($data['dmn_endpoint']) && !filter_var($data['dmn_endpoint'], FILTER_VALIDATE_URL)) {
+        $errors[] = __('DMN Base Endpoint URL is not valid.', 'operaton-dmn');
+    }
+    
+    // Decision key validation
+    if (!empty($data['decision_key'])) {
+        $decision_key = trim($data['decision_key']);
         
-        // Required field validation
-        $required_fields = array(
-            'name' => __('Configuration Name', 'operaton-dmn'),
-            'form_id' => __('Gravity Form', 'operaton-dmn'),
-            'dmn_endpoint' => __('DMN Base Endpoint URL', 'operaton-dmn'),
-            'decision_key' => __('Decision Key', 'operaton-dmn'),
-            'result_field' => __('Result Field Name', 'operaton-dmn')
-        );
-        
-        foreach ($required_fields as $field => $label) {
-            if (empty($data[$field])) {
-                $errors[] = sprintf(__('%s is required.', 'operaton-dmn'), $label);
-            }
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $decision_key)) {
+            $errors[] = __('Decision key should only contain letters, numbers, hyphens, and underscores.', 'operaton-dmn');
         }
         
-        // URL validation
-        if (!empty($data['dmn_endpoint']) && !filter_var($data['dmn_endpoint'], FILTER_VALIDATE_URL)) {
-            $errors[] = __('DMN Base Endpoint URL is not valid.', 'operaton-dmn');
+        if (strpos($decision_key, '/') !== false) {
+            $errors[] = __('Decision key should not contain forward slashes.', 'operaton-dmn');
         }
-        
-        // Check that base URL doesn't include the decision key
-        if (!empty($data['dmn_endpoint']) && !empty($data['decision_key'])) {
-            $base_url = trim($data['dmn_endpoint']);
-            $decision_key = trim($data['decision_key']);
-            
-            // Check if decision key is already in the base URL
-            if (strpos($base_url, $decision_key) !== false) {
-                $errors[] = sprintf(__('The base endpoint URL should not include the decision key "%s". Please remove it from the URL.', 'operaton-dmn'), $decision_key);
-            }
-            
-            // Check if URL ends with /evaluate (which suggests it's a full endpoint)
-            if (substr($base_url, -9) === '/evaluate') {
-                $errors[] = __('The base endpoint URL should not include "/evaluate". This will be added automatically.', 'operaton-dmn');
-            }
-            
-            // Suggest proper format if URL structure looks wrong
-            if (!preg_match('/\/engine-rest\/decision-definition\/key\/?$/', $base_url)) {
-                $errors[] = __('The base endpoint URL should end with "/engine-rest/decision-definition/key/" for Operaton DMN engines.', 'operaton-dmn');
+    }
+    
+    // Form ID validation
+    if (!empty($data['form_id'])) {
+        if (class_exists('GFAPI')) {
+            $form = GFAPI::get_form($data['form_id']);
+            if (!$form) {
+                $errors[] = __('Selected Gravity Form does not exist.', 'operaton-dmn');
             }
         }
+    }
+    
+    // Input field mappings validation
+    $has_input_mappings = false;
+    if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
+        $dmn_variables = $data['field_mappings_dmn_variable'];
+        $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
         
-        // Decision key validation
-        if (!empty($data['decision_key'])) {
-            $decision_key = trim($data['decision_key']);
+        for ($i = 0; $i < count($dmn_variables); $i++) {
+            $dmn_var = trim($dmn_variables[$i]);
+            $field_id = isset($field_ids[$i]) ? trim($field_ids[$i]) : '';
             
-            // Basic validation for decision key format
-            if (!preg_match('/^[a-zA-Z0-9_-]+$/', $decision_key)) {
-                $errors[] = __('Decision key should only contain letters, numbers, hyphens, and underscores.', 'operaton-dmn');
-            }
-            
-            // Check for common mistakes
-            if (strpos($decision_key, '/') !== false) {
-                $errors[] = __('Decision key should not contain forward slashes.', 'operaton-dmn');
-            }
-        }
-        
-        // Form ID validation
-        if (!empty($data['form_id'])) {
-            if (class_exists('GFAPI')) {
-                $form = GFAPI::get_form($data['form_id']);
-                if (!$form) {
-                    $errors[] = __('Selected Gravity Form does not exist.', 'operaton-dmn');
-                }
-            }
-        }
-        
-        // Field mappings validation
-        $has_mappings = false;
-        if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
-            $dmn_variables = $data['field_mappings_dmn_variable'];
-            $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
-            
-            for ($i = 0; $i < count($dmn_variables); $i++) {
-                $dmn_var = trim($dmn_variables[$i]);
-                $field_id = isset($field_ids[$i]) ? trim($field_ids[$i]) : '';
+            if (!empty($dmn_var) && !empty($field_id)) {
+                $has_input_mappings = true;
                 
-                if (!empty($dmn_var) && !empty($field_id)) {
-                    $has_mappings = true;
-                    
-                    // Validate field ID is numeric
-                    if (!is_numeric($field_id)) {
-                        $errors[] = sprintf(__('Field ID "%s" must be numeric.', 'operaton-dmn'), $field_id);
-                    }
-                    
-                    // Validate field exists in form
-                    if (class_exists('GFAPI') && !empty($data['form_id'])) {
-                        $form = GFAPI::get_form($data['form_id']);
-                        if ($form) {
-                            $field_exists = false;
-                            foreach ($form['fields'] as $form_field) {
-                                if ($form_field->id == $field_id) {
-                                    $field_exists = true;
-                                    break;
-                                }
+                if (!is_numeric($field_id)) {
+                    $errors[] = sprintf(__('Field ID "%s" must be numeric.', 'operaton-dmn'), $field_id);
+                }
+                
+                // Validate field exists in form
+                if (class_exists('GFAPI') && !empty($data['form_id'])) {
+                    $form = GFAPI::get_form($data['form_id']);
+                    if ($form) {
+                        $field_exists = false;
+                        foreach ($form['fields'] as $form_field) {
+                            if ($form_field->id == $field_id) {
+                                $field_exists = true;
+                                break;
                             }
-                            if (!$field_exists) {
-                                $errors[] = sprintf(__('Field ID "%s" does not exist in the selected form.', 'operaton-dmn'), $field_id);
-                            }
+                        }
+                        if (!$field_exists) {
+                            $errors[] = sprintf(__('Input field ID "%s" does not exist in the selected form.', 'operaton-dmn'), $field_id);
                         }
                     }
                 }
             }
         }
-        
-        if (!$has_mappings) {
-            $errors[] = __('At least one field mapping is required.', 'operaton-dmn');
-        }
-        
-        return $errors;
     }
     
+    if (!$has_input_mappings) {
+        $errors[] = __('At least one input field mapping is required.', 'operaton-dmn');
+    }
+    
+    // Result mappings validation
+    $has_result_mappings = false;
+    if (isset($data['result_mappings_dmn_result']) && is_array($data['result_mappings_dmn_result'])) {
+        $dmn_results = $data['result_mappings_dmn_result'];
+        $result_field_ids = isset($data['result_mappings_field_id']) ? $data['result_mappings_field_id'] : array();
+        
+        for ($i = 0; $i < count($dmn_results); $i++) {
+            $dmn_result = trim($dmn_results[$i]);
+            $field_id = isset($result_field_ids[$i]) ? trim($result_field_ids[$i]) : '';
+            
+            if (!empty($dmn_result) && !empty($field_id)) {
+                $has_result_mappings = true;
+                
+                if (!is_numeric($field_id)) {
+                    $errors[] = sprintf(__('Result field ID "%s" must be numeric.', 'operaton-dmn'), $field_id);
+                }
+                
+                // Validate field exists in form
+                if (class_exists('GFAPI') && !empty($data['form_id'])) {
+                    $form = GFAPI::get_form($data['form_id']);
+                    if ($form) {
+                        $field_exists = false;
+                        foreach ($form['fields'] as $form_field) {
+                            if ($form_field->id == $field_id) {
+                                $field_exists = true;
+                                break;
+                            }
+                        }
+                        if (!$field_exists) {
+                            $errors[] = sprintf(__('Result field ID "%s" does not exist in the selected form.', 'operaton-dmn'), $field_id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    if (!$has_result_mappings) {
+        $errors[] = __('At least one result field mapping is required.', 'operaton-dmn');
+    }
+    
+    return $errors;
+}
+
 /**
- * Updated configuration saving with new fields
- * Update the save_configuration method
+ * Simplified configuration saving - no backward compatibility
+ * Replace the save_configuration method in your main plugin file
  */
 private function save_configuration($data) {
-    // Validate data (existing validation code...)
+    // Validate data
     $validation_errors = $this->validate_configuration_data($data);
     
     if (!empty($validation_errors)) {
@@ -637,7 +662,7 @@ private function save_configuration($data) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'operaton_dmn_configs';
     
-    // Process field mappings with radio button names
+    // Process field mappings
     $field_mappings = array();
     
     if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
@@ -656,7 +681,26 @@ private function save_configuration($data) {
                 $field_mappings[$dmn_var] = array(
                     'field_id' => $field_id,
                     'type' => $type,
-                    'radio_name' => $radio_name // Store the custom radio button name
+                    'radio_name' => $radio_name
+                );
+            }
+        }
+    }
+    
+    // Process result mappings
+    $result_mappings = array();
+    
+    if (isset($data['result_mappings_dmn_result']) && is_array($data['result_mappings_dmn_result'])) {
+        $dmn_results = $data['result_mappings_dmn_result'];
+        $result_field_ids = isset($data['result_mappings_field_id']) ? $data['result_mappings_field_id'] : array();
+        
+        for ($i = 0; $i < count($dmn_results); $i++) {
+            $dmn_result = sanitize_text_field(trim($dmn_results[$i]));
+            $field_id = isset($result_field_ids[$i]) ? sanitize_text_field(trim($result_field_ids[$i])) : '';
+            
+            if (!empty($dmn_result) && !empty($field_id)) {
+                $result_mappings[$dmn_result] = array(
+                    'field_id' => $field_id
                 );
             }
         }
@@ -668,8 +712,7 @@ private function save_configuration($data) {
         'dmn_endpoint' => esc_url_raw($data['dmn_endpoint']),
         'decision_key' => sanitize_text_field($data['decision_key']),
         'field_mappings' => wp_json_encode($field_mappings),
-        'result_field' => sanitize_text_field($data['result_field']),
-        'result_display_field' => isset($data['result_display_field']) ? sanitize_text_field($data['result_display_field']) : '',
+        'result_mappings' => wp_json_encode($result_mappings),
         'evaluation_step' => isset($data['evaluation_step']) ? sanitize_text_field($data['evaluation_step']) : 'auto',
         'button_text' => sanitize_text_field($data['button_text'] ?: 'Evaluate')
     );
@@ -682,7 +725,7 @@ private function save_configuration($data) {
             $table_name, 
             $config_data, 
             array('id' => $config_id),
-            array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s'),
+            array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s'),
             array('%d')
         );
         
@@ -709,7 +752,7 @@ private function save_configuration($data) {
         $result = $wpdb->insert(
             $table_name, 
             $config_data,
-            array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+            array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s')
         );
         
         if ($result !== false) {
@@ -878,7 +921,7 @@ public function ajax_manual_database_update() {
     }
     
 /**
- * Enhanced script enqueuing with result field configuration
+ * Simplified script enqueuing - no backward compatibility
  * Replace the enqueue_gravity_scripts method in your main plugin file
  */
 public function enqueue_gravity_scripts($form, $is_ajax) {
@@ -890,7 +933,7 @@ public function enqueue_gravity_scripts($form, $is_ajax) {
     // Ensure jQuery is loaded
     wp_enqueue_script('jquery');
     
-    // Enqueue our frontend script with proper dependencies
+    // Enqueue our frontend script
     wp_enqueue_script(
         'operaton-dmn-frontend',
         OPERATON_DMN_PLUGIN_URL . 'assets/js/frontend.js',
@@ -907,27 +950,31 @@ public function enqueue_gravity_scripts($form, $is_ajax) {
         OPERATON_DMN_VERSION
     );
     
-    // Localize script with better error handling
+    // Localize script
     wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
         'url' => rest_url('operaton-dmn/v1/evaluate'),
         'nonce' => wp_create_nonce('wp_rest'),
         'debug' => defined('WP_DEBUG') && WP_DEBUG
     ));
     
-    // Form-specific configuration with new fields
+    // Form-specific configuration
     $field_mappings = json_decode($config->field_mappings, true);
     if (json_last_error() !== JSON_ERROR_NONE) {
         $field_mappings = array();
+    }
+    
+    $result_mappings = json_decode($config->result_mappings, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        $result_mappings = array();
     }
     
     wp_localize_script('operaton-dmn-frontend', 'operaton_config_' . $form['id'], array(
         'config_id' => $config->id,
         'button_text' => $config->button_text,
         'field_mappings' => $field_mappings,
+        'result_mappings' => $result_mappings,
         'form_id' => $form['id'],
-        'result_display_field' => isset($config->result_display_field) ? $config->result_display_field : '',
-        'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto',
-        'result_field_name' => $config->result_field
+        'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto'
     ));
 }
 
@@ -1079,155 +1126,175 @@ public function add_evaluate_button($button, $form) {
         ));
     }
     
-    /**
-     * Enhanced API call handling with separated URL construction
-     */
-    public function handle_evaluation($request) {
-        try {
-            $params = $request->get_json_params();
+/**
+ * Simplified API call handling - no backward compatibility
+ * Replace the handle_evaluation method in your main plugin file
+ */
+public function handle_evaluation($request) {
+    try {
+        $params = $request->get_json_params();
+        
+        if (!isset($params['config_id']) || !isset($params['form_data'])) {
+            return new WP_Error('missing_params', 'Configuration ID and form data are required', array('status' => 400));
+        }
+        
+        $config = $this->get_configuration($params['config_id']);
+        if (!$config) {
+            return new WP_Error('invalid_config', 'Configuration not found', array('status' => 404));
+        }
+        
+        $field_mappings = json_decode($config->field_mappings, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return new WP_Error('invalid_mappings', 'Invalid field mappings configuration', array('status' => 500));
+        }
+        
+        $result_mappings = json_decode($config->result_mappings, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return new WP_Error('invalid_result_mappings', 'Invalid result mappings configuration', array('status' => 500));
+        }
+        
+        if (empty($result_mappings)) {
+            return new WP_Error('no_result_mappings', 'No result mappings configured', array('status' => 500));
+        }
+        
+        // Process input variables
+        $variables = array();
+        
+        foreach ($field_mappings as $dmn_variable => $form_field) {
+            $value = null;
             
-            if (!isset($params['config_id']) || !isset($params['form_data'])) {
-                return new WP_Error('missing_params', 'Configuration ID and form data are required', array('status' => 400));
+            if (isset($params['form_data'][$dmn_variable])) {
+                $value = $params['form_data'][$dmn_variable];
             }
             
-            $config = $this->get_configuration($params['config_id']);
-            if (!$config) {
-                return new WP_Error('invalid_config', 'Configuration not found', array('status' => 404));
+            if ($value === null || $value === 'null' || $value === '') {
+                $variables[$dmn_variable] = array(
+                    'value' => null,
+                    'type' => $form_field['type']
+                );
+                continue;
             }
             
-            $field_mappings = json_decode($config->field_mappings, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                return new WP_Error('invalid_mappings', 'Invalid field mappings configuration', array('status' => 500));
-            }
-            
-// Replace the variable processing section in your handle_evaluation method:
-
-$variables = array();
-
-// Process ALL mapped fields, ensuring each one is included
-foreach ($field_mappings as $dmn_variable => $form_field) {
-    $value = null; // Default to null
-    
-    // Check if data was provided for this variable
-    if (isset($params['form_data'][$dmn_variable])) {
-        $value = $params['form_data'][$dmn_variable];
-    }
-    
-    // Handle explicit null values
-    if ($value === null || $value === 'null' || $value === '') {
-        $variables[$dmn_variable] = array(
-            'value' => null,
-            'type' => $form_field['type']
-        );
-        continue;
-    }
-    
-    // Enhanced type conversion with validation
-    switch ($form_field['type']) {
-        case 'Integer':
-            if (!is_numeric($value)) {
-                return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
-            }
-            $value = intval($value);
-            break;
-        case 'Double':
-            if (!is_numeric($value)) {
-                return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
-            }
-            $value = floatval($value);
-            break;
-        case 'Boolean':
-            // Handle string boolean values
-            if (is_string($value)) {
-                $value = strtolower($value);
-                if ($value === 'true' || $value === '1') {
-                    $value = true;
-                } elseif ($value === 'false' || $value === '0') {
-                    $value = false;
-                } else {
-                    $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-                    if ($value === null) {
-                        return new WP_Error('invalid_type', sprintf('Value for %s must be boolean', $dmn_variable), array('status' => 400));
+            // Type conversion
+            switch ($form_field['type']) {
+                case 'Integer':
+                    if (!is_numeric($value)) {
+                        return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
                     }
-                }
+                    $value = intval($value);
+                    break;
+                case 'Double':
+                    if (!is_numeric($value)) {
+                        return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
+                    }
+                    $value = floatval($value);
+                    break;
+                case 'Boolean':
+                    if (is_string($value)) {
+                        $value = strtolower($value);
+                        if ($value === 'true' || $value === '1') {
+                            $value = true;
+                        } elseif ($value === 'false' || $value === '0') {
+                            $value = false;
+                        } else {
+                            $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                            if ($value === null) {
+                                return new WP_Error('invalid_type', sprintf('Value for %s must be boolean', $dmn_variable), array('status' => 400));
+                            }
+                        }
+                    }
+                    break;
+                default:
+                    $value = sanitize_text_field($value);
             }
-            break;
-        default:
-            $value = sanitize_text_field($value);
+            
+            $variables[$dmn_variable] = array(
+                'value' => $value,
+                'type' => $form_field['type']
+            );
+        }
+        
+        error_log('Operaton DMN: Variables being sent to DMN engine: ' . print_r($variables, true));
+        
+        if (empty($variables)) {
+            return new WP_Error('no_data', 'No valid form data provided', array('status' => 400));
+        }
+        
+        // Build the full evaluation endpoint
+        $evaluation_endpoint = $this->build_evaluation_endpoint($config->dmn_endpoint, $config->decision_key);
+        
+        error_log('Operaton DMN: Using evaluation endpoint: ' . $evaluation_endpoint);
+        
+        // Make API call
+        $operaton_data = array('variables' => $variables);
+        
+        $response = wp_remote_post($evaluation_endpoint, array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+            ),
+            'body' => wp_json_encode($operaton_data),
+            'timeout' => 30,
+            'sslverify' => false,
+        ));
+        
+        if (is_wp_error($response)) {
+            return new WP_Error('api_error', 'Failed to connect to Operaton API: ' . $response->get_error_message(), array('status' => 500));
+        }
+        
+        $http_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        
+        if ($http_code !== 200) {
+            return new WP_Error('api_error', sprintf('API returned status code %d: %s', $http_code, $body), array('status' => 500));
+        }
+        
+        $data = json_decode($body, true);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return new WP_Error('invalid_response', 'Invalid JSON response from Operaton API', array('status' => 500));
+        }
+        
+        // Process results based on configured mappings
+        $results = array();
+        
+        foreach ($result_mappings as $dmn_result_field => $mapping) {
+            $result_value = null;
+            
+            if (isset($data[0][$dmn_result_field]['value'])) {
+                $result_value = $data[0][$dmn_result_field]['value'];
+            } elseif (isset($data[0][$dmn_result_field])) {
+                $result_value = $data[0][$dmn_result_field];
+            }
+            
+            if ($result_value !== null) {
+                $results[$dmn_result_field] = array(
+                    'value' => $result_value,
+                    'field_id' => $mapping['field_id']
+                );
+            }
+        }
+        
+        if (empty($results)) {
+            return new WP_Error('no_results', 'No valid results found in API response', array('status' => 500));
+        }
+        
+        return array(
+            'success' => true,
+            'results' => $results,
+            'debug_info' => defined('WP_DEBUG') && WP_DEBUG ? array(
+                'variables_sent' => $variables,
+                'api_response' => $data,
+                'endpoint_used' => $evaluation_endpoint,
+                'result_mappings' => $result_mappings
+            ) : null
+        );
+        
+    } catch (Exception $e) {
+        return new WP_Error('server_error', $e->getMessage(), array('status' => 500));
     }
-    
-    $variables[$dmn_variable] = array(
-        'value' => $value,
-        'type' => $form_field['type']
-    );
 }
 
-// Log the variables being sent for debugging
-error_log('Operaton DMN: Variables being sent to DMN engine: ' . print_r($variables, true));
-
-if (empty($variables)) {
-    return new WP_Error('no_data', 'No valid form data provided', array('status' => 400));
-}            
-            // Build the full evaluation endpoint
-            $evaluation_endpoint = $this->build_evaluation_endpoint($config->dmn_endpoint, $config->decision_key);
-            
-            error_log('Operaton DMN: Using evaluation endpoint: ' . $evaluation_endpoint);
-            
-            // Make API call with better error handling
-            $operaton_data = array('variables' => $variables);
-            
-            $response = wp_remote_post($evaluation_endpoint, array(
-                'headers' => array(
-                    'Content-Type' => 'application/json',
-                    'Accept' => 'application/json',
-                ),
-                'body' => wp_json_encode($operaton_data),
-                'timeout' => 30,
-                'sslverify' => false, // Only for development
-            ));
-            
-            if (is_wp_error($response)) {
-                return new WP_Error('api_error', 'Failed to connect to Operaton API: ' . $response->get_error_message(), array('status' => 500));
-            }
-            
-            $http_code = wp_remote_retrieve_response_code($response);
-            $body = wp_remote_retrieve_body($response);
-            
-            if ($http_code !== 200) {
-                return new WP_Error('api_error', sprintf('API returned status code %d: %s', $http_code, $body), array('status' => 500));
-            }
-            
-            $data = json_decode($body, true);
-            
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                return new WP_Error('invalid_response', 'Invalid JSON response from Operaton API', array('status' => 500));
-            }
-            
-            // Extract result with better error handling
-            $result_value = '';
-            if (isset($data[0][$config->result_field]['value'])) {
-                $result_value = $data[0][$config->result_field]['value'];
-            } elseif (isset($data[0][$config->result_field])) {
-                $result_value = $data[0][$config->result_field];
-            } else {
-                return new WP_Error('result_not_found', sprintf('Result field "%s" not found in API response', $config->result_field), array('status' => 500));
-            }
-            
-            return array(
-                'success' => true,
-                'result' => $result_value,
-                'debug_info' => defined('WP_DEBUG') && WP_DEBUG ? array(
-                    'variables_sent' => $variables,
-                    'api_response' => $data,
-                    'endpoint_used' => $evaluation_endpoint
-                ) : null
-            );
-            
-        } catch (Exception $e) {
-            return new WP_Error('server_error', $e->getMessage(), array('status' => 500));
-        }
-    }
-    
     /**
      * Updated AJAX handler for testing DMN endpoints with URL construction
      */
