@@ -3,7 +3,7 @@
  * Plugin Name: Operaton DMN Evaluator
  * Plugin URI: https://git.open-regels.nl/showcases/operaton-dmn-evaluator
  * Description: WordPress plugin to integrate Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.
- * Version: 1.0.0-beta.8
+ * Version: 1.0.0-beta.8.1
  * Author: Steven Gort
  * License: EU PL v1.2
  * Text Domain: operaton-dmn
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('OPERATON_DMN_VERSION', '1.0.0-beta.8');
+define('OPERATON_DMN_VERSION', '1.0.0-beta.8.1');
 define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('OPERATON_DMN_PLUGIN_PATH', plugin_dir_path(__FILE__));
 
@@ -91,12 +91,23 @@ class OperatonDMNEvaluator {
         return self::$instance;
     }
     
-    private function __construct() {
-        add_action('init', array($this, 'init'));
-        add_action('admin_menu', array($this, 'add_admin_menu'));
-        add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
-        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
-        add_action('rest_api_init', array($this, 'register_rest_routes'));
+/**
+ * Updated constructor - add database check on every admin page load
+ */
+private function __construct() {
+    add_action('init', array($this, 'init'));
+    add_action('admin_menu', array($this, 'add_admin_menu'));
+    add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
+    add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+    add_action('rest_api_init', array($this, 'register_rest_routes'));
+    
+    // CRITICAL: Check database on every admin page load
+    if (is_admin()) {
+        add_action('admin_init', array($this, 'check_and_update_database'), 1);
+    }
+    
+    // Version check for upgrades
+    add_action('admin_init', array($this, 'check_version'), 5);
         
         // Add AJAX handlers
         add_action('wp_ajax_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
@@ -167,25 +178,24 @@ class OperatonDMNEvaluator {
         // Placeholder for future field-specific settings
     }
     
-    /**
-     * Enhanced activation hook
-     */
-    public function activate() {
-        // Create database tables
-        $this->create_database_tables();
-        
-        // Set default options
-        add_option('operaton_dmn_version', OPERATON_DMN_VERSION);
-        add_option('operaton_dmn_activated', current_time('mysql'));
-        
-        // Schedule cleanup cron job
-        if (!wp_next_scheduled('operaton_dmn_cleanup')) {
-            wp_schedule_event(time(), 'daily', 'operaton_dmn_cleanup');
-        }
-        
-        flush_rewrite_rules();
+/**
+ * Enhanced activation hook with automatic migration
+ */
+public function activate() {
+    // Create/update database tables
+    $this->create_database_tables();
+    
+    // Set default options
+    add_option('operaton_dmn_version', OPERATON_DMN_VERSION);
+    add_option('operaton_dmn_activated', current_time('mysql'));
+    
+    // Schedule cleanup cron job
+    if (!wp_next_scheduled('operaton_dmn_cleanup')) {
+        wp_schedule_event(time(), 'daily', 'operaton_dmn_cleanup');
     }
     
+    flush_rewrite_rules();
+}    
     /**
      * Enhanced deactivation hook
      */
@@ -336,52 +346,67 @@ public function temp_debug_page() {
     echo '</div>';
 }
     
+/**
+ * Safe admin form template with automatic migration trigger
+ */
 public function admin_page() {
-    // Check for database update success message
-    if (isset($_GET['database_updated'])) {
-        echo '<div class="notice notice-success is-dismissible"><p>' . __('Database schema updated successfully!', 'operaton-dmn') . '</p></div>';
-    }
+    // Force database check when accessing admin pages
+    $this->check_and_update_database();
     
-    // Check if database needs updating
+    // Check for any database issues and show user-friendly message
     global $wpdb;
     $table_name = $wpdb->prefix . 'operaton_dmn_configs';
     $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
-    $needs_update = !in_array('result_display_field', $columns) || !in_array('evaluation_step', $columns);
     
-    if ($needs_update) {
-        echo '<div class="notice notice-warning">';
-        echo '<p><strong>' . __('Database Update Required', 'operaton-dmn') . '</strong></p>';
-        echo '<p>' . __('Your database schema needs to be updated to support the latest features.', 'operaton-dmn') . '</p>';
-        echo '<p>';
-        echo '<a href="' . wp_nonce_url(admin_url('admin-ajax.php?action=operaton_manual_db_update'), 'operaton_manual_db_update') . '" class="button button-primary">';
-        echo __('Update Database Now', 'operaton-dmn');
-        echo '</a>';
-        echo '</p>';
+    if (!in_array('result_mappings', $columns)) {
+        echo '<div class="notice notice-error">';
+        echo '<p><strong>Database Update Failed</strong></p>';
+        echo '<p>The plugin attempted to update the database but it failed. Please contact your administrator.</p>';
+        echo '<p>Error: Missing result_mappings column in database table.</p>';
         echo '</div>';
+        return;
     }
     
+    // Rest of existing admin_page method...
     if (isset($_POST['delete_config']) && wp_verify_nonce($_POST['_wpnonce'], 'delete_config')) {
         $this->delete_config($_POST['config_id']);
     }
     
     $configs = $this->get_all_configurations();
-    
-    // Show update management section
-    $this->show_update_management_section();
-    
     include OPERATON_DMN_PLUGIN_PATH . 'templates/admin-list.php';
 }
 
-    public function add_config_page() {
-        if (isset($_POST['save_config']) && wp_verify_nonce($_POST['_wpnonce'], 'save_config')) {
-            $this->save_configuration($_POST);
-        }
-        
-        $gravity_forms = $this->get_gravity_forms();
-        $config = isset($_GET['edit']) ? $this->get_configuration($_GET['edit']) : null;
-        include OPERATON_DMN_PLUGIN_PATH . 'templates/admin-form.php';
+/**
+ * Safe configuration page with migration check
+ */
+public function add_config_page() {
+    // Force database check
+    $this->check_and_update_database();
+    
+    // Check if migration was successful
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'operaton_dmn_configs';
+    $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
+    
+    if (!in_array('result_mappings', $columns)) {
+        echo '<div class="wrap">';
+        echo '<h1>Database Update Required</h1>';
+        echo '<div class="notice notice-error">';
+        echo '<p><strong>Database update failed.</strong> Please deactivate and reactivate the plugin, or contact your administrator.</p>';
+        echo '</div>';
+        echo '</div>';
+        return;
     }
     
+    // Rest of existing add_config_page method...
+    if (isset($_POST['save_config']) && wp_verify_nonce($_POST['_wpnonce'], 'save_config')) {
+        $this->save_configuration($_POST);
+    }
+    
+    $gravity_forms = $this->get_gravity_forms();
+    $config = isset($_GET['edit']) ? $this->get_configuration($_GET['edit']) : null;
+    include OPERATON_DMN_PLUGIN_PATH . 'templates/admin-form.php';
+}    
     /**
      * Show update management section in admin
      */
@@ -769,15 +794,15 @@ private function save_configuration($data) {
 }
 
 /**
- * Check and update database schema
+ * Automatic database migration on plugin updates
  */
 public function check_and_update_database() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'operaton_dmn_configs';
     
-    // Check if table exists
+    // Check if table exists at all
     if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") !== $table_name) {
-        // Table doesn't exist, create it
+        // Table doesn't exist, create it with new schema
         $this->create_database_tables();
         return;
     }
@@ -786,22 +811,30 @@ public function check_and_update_database() {
     $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
     
     // Add missing columns
-    if (!in_array('result_display_field', $columns)) {
-        $wpdb->query("ALTER TABLE $table_name ADD COLUMN result_display_field varchar(255) DEFAULT NULL AFTER result_field");
-        error_log('Operaton DMN: Added result_display_field column');
+    if (!in_array('result_mappings', $columns)) {
+        $sql = "ALTER TABLE $table_name ADD COLUMN result_mappings longtext NOT NULL DEFAULT '{}'";
+        $result = $wpdb->query($sql);
+        
+        if ($result === false) {
+            error_log('Operaton DMN: Error adding result_mappings column: ' . $wpdb->last_error);
+        } else {
+            error_log('Operaton DMN: Successfully added result_mappings column');
+        }
     }
     
     if (!in_array('evaluation_step', $columns)) {
-        $wpdb->query("ALTER TABLE $table_name ADD COLUMN evaluation_step varchar(10) DEFAULT 'auto' AFTER result_display_field");
-        error_log('Operaton DMN: Added evaluation_step column');
+        $sql = "ALTER TABLE $table_name ADD COLUMN evaluation_step varchar(10) DEFAULT 'auto'";
+        $result = $wpdb->query($sql);
+        
+        if ($result === false) {
+            error_log('Operaton DMN: Error adding evaluation_step column: ' . $wpdb->last_error);
+        } else {
+            error_log('Operaton DMN: Successfully added evaluation_step column');
+        }
     }
     
-    // Check for any errors
-    if (!empty($wpdb->last_error)) {
-        error_log('Operaton DMN: Database update error: ' . $wpdb->last_error);
-    } else {
-        error_log('Operaton DMN: Database schema updated successfully');
-    }
+    // Migration successful
+    error_log('Operaton DMN: Database migration completed successfully');
 }
 
 /**
@@ -1547,20 +1580,22 @@ public function handle_evaluation($request) {
         $this->clear_config_cache();
     }
     
-    /**
-     * Add version check for database migrations
-     */
-    public function check_version() {
-        $installed_version = get_option('operaton_dmn_version', '1.0.0-beta.1');
+/**
+ * Version check with automatic migration
+ */
+public function check_version() {
+    $installed_version = get_option('operaton_dmn_version', '1.0.0-beta.1');
+    
+    if (version_compare($installed_version, OPERATON_DMN_VERSION, '<')) {
+        // Run database migration for any version upgrade
+        $this->check_and_update_database();
         
-        if (version_compare($installed_version, OPERATON_DMN_VERSION, '<')) {
-            // Run any necessary upgrades
-            $this->upgrade_database($installed_version);
-            
-            // Update stored version
-            update_option('operaton_dmn_version', OPERATON_DMN_VERSION);
-        }
+        // Update stored version
+        update_option('operaton_dmn_version', OPERATON_DMN_VERSION);
+        
+        error_log('Operaton DMN: Upgraded from ' . $installed_version . ' to ' . OPERATON_DMN_VERSION);
     }
+}
     
     /**
      * Handle database upgrades between versions

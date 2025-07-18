@@ -1,9 +1,20 @@
 <?php
-// Simplified admin-form.php - no backward compatibility
+// Safe admin-form.php with automatic migration handling
 
 $editing = isset($config) && $config;
 $field_mappings = $editing ? json_decode($config->field_mappings, true) : array();
-$result_mappings = $editing ? json_decode($config->result_mappings, true) : array();
+
+// SAFE handling of result_mappings - check if property exists
+$result_mappings = array();
+if ($editing) {
+    // Check if the property exists before accessing it
+    if (property_exists($config, 'result_mappings') && !empty($config->result_mappings)) {
+        $result_mappings = json_decode($config->result_mappings, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $result_mappings = array();
+        }
+    }
+}
 
 // Get form fields for the selected form
 $selected_form_fields = array();
@@ -21,6 +32,12 @@ if ($editing && $config->form_id) {
         }
     }
 }
+
+// Check if database migration is needed
+global $wpdb;
+$table_name = $wpdb->prefix . 'operaton_dmn_configs';
+$columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
+$needs_migration = !in_array('result_mappings', $columns);
 ?>
 <div class="wrap">
     <h1><?php echo $editing ? __('Edit Configuration', 'operaton-dmn') : __('Add New Configuration', 'operaton-dmn'); ?></h1>
@@ -29,6 +46,24 @@ if ($editing && $config->form_id) {
         <div class="notice notice-error">
             <p><?php _e('Gravity Forms is required for this plugin to work. Please install and activate Gravity Forms.', 'operaton-dmn'); ?></p>
         </div>
+    <?php endif; ?>
+    
+    <?php if ($needs_migration): ?>
+        <div class="notice notice-error">
+            <p><strong><?php _e('Database Update Required', 'operaton-dmn'); ?></strong></p>
+            <p><?php _e('The plugin database needs to be updated. Please deactivate and reactivate the plugin to complete the update.', 'operaton-dmn'); ?></p>
+            <p>
+                <a href="<?php echo admin_url('plugins.php'); ?>" class="button button-primary">
+                    <?php _e('Go to Plugins Page', 'operaton-dmn'); ?>
+                </a>
+            </p>
+        </div>
+        
+        <div style="opacity: 0.5; pointer-events: none;">
+            <p><em><?php _e('Configuration editing is disabled until database update is complete.', 'operaton-dmn'); ?></em></p>
+        </div>
+        
+        <?php return; // Stop rendering the form ?>
     <?php endif; ?>
     
     <form method="post" id="operaton-config-form">
@@ -108,10 +143,13 @@ if ($editing && $config->form_id) {
                     </th>
                     <td>
                         <select name="evaluation_step" id="evaluation_step" class="regular-text">
-                            <option value="auto" <?php selected($editing && isset($config->evaluation_step) ? $config->evaluation_step : 'auto', 'auto'); ?>><?php _e('Auto-detect (recommended)', 'operaton-dmn'); ?></option>
-                            <option value="1" <?php selected($editing && isset($config->evaluation_step) ? $config->evaluation_step : '', '1'); ?>>Step 1</option>
-                            <option value="2" <?php selected($editing && isset($config->evaluation_step) ? $config->evaluation_step : '', '2'); ?>>Step 2</option>
-                            <option value="3" <?php selected($editing && isset($config->evaluation_step) ? $config->evaluation_step : '', '3'); ?>>Step 3</option>
+                            <?php 
+                            $current_step = ($editing && property_exists($config, 'evaluation_step')) ? $config->evaluation_step : 'auto';
+                            ?>
+                            <option value="auto" <?php selected($current_step, 'auto'); ?>><?php _e('Auto-detect (recommended)', 'operaton-dmn'); ?></option>
+                            <option value="1" <?php selected($current_step, '1'); ?>>Step 1</option>
+                            <option value="2" <?php selected($current_step, '2'); ?>>Step 2</option>
+                            <option value="3" <?php selected($current_step, '3'); ?>>Step 3</option>
                         </select>
                         <p class="description"><?php _e('Choose which step of the form should show the evaluate button.', 'operaton-dmn'); ?></p>
                     </td>
