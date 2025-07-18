@@ -396,7 +396,7 @@ Expected Result: ✅ Results populated (5): loanApproved: true, interestRate: 3.
 
 ## Version Information
 
-- **Plugin Version**: 1.0.0-beta.6
+- **Plugin Version**: 1.0.0-beta.8.1
 - **Gravity Forms Compatibility**: 2.4+
 - **WordPress Compatibility**: 5.0+
 - **PHP Requirements**: 7.4+
