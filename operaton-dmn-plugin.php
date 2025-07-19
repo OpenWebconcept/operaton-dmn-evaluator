@@ -2,8 +2,17 @@
 /**
  * Plugin Name: Operaton DMN Evaluator
  * Plugin URI: https://git.open-regels.nl/showcases/operaton-dmn-evaluator
+ *
+ * Enhanced Operaton DMN Evaluator v1.0.0-beta.9 with Process Integration
+ * 
+ * Key Changes:
+ * 1. Added process execution support alongside decision evaluation
+ * 2. Added decision flow results summary display
+ * 3. Enhanced configuration to support both modes
+ * 4. Added third page summary functionality
+ * 
  * Description: WordPress plugin to integrate Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.
- * Version: 1.0.0-beta.8.1
+ * Version: 1.0.0-beta.9
  * Author: Steven Gort
  * License: EU PL v1.2
  * Text Domain: operaton-dmn
@@ -16,7 +25,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('OPERATON_DMN_VERSION', '1.0.0-beta.8.1');
+define('OPERATON_DMN_VERSION', '1.0.0-beta.9');
 define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('OPERATON_DMN_PLUGIN_PATH', plugin_dir_path(__FILE__));
 
@@ -146,7 +155,30 @@ private function __construct() {
         
         // Version check for upgrades
         add_action('admin_init', array($this, 'check_version'));
-    
+
+// TEMPORARY: Clear decision flow cache
+add_action('admin_init', function() {
+    if (isset($_GET['clear_operaton_cache'])) {
+        global $wpdb;
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_operaton_%'");
+        wp_redirect(admin_url('admin.php?page=operaton-dmn&cache_cleared=1'));
+        exit;
+    }
+});
+
+// Add a button to clear cache
+add_action('admin_notices', function() {
+    if (current_user_can('manage_options') && isset($_GET['page']) && $_GET['page'] === 'operaton-dmn') {
+        echo '<div class="notice notice-info">';
+        echo '<p><strong>Decision Flow Cache:</strong> ';
+        echo '<a href="' . admin_url('admin.php?page=operaton-dmn&clear_operaton_cache=1') . '" class="button">Clear Decision Flow Cache</a>';
+        echo '</p></div>';
+        
+        if (isset($_GET['cache_cleared'])) {
+            echo '<div class="notice notice-success"><p>Decision flow cache cleared!</p></div>';
+        }
+    }
+});
         // IMMEDIATE database check on admin pages
         if (is_admin()) {
             add_action('admin_init', array($this, 'check_and_update_database'), 5);
@@ -226,68 +258,68 @@ public function activate() {
         flush_rewrite_rules();
     }
     
-/**
- * Simplified database table creation - no backward compatibility
- * Replace the create_database_tables method in your main plugin file
- */
-private function create_database_tables() {
-    global $wpdb;
-    
-    $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-    
-    // Check if table already exists
-    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name) {
-        // Check if new columns exist, add them if not
-        $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
+    /**
+     * Enhanced database table creation with process support
+     */
+    private function create_database_tables() {
+        global $wpdb;
         
-        if (!in_array('result_mappings', $columns)) {
-            $wpdb->query("ALTER TABLE $table_name ADD COLUMN result_mappings longtext NOT NULL");
+        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
+        
+        // Check if table already exists
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name) {
+            // Check if new columns exist, add them if not
+            $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
+            
+            if (!in_array('result_mappings', $columns)) {
+                $wpdb->query("ALTER TABLE $table_name ADD COLUMN result_mappings longtext NOT NULL");
+            }
+            
+            if (!in_array('evaluation_step', $columns)) {
+                $wpdb->query("ALTER TABLE $table_name ADD COLUMN evaluation_step varchar(10) DEFAULT 'auto'");
+            }
+            
+            // NEW: Add process integration columns
+            if (!in_array('use_process', $columns)) {
+                $wpdb->query("ALTER TABLE $table_name ADD COLUMN use_process boolean DEFAULT false");
+            }
+            
+            if (!in_array('process_key', $columns)) {
+                $wpdb->query("ALTER TABLE $table_name ADD COLUMN process_key varchar(255) DEFAULT NULL");
+            }
+            
+            if (!in_array('show_decision_flow', $columns)) {
+                $wpdb->query("ALTER TABLE $table_name ADD COLUMN show_decision_flow boolean DEFAULT false");
+            }
+            
+            return;
         }
         
-        if (!in_array('evaluation_step', $columns)) {
-            $wpdb->query("ALTER TABLE $table_name ADD COLUMN evaluation_step varchar(10) DEFAULT 'auto'");
-        }
+        $charset_collate = $wpdb->get_charset_collate();
         
-        // Remove old columns if they exist
-        if (in_array('result_field', $columns)) {
-            $wpdb->query("ALTER TABLE $table_name DROP COLUMN result_field");
-        }
+        $sql = "CREATE TABLE $table_name (
+            id int(11) NOT NULL AUTO_INCREMENT,
+            name varchar(255) NOT NULL,
+            form_id int(11) NOT NULL,
+            dmn_endpoint varchar(500) NOT NULL,
+            decision_key varchar(255) NOT NULL,
+            field_mappings longtext NOT NULL,
+            result_mappings longtext NOT NULL,
+            evaluation_step varchar(10) DEFAULT 'auto',
+            button_text varchar(255) DEFAULT 'Evaluate',
+            use_process boolean DEFAULT false,
+            process_key varchar(255) DEFAULT NULL,
+            show_decision_flow boolean DEFAULT false,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_form_id (form_id),
+            KEY idx_form_id (form_id)
+        ) $charset_collate;";
         
-        if (in_array('result_display_field', $columns)) {
-            $wpdb->query("ALTER TABLE $table_name DROP COLUMN result_display_field");
-        }
-        
-        return;
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        return dbDelta($sql);
     }
-    
-    $charset_collate = $wpdb->get_charset_collate();
-    
-    $sql = "CREATE TABLE $table_name (
-        id int(11) NOT NULL AUTO_INCREMENT,
-        name varchar(255) NOT NULL,
-        form_id int(11) NOT NULL,
-        dmn_endpoint varchar(500) NOT NULL,
-        decision_key varchar(255) NOT NULL,
-        field_mappings longtext NOT NULL,
-        result_mappings longtext NOT NULL,
-        evaluation_step varchar(10) DEFAULT 'auto',
-        button_text varchar(255) DEFAULT 'Evaluate',
-        created_at datetime DEFAULT CURRENT_TIMESTAMP,
-        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY unique_form_id (form_id),
-        KEY idx_form_id (form_id)
-    ) $charset_collate;";
-    
-    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-    $result = dbDelta($sql);
-    
-    if (!empty($wpdb->last_error)) {
-        error_log('Operaton DMN: Database table creation error: ' . $wpdb->last_error);
-    }
-    
-    return $result;
-}
 
 public function add_admin_menu() {
     add_menu_page(
@@ -433,6 +465,36 @@ public function add_config_page() {
     $config = isset($_GET['edit']) ? $this->get_configuration($_GET['edit']) : null;
     include OPERATON_DMN_PLUGIN_PATH . 'templates/admin-form.php';
 }    
+
+/**
+ * Helper method for timezone handling
+ */
+private function format_evaluation_time($iso_timestamp) {
+    if (empty($iso_timestamp)) {
+        return 'Unknown';
+    }
+    
+    try {
+        // Parse the ISO timestamp (handles UTC offsets)
+        $datetime = new DateTime($iso_timestamp);
+        
+        // Convert to WordPress site timezone
+        $wp_timezone = wp_timezone();
+        $datetime->setTimezone($wp_timezone);
+        
+        // Format in a user-friendly way
+        $formatted_date = $datetime->format('Y-m-d H:i:s');
+        $timezone_name = $datetime->format('T'); // Timezone abbreviation (CEST, CET, etc.)
+        
+        return $formatted_date . ' (' . $timezone_name . ')';
+        
+    } catch (Exception $e) {
+        // Fallback: just clean up the original timestamp
+        $clean_time = str_replace(['T', '+0000'], [' ', ' UTC'], $iso_timestamp);
+        return $clean_time;
+    }
+}
+
     /**
      * Show update management section in admin
      */
@@ -559,44 +621,51 @@ private function show_update_management_section() {
         return $base_endpoint . $decision_key . '/evaluate';
     }
     
-/**
- * Simplified form validation - no backward compatibility
- * Replace the validate_configuration_data method in your main plugin file
- */
-private function validate_configuration_data($data) {
-    $errors = array();
-    
-    // Required field validation
-    $required_fields = array(
-        'name' => __('Configuration Name', 'operaton-dmn'),
-        'form_id' => __('Gravity Form', 'operaton-dmn'),
-        'dmn_endpoint' => __('DMN Base Endpoint URL', 'operaton-dmn'),
-        'decision_key' => __('Decision Key', 'operaton-dmn')
-    );
-    
-    foreach ($required_fields as $field => $label) {
-        if (empty($data[$field])) {
-            $errors[] = sprintf(__('%s is required.', 'operaton-dmn'), $label);
-        }
-    }
-    
-    // URL validation
-    if (!empty($data['dmn_endpoint']) && !filter_var($data['dmn_endpoint'], FILTER_VALIDATE_URL)) {
-        $errors[] = __('DMN Base Endpoint URL is not valid.', 'operaton-dmn');
-    }
-    
-    // Decision key validation
-    if (!empty($data['decision_key'])) {
-        $decision_key = trim($data['decision_key']);
+    /**
+     * Enhanced validation with process support
+     */
+    private function validate_configuration_data($data) {
+        $errors = array();
         
-        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $decision_key)) {
-            $errors[] = __('Decision key should only contain letters, numbers, hyphens, and underscores.', 'operaton-dmn');
+        // Required field validation
+        $required_fields = array(
+            'name' => __('Configuration Name', 'operaton-dmn'),
+            'form_id' => __('Gravity Form', 'operaton-dmn'),
+            'dmn_endpoint' => __('DMN Base Endpoint URL', 'operaton-dmn'),
+        );
+        
+        // Decision key OR process key is required
+        $use_process = isset($data['use_process']) && $data['use_process'];
+        
+        if ($use_process) {
+            if (empty($data['process_key'])) {
+                $errors[] = __('Process Key is required when using process execution.', 'operaton-dmn');
+            }
+        } else {
+            if (empty($data['decision_key'])) {
+                $errors[] = __('Decision Key is required when using direct decision evaluation.', 'operaton-dmn');
+            }
         }
         
-        if (strpos($decision_key, '/') !== false) {
-            $errors[] = __('Decision key should not contain forward slashes.', 'operaton-dmn');
+        foreach ($required_fields as $field => $label) {
+            if (empty($data[$field])) {
+                $errors[] = sprintf(__('%s is required.', 'operaton-dmn'), $label);
+            }
         }
-    }
+        
+        // URL validation
+        if (!empty($data['dmn_endpoint']) && !filter_var($data['dmn_endpoint'], FILTER_VALIDATE_URL)) {
+            $errors[] = __('DMN Base Endpoint URL is not valid.', 'operaton-dmn');
+        }
+        
+        // Key validation
+        $key_to_validate = $use_process ? $data['process_key'] : $data['decision_key'];
+        if (!empty($key_to_validate)) {
+            if (!preg_match('/^[a-zA-Z0-9_-]+$/', trim($key_to_validate))) {
+                $key_type = $use_process ? 'Process key' : 'Decision key';
+                $errors[] = sprintf(__('%s should only contain letters, numbers, hyphens, and underscores.', 'operaton-dmn'), $key_type);
+            }
+        }
     
     // Form ID validation
     if (!empty($data['form_id'])) {
@@ -694,8 +763,7 @@ private function validate_configuration_data($data) {
 }
 
 /**
- * Simplified configuration saving - no backward compatibility
- * Replace the save_configuration method in your main plugin file
+ * Enhanced configuration saving with process support
  */
 private function save_configuration($data) {
     // Validate data
@@ -757,16 +825,20 @@ private function save_configuration($data) {
         }
     }
     
-    $config_data = array(
-        'name' => sanitize_text_field($data['name']),
-        'form_id' => intval($data['form_id']),
-        'dmn_endpoint' => esc_url_raw($data['dmn_endpoint']),
-        'decision_key' => sanitize_text_field($data['decision_key']),
-        'field_mappings' => wp_json_encode($field_mappings),
-        'result_mappings' => wp_json_encode($result_mappings),
-        'evaluation_step' => isset($data['evaluation_step']) ? sanitize_text_field($data['evaluation_step']) : 'auto',
-        'button_text' => sanitize_text_field($data['button_text'] ?: 'Evaluate')
-    );
+        $config_data = array(
+            'name' => sanitize_text_field($data['name']),
+            'form_id' => intval($data['form_id']),
+            'dmn_endpoint' => esc_url_raw($data['dmn_endpoint']),
+            'decision_key' => sanitize_text_field($data['decision_key'] ?? ''),
+            'field_mappings' => wp_json_encode($field_mappings),
+            'result_mappings' => wp_json_encode($result_mappings),
+            'evaluation_step' => sanitize_text_field($data['evaluation_step'] ?? 'auto'),
+            'button_text' => sanitize_text_field($data['button_text'] ?: 'Evaluate'),
+            // NEW: Process-related fields
+            'use_process' => isset($data['use_process']) ? (bool)$data['use_process'] : false,
+            'process_key' => sanitize_text_field($data['process_key'] ?? ''),
+            'show_decision_flow' => isset($data['show_decision_flow']) ? (bool)$data['show_decision_flow'] : false
+        );
     
     $config_id = isset($data['config_id']) ? intval($data['config_id']) : 0;
     
@@ -1038,11 +1110,9 @@ public function enqueue_gravity_scripts($form, $is_ajax) {
 }
 
 /**
- * Fixed button rendering for multi-page forms
- * Replace the add_evaluate_button method in your main plugin file
+ * Button placement with JavaScript fallback
  */
 public function add_evaluate_button($button, $form) {
-    // Don't add button in admin/editor context
     if (is_admin() || (defined('DOING_AJAX') && DOING_AJAX)) {
         return $button;
     }
@@ -1052,74 +1122,393 @@ public function add_evaluate_button($button, $form) {
         return $button;
     }
     
-    // Get current page and total pages
-    $current_page = isset($_GET['gf_page']) ? intval($_GET['gf_page']) : 1;
-    $total_pages = 1;
+    // Get evaluation step from config
+    $evaluation_step = isset($config->evaluation_step) ? $config->evaluation_step : '2';
+    if ($evaluation_step === 'auto') {
+        $evaluation_step = '2';
+    }
     
-    // Count total pages by looking for page break fields
-    if (isset($form['fields'])) {
-        foreach ($form['fields'] as $field) {
-            if ($field->type === 'page') {
-                $total_pages++;
-            }
+    // Count total pages
+    $total_pages = 1;
+    foreach ($form['fields'] as $field) {
+        if ($field->type === 'page') {
+            $total_pages++;
         }
     }
     
-    // Determine which page should have the evaluate button
-    $evaluation_step = isset($config->evaluation_step) ? $config->evaluation_step : 'auto';
+    // Check for decision flow summary
+    $show_decision_flow = isset($config->show_decision_flow) ? $config->show_decision_flow : false;
     
-    if ($evaluation_step === 'auto') {
-        // Auto-detect: put evaluate button on the second-to-last page
-        $evaluate_page = max(1, $total_pages - 1);
-    } else {
-        $evaluate_page = intval($evaluation_step);
-    }
-    
-    // Create the evaluate button
+    // Create the evaluate button (always add it, let JavaScript control placement)
     $evaluate_button = sprintf(
-        '<input type="button" id="operaton-evaluate-%1$d" value="%2$s" class="gform_button gform-theme-button operaton-evaluate-btn" data-form-id="%1$d" data-config-id="%3$d" style="margin-right: 10px;">',
+        '<input type="button" id="operaton-evaluate-%1$d" value="%2$s" class="gform_button gform-theme-button operaton-evaluate-btn" data-form-id="%1$d" data-config-id="%3$d" style="display: none;">',
         $form['id'],
         esc_attr($config->button_text),
         $config->id
     );
     
-    // For single page forms
-    if ($total_pages <= 1) {
-        return sprintf(
-            '<div class="gform_footer top_label">
-                <div class="gform_button_wrapper gform_button_select_wrapper">
-                    %s
-                    %s
-                </div>
-            </div>',
-            $evaluate_button,
-            $button
-        );
+    // Decision flow summary container (always add it)
+    $decision_flow_container = sprintf(
+        '<div id="decision-flow-summary-%d" class="decision-flow-summary" style="display: none;"></div>',
+        $form['id']
+    );
+    
+// FIXED JavaScript for dynamic button placement and decision flow
+$script = '
+<script>
+jQuery(document).ready(function($) {
+    var formId = ' . $form['id'] . ';
+    var targetPage = ' . intval($evaluation_step) . ';
+    var totalPages = ' . $total_pages . ';
+    var showDecisionFlow = ' . ($show_decision_flow ? 'true' : 'false') . ';
+    var useProcess = ' . (isset($config->use_process) && $config->use_process ? 'true' : 'false') . ';
+    var decisionFlowLoaded = false;
+    
+    function getCurrentPage() {
+        // Check URL parameter first
+        var urlParams = new URLSearchParams(window.location.search);
+        var gfPage = urlParams.get("gf_page");
+        if (gfPage) {
+            return parseInt(gfPage);
+        }
+        
+        // Check Gravity Forms page field
+        var pageField = $("#gform_source_page_number_" + formId);
+        if (pageField.length && pageField.val()) {
+            return parseInt(pageField.val());
+        }
+        
+        // Check visible elements
+        var form = $("#gform_" + formId);
+        
+        // Page 1: Personal info
+        if (form.find("#input_" + formId + "_6:visible, #input_" + formId + "_5:visible").length > 0) {
+            return 1;
+        }
+        
+        // Page 2: Radio button table
+        if (form.find(".gf-table-row:visible").length > 0) {
+            return 2;
+        }
+        
+        // Page 3: Summary
+        if (form.find("#field_" + formId + "_40:visible").length > 0) {
+            return 3;
+        }
+        
+        return 1;
     }
     
-    // For multi-page forms - add evaluate button on the appropriate page
-    if ($current_page == $evaluate_page) {
-        // This is the page that should have the evaluate button
-        // Add it alongside the existing Next button
-        return sprintf(
-            '%s
-            <div style="margin-top: 10px;">
-                %s
-            </div>
-            <style>
-                .operaton-evaluate-btn { 
-                    background-color: #007ba7 !important;
-                    border-color: #007ba7 !important;
-                    margin-top: 10px !important;
-                }
-            </style>',
-            $button,  // Original button (Next/Previous)
-            $evaluate_button
-        );
-    } else {
-        // Other pages should show normal buttons
-        return $button;
+    // CLEAR PROCESS DATA WHEN USER NAVIGATES OR CHANGES FORM
+    function clearProcessData() {
+        console.log("Clearing process data due to form changes");
+        
+        // Clear all stored process data
+        sessionStorage.removeItem("operaton_process_" + formId);
+        sessionStorage.removeItem("operaton_dmn_eval_data_" + formId);
+        
+        // Clear global variables
+        if (window["operaton_process_" + formId]) {
+            delete window["operaton_process_" + formId];
+        }
+        
+        // Reset decision flow loaded flag
+        decisionFlowLoaded = false;
+        
+        // Clear the summary container
+        $("#decision-flow-summary-" + formId).html("");
     }
+    
+    function handleButtonAndSummary() {
+        var currentPage = getCurrentPage();
+        var evaluateBtn = $("#operaton-evaluate-" + formId);
+        var summaryContainer = $("#decision-flow-summary-" + formId);
+        
+        console.log("=== BUTTON CONTROL ===");
+        console.log("Current page:", currentPage, "Target page:", targetPage);
+        console.log("Use process:", useProcess, "Show decision flow:", showDecisionFlow);
+        
+        // Always hide first
+        evaluateBtn.hide();
+        summaryContainer.hide();
+        
+        // Show button ONLY on page 2
+        if (currentPage === 2 && targetPage === 2) {
+            console.log("✅ Showing evaluate button on page 2");
+            
+            var form = $("#gform_" + formId);
+            
+            // SOLUTION: Move button to a guaranteed visible container
+            // Try multiple containers in order of preference
+            var containers = [
+                form.find(".gform_body"),                    // Form body (most reliable)
+                form.find(".gform-page"),                    // Current page
+                form.find(".gform_wrapper"),                 // Form wrapper
+                form                                         // Form itself
+            ];
+            
+            var targetContainer = null;
+            for (var i = 0; i < containers.length; i++) {
+                if (containers[i].length > 0 && containers[i].is(":visible")) {
+                    targetContainer = containers[i];
+                    console.log("Using container " + i + ":", targetContainer[0]);
+                    break;
+                }
+            }
+            
+            if (!targetContainer) {
+                console.log("No visible container found, using form body");
+                targetContainer = form.find(".gform_body");
+            }
+            
+            // Remove button from any hidden parent and add to visible container
+            evaluateBtn.detach().appendTo(targetContainer);
+            
+            // FORCE ALL PARENT ELEMENTS TO BE VISIBLE
+            evaluateBtn.parents().each(function() {
+                $(this).css({
+                    "display": "block",
+                    "visibility": "visible",
+                    "opacity": "1"
+                });
+            });
+            
+            // Apply button styles
+            evaluateBtn.show().css({
+                "display": "inline-block !important",
+                "visibility": "visible !important",
+                "opacity": "1 !important",
+                "position": "relative !important",
+                "margin": "15px 10px !important",
+                "padding": "12px 24px !important",
+                "background": "#007ba7 !important",
+                "color": "white !important",
+                "border": "1px solid #007ba7 !important",
+                "border-radius": "4px !important",
+                "font-size": "14px !important",
+                "font-weight": "normal !important",
+                "cursor": "pointer !important",
+                "z-index": "1000 !important"
+            });
+            
+            // Force inline styles as backup
+            evaluateBtn.attr("style", 
+                "display: inline-block !important; " +
+                "visibility: visible !important; " +
+                "opacity: 1 !important; " +
+                "position: relative !important; " +
+                "margin: 15px 10px !important; " +
+                "padding: 12px 24px !important; " +
+                "background: #007ba7 !important; " +
+                "color: white !important; " +
+                "border: 1px solid #007ba7 !important; " +
+                "border-radius: 4px !important; " +
+                "font-size: 14px !important; " +
+                "cursor: pointer !important; " +
+                "z-index: 1000 !important;"
+            );
+            
+            console.log("Button styling complete");
+            
+        } else if (currentPage === 3 && showDecisionFlow && useProcess) {
+            // FIXED: Only show decision flow if BOTH conditions are met:
+            // 1. showDecisionFlow is enabled
+            // 2. useProcess is true (process execution mode)
+            console.log("📋 Page 3: showing decision flow (process execution mode)");
+            
+            evaluateBtn.remove(); // Remove completely on page 3
+            summaryContainer.show();
+            
+            if (!decisionFlowLoaded) {
+                loadDecisionFlowSummary();
+                decisionFlowLoaded = true;
+            }
+            
+        } else if (currentPage === 3 && (!useProcess || !showDecisionFlow)) {
+            // NEW: Hide decision flow on page 3 if not using process execution
+            console.log("⏹️ Page 3: hiding decision flow (direct decision evaluation or disabled)");
+            
+            evaluateBtn.remove();
+            summaryContainer.hide();
+            
+            // Show a simple message instead
+            if (!useProcess) {
+                console.log("Direct decision evaluation - no decision flow available");
+            }
+            
+        } else {
+            console.log("⏹️ Other page - hiding everything");
+            evaluateBtn.hide();
+            summaryContainer.hide();
+            
+            if (currentPage !== 3) {
+                decisionFlowLoaded = false;
+            }
+        }
+    }
+    
+    function loadDecisionFlowSummary() {
+        var container = $("#decision-flow-summary-" + formId);
+        
+        if (container.hasClass("loading")) {
+            return;
+        }
+        
+        container.addClass("loading");
+        container.html("<p>⏳ Loading decision flow summary...</p>");
+        
+        // FIXED: Add cache busting to always get fresh data
+        $.ajax({
+            url: "' . home_url() . '/wp-json/operaton-dmn/v1/decision-flow/" + formId + "?cache_bust=" + Date.now(),
+            type: "GET",
+            cache: false,
+            success: function(response) {
+                if (response.success && response.html) {
+                    container.html(response.html);
+                } else {
+                    container.html("<p><em>No decision flow data available.</em></p>");
+                }
+            },
+            error: function() {
+                container.html("<p><em>Error loading decision flow summary.</em></p>");
+            },
+            complete: function() {
+                container.removeClass("loading");
+            }
+        });
+    }
+    
+    // Refresh button handler
+    $(document).on("click", ".refresh-decision-flow-controlled", function(e) {
+        e.preventDefault();
+        
+        var button = $(this);
+        var originalText = button.text();
+        button.text("🔄 Refreshing...").prop("disabled", true);
+        
+        decisionFlowLoaded = false;
+        
+        setTimeout(function() {
+            loadDecisionFlowSummary();
+            button.text(originalText).prop("disabled", false);
+        }, 500);
+    });
+    
+    // Initialize after short delay
+    setTimeout(handleButtonAndSummary, 500);
+    
+    // Handle Gravity Forms events
+    $(document).on("gform_page_loaded", function(event, form_id, current_page) {
+        if (form_id == formId) {
+            console.log("GF page loaded:", current_page);
+            
+            // CLEAR PROCESS DATA when navigating between pages
+            if (current_page < 3) {
+                clearProcessData();
+            }
+            
+            decisionFlowLoaded = false;
+            setTimeout(handleButtonAndSummary, 200);
+        }
+    });
+    
+    // CLEAR PROCESS DATA when form inputs change
+    $("form#gform_" + formId).on("change", "input, select, textarea", function() {
+        console.log("Form input changed, clearing process data");
+        clearProcessData();
+    });
+    
+    // Emergency fix for hidden parents
+    setInterval(function() {
+        var currentPage = getCurrentPage();
+        if (currentPage === 2) {
+            var btn = $("#operaton-evaluate-" + formId);
+            if (btn.length > 0 && !btn.is(":visible")) {
+                console.log("Emergency: fixing hidden button");
+                
+                // Force all parents to be visible
+                btn.parents().css({
+                    "display": "block !important",
+                    "visibility": "visible !important",
+                    "opacity": "1 !important"
+                });
+                
+                // Re-apply button styles
+                btn.css({
+                    "display": "inline-block !important",
+                    "visibility": "visible !important",
+                    "opacity": "1 !important"
+                });
+            }
+        }
+        
+        // Remove button on page 3
+        if (currentPage === 3) {
+            var btn = $("#operaton-evaluate-" + formId);
+            if (btn.length > 0) {
+                btn.remove();
+            }
+        }
+    }, 2000);
+    
+    console.log("Button control initialized");
+});
+</script>
+
+<style>
+/* AGGRESSIVE BUTTON AND PARENT VISIBILITY */
+#operaton-evaluate-' . $form['id'] . ' {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    margin: 15px 10px !important;
+    padding: 12px 24px !important;
+    background: #007ba7 !important;
+    color: white !important;
+    border: 1px solid #007ba7 !important;
+    border-radius: 4px !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    z-index: 1000 !important;
+}
+
+#operaton-evaluate-' . $form['id'] . ':hover {
+    background: #005a7a !important;
+}
+
+/* FORCE PARENT CONTAINERS TO BE VISIBLE */
+.gform-page-footer,
+.gform_page_footer,
+.gform_footer {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.operaton-evaluate-btn {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.decision-flow-summary { 
+    margin: 20px 0;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border-left: 4px solid #0073aa;
+}
+
+.decision-flow-summary.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+</style>
+';
+
+    // Always return button + hidden elements + script
+    return $button . $evaluate_button . $decision_flow_container . $script;
 }
 
     /**
@@ -1185,173 +1574,1142 @@ public function add_evaluate_button($button, $form) {
         ));
     }
     
-/**
- * Simplified API call handling - no backward compatibility
- * Replace the handle_evaluation method in your main plugin file
- */
-public function handle_evaluation($request) {
-    try {
-        $params = $request->get_json_params();
-        
-        if (!isset($params['config_id']) || !isset($params['form_data'])) {
-            return new WP_Error('missing_params', 'Configuration ID and form data are required', array('status' => 400));
-        }
-        
-        $config = $this->get_configuration($params['config_id']);
-        if (!$config) {
-            return new WP_Error('invalid_config', 'Configuration not found', array('status' => 404));
-        }
-        
-        $field_mappings = json_decode($config->field_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            return new WP_Error('invalid_mappings', 'Invalid field mappings configuration', array('status' => 500));
-        }
-        
-        $result_mappings = json_decode($config->result_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            return new WP_Error('invalid_result_mappings', 'Invalid result mappings configuration', array('status' => 500));
-        }
-        
-        if (empty($result_mappings)) {
-            return new WP_Error('no_result_mappings', 'No result mappings configured', array('status' => 500));
-        }
-        
-        // Process input variables
-        $variables = array();
-        
-        foreach ($field_mappings as $dmn_variable => $form_field) {
-            $value = null;
+    /**
+     * Enhanced evaluation handler with process support
+     */
+    public function handle_evaluation($request) {
+        try {
+            $params = $request->get_json_params();
             
-            if (isset($params['form_data'][$dmn_variable])) {
-                $value = $params['form_data'][$dmn_variable];
+            if (!isset($params['config_id']) || !isset($params['form_data'])) {
+                return new WP_Error('missing_params', 'Configuration ID and form data are required', array('status' => 400));
             }
             
-            if ($value === null || $value === 'null' || $value === '') {
-                $variables[$dmn_variable] = array(
-                    'value' => null,
-                    'type' => $form_field['type']
-                );
-                continue;
+            $config = $this->get_configuration($params['config_id']);
+            if (!$config) {
+                return new WP_Error('invalid_config', 'Configuration not found', array('status' => 404));
             }
             
-            // Type conversion
-            switch ($form_field['type']) {
-                case 'Integer':
-                    if (!is_numeric($value)) {
-                        return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
-                    }
-                    $value = intval($value);
-                    break;
-                case 'Double':
-                    if (!is_numeric($value)) {
-                        return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
-                    }
-                    $value = floatval($value);
-                    break;
-                case 'Boolean':
-                    if (is_string($value)) {
-                        $value = strtolower($value);
-                        if ($value === 'true' || $value === '1') {
-                            $value = true;
-                        } elseif ($value === 'false' || $value === '0') {
-                            $value = false;
-                        } else {
-                            $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-                            if ($value === null) {
-                                return new WP_Error('invalid_type', sprintf('Value for %s must be boolean', $dmn_variable), array('status' => 400));
-                            }
-                        }
-                    }
-                    break;
-                default:
-                    $value = sanitize_text_field($value);
+            // NEW: Check if we should use process execution
+            $use_process = isset($config->use_process) ? $config->use_process : false;
+            
+            if ($use_process && !empty($config->process_key)) {
+                return $this->handle_process_execution($config, $params['form_data']);
+            } else {
+                return $this->handle_decision_evaluation($config, $params['form_data']);
             }
             
+        } catch (Exception $e) {
+            return new WP_Error('server_error', $e->getMessage(), array('status' => 500));
+        }
+    }
+
+    /**
+     * NEW: Handle process execution
+     * FIXED: Handle process execution with correct endpoint construction
+     * UPDATED: Handle process execution using history API for completed processes
+     */
+private function handle_process_execution($config, $form_data) {
+    $field_mappings = json_decode($config->field_mappings, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return new WP_Error('invalid_mappings', 'Invalid field mappings configuration', array('status' => 500));
+    }
+
+    // Process input variables
+    $variables = array();
+    
+    foreach ($field_mappings as $dmn_variable => $form_field) {
+        $value = isset($form_data[$dmn_variable]) ? $form_data[$dmn_variable] : null;
+        
+        if ($value === null || $value === 'null' || $value === '') {
             $variables[$dmn_variable] = array(
-                'value' => $value,
+                'value' => null,
                 'type' => $form_field['type']
             );
+            continue;
         }
         
-        error_log('Operaton DMN: Variables being sent to DMN engine: ' . print_r($variables, true));
-        
-        if (empty($variables)) {
-            return new WP_Error('no_data', 'No valid form data provided', array('status' => 400));
+        // Type conversion
+        switch ($form_field['type']) {
+            case 'Integer':
+                $value = intval($value);
+                break;
+            case 'Double':
+                $value = floatval($value);
+                break;
+            case 'Boolean':
+                if (is_string($value)) {
+                    $value = strtolower($value);
+                    $value = ($value === 'true' || $value === '1') ? true : false;
+                }
+                break;
+            default:
+                $value = sanitize_text_field($value);
         }
         
-        // Build the full evaluation endpoint
-        $evaluation_endpoint = $this->build_evaluation_endpoint($config->dmn_endpoint, $config->decision_key);
+        $variables[$dmn_variable] = array(
+            'value' => $value,
+            'type' => $form_field['type']
+        );
+    }
+
+    // Build process start endpoint
+    $base_url = rtrim($config->dmn_endpoint, '/');
+    $base_url = str_replace('/decision-definition/key', '', $base_url);
+    $base_url = str_replace('/decision-definition', '', $base_url);
+    
+    if (strpos($base_url, '/engine-rest') === false) {
+        $base_url .= '/engine-rest';
+    }
+    
+    $process_endpoint = $base_url . '/process-definition/key/' . $config->process_key . '/start';
+    
+    error_log('Operaton DMN: Starting process at: ' . $process_endpoint);
+    
+    // Start the process
+    $process_data = array('variables' => $variables);
+    
+    $response = wp_remote_post($process_endpoint, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ),
+        'body' => wp_json_encode($process_data),
+        'timeout' => 30,
+        'sslverify' => false,
+    ));
+    
+    if (is_wp_error($response)) {
+        return new WP_Error('api_error', 'Failed to start process: ' . $response->get_error_message(), array('status' => 500));
+    }
+    
+    $http_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    
+    if ($http_code !== 200 && $http_code !== 201) {
+        return new WP_Error('api_error', sprintf('Process start failed with status %d: %s', $http_code, $body), array('status' => 500));
+    }
+    
+    $process_result = json_decode($body, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return new WP_Error('invalid_response', 'Invalid JSON response from process start', array('status' => 500));
+    }
+    
+    $process_instance_id = $process_result['id'];
+    $process_ended = isset($process_result['ended']) ? $process_result['ended'] : false;
+    
+    error_log('Operaton DMN: Process started with ID: ' . $process_instance_id . ', ended: ' . ($process_ended ? 'true' : 'false'));
+    
+    $final_variables = array();
+    
+    if ($process_ended) {
+        // Process completed immediately - get variables from history
+        error_log('Operaton DMN: Process completed immediately, getting variables from history');
         
-        error_log('Operaton DMN: Using evaluation endpoint: ' . $evaluation_endpoint);
+        $history_endpoint = $base_url . '/history/variable-instance';
+        $history_url = $history_endpoint . '?processInstanceId=' . $process_instance_id;
         
-        // Make API call
-        $operaton_data = array('variables' => $variables);
+        error_log('Operaton DMN: Getting historical variables from: ' . $history_url);
         
-        $response = wp_remote_post($evaluation_endpoint, array(
-            'headers' => array(
-                'Content-Type' => 'application/json',
-                'Accept' => 'application/json',
-            ),
-            'body' => wp_json_encode($operaton_data),
-            'timeout' => 30,
+        $history_response = wp_remote_get($history_url, array(
+            'headers' => array('Accept' => 'application/json'),
+            'timeout' => 15,
             'sslverify' => false,
         ));
         
-        if (is_wp_error($response)) {
-            return new WP_Error('api_error', 'Failed to connect to Operaton API: ' . $response->get_error_message(), array('status' => 500));
+        if (is_wp_error($history_response)) {
+            error_log('Operaton DMN: Failed to get historical variables: ' . $history_response->get_error_message());
+            return new WP_Error('api_error', 'Failed to get historical variables: ' . $history_response->get_error_message(), array('status' => 500));
         }
         
-        $http_code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
+        $history_body = wp_remote_retrieve_body($history_response);
+        $historical_variables = json_decode($history_body, true);
         
-        if ($http_code !== 200) {
-            return new WP_Error('api_error', sprintf('API returned status code %d: %s', $http_code, $body), array('status' => 500));
-        }
+        error_log('Operaton DMN: Historical variables response: ' . $history_body);
         
-        $data = json_decode($body, true);
-        
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            return new WP_Error('invalid_response', 'Invalid JSON response from Operaton API', array('status' => 500));
-        }
-        
-        // Process results based on configured mappings
-        $results = array();
-        
-        foreach ($result_mappings as $dmn_result_field => $mapping) {
-            $result_value = null;
-            
-            if (isset($data[0][$dmn_result_field]['value'])) {
-                $result_value = $data[0][$dmn_result_field]['value'];
-            } elseif (isset($data[0][$dmn_result_field])) {
-                $result_value = $data[0][$dmn_result_field];
-            }
-            
-            if ($result_value !== null) {
-                $results[$dmn_result_field] = array(
-                    'value' => $result_value,
-                    'field_id' => $mapping['field_id']
+    if (json_last_error() === JSON_ERROR_NONE && is_array($historical_variables)) {
+        // FIXED: Convert historical variables with proper error checking
+        foreach ($historical_variables as $var) {
+            // Add proper checks for array keys
+            if (isset($var['name']) && array_key_exists('value', $var)) {
+                $final_variables[$var['name']] = array(
+                    'value' => $var['value'],
+                    'type' => isset($var['type']) ? $var['type'] : 'String'
                 );
             }
         }
+    }
         
-        if (empty($results)) {
-            return new WP_Error('no_results', 'No valid results found in API response', array('status' => 500));
+    } else {
+        // Process is still running - wait and try to get active variables
+        error_log('Operaton DMN: Process still running, waiting for completion');
+        sleep(3);
+        
+        $variables_endpoint = $base_url . '/process-instance/' . $process_instance_id . '/variables';
+        
+        $variables_response = wp_remote_get($variables_endpoint, array(
+            'headers' => array('Accept' => 'application/json'),
+            'timeout' => 15,
+            'sslverify' => false,
+        ));
+        
+        if (!is_wp_error($variables_response)) {
+            $variables_body = wp_remote_retrieve_body($variables_response);
+            $final_variables = json_decode($variables_body, true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $final_variables = array();
+            }
         }
         
-        return array(
-            'success' => true,
-            'results' => $results,
-            'debug_info' => defined('WP_DEBUG') && WP_DEBUG ? array(
-                'variables_sent' => $variables,
-                'api_response' => $data,
-                'endpoint_used' => $evaluation_endpoint,
-                'result_mappings' => $result_mappings
-            ) : null
+        // If active variables failed, try history as fallback
+        if (empty($final_variables)) {
+            error_log('Operaton DMN: Active variables failed, trying history as fallback');
+            
+            $history_endpoint = $base_url . '/history/variable-instance';
+            $history_url = $history_endpoint . '?processInstanceId=' . $process_instance_id;
+            
+            $history_response = wp_remote_get($history_url, array(
+                'headers' => array('Accept' => 'application/json'),
+                'timeout' => 15,
+                'sslverify' => false,
+            ));
+            
+            if (!is_wp_error($history_response)) {
+                $history_body = wp_remote_retrieve_body($history_response);
+                $historical_variables = json_decode($history_body, true);
+                
+                if (json_last_error() === JSON_ERROR_NONE && is_array($historical_variables)) {
+                    foreach ($historical_variables as $var) {
+                        if (isset($var['name']) && isset($var['value'])) {
+                            $final_variables[$var['name']] = array(
+                                'value' => $var['value'],
+                                'type' => isset($var['type']) ? $var['type'] : 'String'
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    error_log('Operaton DMN: Final variables after processing: ' . print_r($final_variables, true));
+    
+// Process results based on configured mappings
+$result_mappings = json_decode($config->result_mappings, true);
+if (json_last_error() !== JSON_ERROR_NONE) {
+    $result_mappings = array();
+}
+
+$results = array();
+
+foreach ($result_mappings as $dmn_result_field => $mapping) {
+    $result_value = null;
+    
+    // Strategy 1: Direct variable access
+    if (isset($final_variables[$dmn_result_field]['value'])) {
+        $result_value = $final_variables[$dmn_result_field]['value'];
+        error_log('Operaton DMN: Found direct result for ' . $dmn_result_field . ': ' . print_r($result_value, true));
+    } elseif (isset($final_variables[$dmn_result_field])) {
+        $result_value = $final_variables[$dmn_result_field];
+        error_log('Operaton DMN: Found simple result for ' . $dmn_result_field . ': ' . print_r($result_value, true));
+    }
+    
+    // Strategy 2: Search in nested result objects (for DMN array results)
+    if ($result_value === null) {
+        // Look in heusdenpasResult, kindpakketResult, finalResult, etc.
+        $possible_containers = array(
+            'heusdenpasResult',
+            'kindpakketResult', 
+            'finalResult',
+            'autoApprovalResult',
+            'knockoffsResult'
         );
         
-    } catch (Exception $e) {
-        return new WP_Error('server_error', $e->getMessage(), array('status' => 500));
+        foreach ($possible_containers as $container) {
+            if (isset($final_variables[$container]['value']) && is_array($final_variables[$container]['value'])) {
+                $container_data = $final_variables[$container]['value'];
+                
+                // Check if it's an array of results
+                if (isset($container_data[0]) && is_array($container_data[0])) {
+                    if (isset($container_data[0][$dmn_result_field])) {
+                        $result_value = $container_data[0][$dmn_result_field];
+                        error_log('Operaton DMN: Found nested result for ' . $dmn_result_field . ' in ' . $container . ': ' . print_r($result_value, true));
+                        break;
+                    }
+                }
+                // Also check direct access in case it's not nested
+                elseif (isset($container_data[$dmn_result_field])) {
+                    $result_value = $container_data[$dmn_result_field];
+                    error_log('Operaton DMN: Found container result for ' . $dmn_result_field . ' in ' . $container . ': ' . print_r($result_value, true));
+                    break;
+                }
+            }
+        }
     }
+    
+    // Strategy 3: Search ALL variables for the field name (comprehensive search)
+    if ($result_value === null) {
+        foreach ($final_variables as $var_name => $var_data) {
+            if (isset($var_data['value']) && is_array($var_data['value'])) {
+                // Check if it's an array of objects
+                if (isset($var_data['value'][0]) && is_array($var_data['value'][0])) {
+                    if (isset($var_data['value'][0][$dmn_result_field])) {
+                        $result_value = $var_data['value'][0][$dmn_result_field];
+                        error_log('Operaton DMN: Found comprehensive result for ' . $dmn_result_field . ' in ' . $var_name . ': ' . print_r($result_value, true));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Convert result value if found
+    if ($result_value !== null) {
+        // Handle boolean conversion (DMN often returns 1/0 instead of true/false)
+        if (is_numeric($result_value) && ($result_value === 1 || $result_value === 0 || $result_value === '1' || $result_value === '0')) {
+            $result_value = (bool) $result_value;
+        }
+        
+        $results[$dmn_result_field] = array(
+            'value' => $result_value,
+            'field_id' => $mapping['field_id']
+        );
+        error_log('Operaton DMN: Final processed result for ' . $dmn_result_field . ': ' . print_r($result_value, true));
+    } else {
+        error_log('Operaton DMN: No result found for ' . $dmn_result_field . ' after comprehensive search');
+        
+        // Debug: Show what variables are available
+        error_log('Operaton DMN: Available variables: ' . implode(', ', array_keys($final_variables)));
+    }
+}
+
+// Store process instance ID for decision flow retrieval
+$this->store_process_instance_id($config->form_id, $process_instance_id);
+
+return array(
+    'success' => true,
+    'results' => $results,
+    'process_instance_id' => $process_instance_id,
+    'debug_info' => defined('WP_DEBUG') && WP_DEBUG ? array(
+        'variables_sent' => $variables,
+        'process_result' => $process_result,
+        'final_variables' => $final_variables,
+        'endpoint_used' => $process_endpoint,
+        'process_ended_immediately' => $process_ended,
+        'result_mappings' => $result_mappings,
+        'extraction_summary' => array(
+            'total_variables_found' => count($final_variables),
+            'results_extracted' => count($results),
+            'result_fields_searched' => array_keys($result_mappings)
+        )
+    ) : null
+);
+}
+
+/**
+ * Add this missing method to your OperatonDMNEvaluator class
+ * Insert this method right after your handle_evaluation() method
+ */
+
+/**
+ * Handle direct decision evaluation (your original logic)
+ */
+private function handle_decision_evaluation($config, $form_data) {
+    $field_mappings = json_decode($config->field_mappings, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return new WP_Error('invalid_mappings', 'Invalid field mappings configuration', array('status' => 500));
+    }
+    
+    $result_mappings = json_decode($config->result_mappings, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return new WP_Error('invalid_result_mappings', 'Invalid result mappings configuration', array('status' => 500));
+    }
+    
+    if (empty($result_mappings)) {
+        return new WP_Error('no_result_mappings', 'No result mappings configured', array('status' => 500));
+    }
+    
+    // Process input variables
+    $variables = array();
+    
+    foreach ($field_mappings as $dmn_variable => $form_field) {
+        $value = null;
+        
+        if (isset($form_data[$dmn_variable])) {
+            $value = $form_data[$dmn_variable];
+        }
+        
+        if ($value === null || $value === 'null' || $value === '') {
+            $variables[$dmn_variable] = array(
+                'value' => null,
+                'type' => $form_field['type']
+            );
+            continue;
+        }
+        
+        // Type conversion
+        switch ($form_field['type']) {
+            case 'Integer':
+                if (!is_numeric($value)) {
+                    return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
+                }
+                $value = intval($value);
+                break;
+            case 'Double':
+                if (!is_numeric($value)) {
+                    return new WP_Error('invalid_type', sprintf('Value for %s must be numeric', $dmn_variable), array('status' => 400));
+                }
+                $value = floatval($value);
+                break;
+            case 'Boolean':
+                if (is_string($value)) {
+                    $value = strtolower($value);
+                    if ($value === 'true' || $value === '1') {
+                        $value = true;
+                    } elseif ($value === 'false' || $value === '0') {
+                        $value = false;
+                    } else {
+                        $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                        if ($value === null) {
+                            return new WP_Error('invalid_type', sprintf('Value for %s must be boolean', $dmn_variable), array('status' => 400));
+                        }
+                    }
+                }
+                break;
+            default:
+                $value = sanitize_text_field($value);
+        }
+        
+        $variables[$dmn_variable] = array(
+            'value' => $value,
+            'type' => $form_field['type']
+        );
+    }
+    
+    error_log('Operaton DMN: Variables being sent to DMN engine: ' . print_r($variables, true));
+    
+    if (empty($variables)) {
+        return new WP_Error('no_data', 'No valid form data provided', array('status' => 400));
+    }
+    
+    // Build the full evaluation endpoint
+    $evaluation_endpoint = $this->build_evaluation_endpoint($config->dmn_endpoint, $config->decision_key);
+    
+    error_log('Operaton DMN: Using evaluation endpoint: ' . $evaluation_endpoint);
+    
+    // Make API call
+    $operaton_data = array('variables' => $variables);
+    
+    $response = wp_remote_post($evaluation_endpoint, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ),
+        'body' => wp_json_encode($operaton_data),
+        'timeout' => 30,
+        'sslverify' => false,
+    ));
+    
+    if (is_wp_error($response)) {
+        return new WP_Error('api_error', 'Failed to connect to Operaton API: ' . $response->get_error_message(), array('status' => 500));
+    }
+    
+    $http_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    
+    if ($http_code !== 200) {
+        return new WP_Error('api_error', sprintf('API returned status code %d: %s', $http_code, $body), array('status' => 500));
+    }
+    
+    $data = json_decode($body, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return new WP_Error('invalid_response', 'Invalid JSON response from Operaton API', array('status' => 500));
+    }
+    
+    // Process results based on configured mappings
+    $results = array();
+    
+    foreach ($result_mappings as $dmn_result_field => $mapping) {
+        $result_value = null;
+        
+        if (isset($data[0][$dmn_result_field]['value'])) {
+            $result_value = $data[0][$dmn_result_field]['value'];
+        } elseif (isset($data[0][$dmn_result_field])) {
+            $result_value = $data[0][$dmn_result_field];
+        }
+        
+        if ($result_value !== null) {
+            $results[$dmn_result_field] = array(
+                'value' => $result_value,
+                'field_id' => $mapping['field_id']
+            );
+        }
+    }
+    
+    if (empty($results)) {
+        return new WP_Error('no_results', 'No valid results found in API response', array('status' => 500));
+    }
+    
+    return array(
+        'success' => true,
+        'results' => $results,
+        'debug_info' => defined('WP_DEBUG') && WP_DEBUG ? array(
+            'variables_sent' => $variables,
+            'api_response' => $data,
+            'endpoint_used' => $evaluation_endpoint,
+            'result_mappings' => $result_mappings
+        ) : null
+    );
+}
+
+    /**
+     * Store process instance ID for later retrieval
+     */
+    private function store_process_instance_id($form_id, $process_instance_id) {
+        // Store in session or user meta for later retrieval
+        if (session_status() == PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['operaton_process_' . $form_id] = $process_instance_id;
+        
+        // Also store in user meta if user is logged in
+        if (is_user_logged_in()) {
+            update_user_meta(get_current_user_id(), 'operaton_process_' . $form_id, $process_instance_id);
+        }
+    }
+
+    /**
+     * Get stored process instance ID
+     */
+    private function get_process_instance_id($form_id) {
+        // Try session first
+        if (session_status() == PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        if (isset($_SESSION['operaton_process_' . $form_id])) {
+            return $_SESSION['operaton_process_' . $form_id];
+        }
+        
+        // Try user meta if logged in
+        if (is_user_logged_in()) {
+            $process_id = get_user_meta(get_current_user_id(), 'operaton_process_' . $form_id, true);
+            if ($process_id) {
+                return $process_id;
+            }
+        }
+        
+        return null;
+    }
+
+/**
+ * UPDATED: Get decision flow summary HTML with cache busting support
+ */
+public function get_decision_flow_summary_html($form_id) {
+    // CHECK: Only show decision flow for process execution
+    $config = $this->get_config_by_form_id($form_id);
+    if (!$config || !$config->show_decision_flow || !$config->use_process) {
+        error_log('Operaton DMN: Decision flow not available - not using process execution or disabled');
+        $result = '<div class="decision-flow-placeholder">' .
+               '<h3>🔍 Decision Flow Results</h3>' .
+               '<p><em>Decision flow summary is only available for process execution mode.</em></p>' .
+               '</div>';
+        return $result;
+    }
+    
+    // CACHE BUSTING: Check if cache bust parameter is present
+    $cache_bust = isset($_GET['cache_bust']) ? sanitize_text_field($_GET['cache_bust']) : '';
+    
+    // ADD RATE LIMITING TO PREVENT LOOPS (but allow cache busting)
+    $cache_key = 'operaton_decision_flow_' . $form_id;
+    if (empty($cache_bust)) {
+        $cached_result = get_transient($cache_key);
+        
+        if ($cached_result !== false) {
+            error_log('Operaton DMN: Returning cached decision flow for form ' . $form_id);
+            return $cached_result;
+        }
+    } else {
+        error_log('Operaton DMN: Cache busting requested for form ' . $form_id);
+        // Clear the existing cache when cache busting
+        delete_transient($cache_key);
+    }
+    
+    error_log('Operaton DMN: Loading fresh decision flow for form ' . $form_id);
+    
+    $process_instance_id = $this->get_process_instance_id($form_id);
+    if (!$process_instance_id) {
+        $result = '<div class="decision-flow-placeholder">' .
+               '<h3>🔍 Decision Flow Results</h3>' .
+               '<p><em>Complete the evaluation on the previous step to see the detailed decision flow summary here.</em></p>' .
+               '</div>';
+        
+        // Cache for 1 minute (shorter since user might complete evaluation)
+        if (empty($cache_bust)) {
+            set_transient($cache_key, $result, 60);
+        }
+        return $result;
+    }
+    
+    // PREVENT RAPID API CALLS (but allow cache busting)
+    $api_cache_key = 'operaton_api_call_' . $process_instance_id;
+    if (empty($cache_bust) && get_transient($api_cache_key)) {
+        error_log('Operaton DMN: API call rate limited for process ' . $process_instance_id);
+        
+        $result = '<div class="decision-flow-loading">' .
+               '<h3>🔍 Decision Flow Results</h3>' .
+               '<p>⏳ Loading decision flow data... Please wait.</p>' .
+               '</div>';
+        return $result;
+    }
+    
+    // SET API RATE LIMIT (prevent calls for 5 seconds, unless cache busting)
+    if (empty($cache_bust)) {
+        set_transient($api_cache_key, true, 5);
+    }
+    
+    // Build correct history endpoint
+    $base_url = rtrim($config->dmn_endpoint, '/');
+    $base_url = str_replace('/decision-definition/key', '', $base_url);
+    $base_url = str_replace('/decision-definition', '', $base_url);
+    
+    if (strpos($base_url, '/engine-rest') === false) {
+        $base_url .= '/engine-rest';
+    }
+    
+    $history_endpoint = $base_url . '/history/decision-instance';
+    $history_url = $history_endpoint . '?processInstanceId=' . $process_instance_id . '&includeInputs=true&includeOutputs=true';
+    
+    error_log('Operaton DMN: Getting decision flow from: ' . $history_url);
+    
+    $response = wp_remote_get($history_url, array(
+        'headers' => array('Accept' => 'application/json'),
+        'timeout' => 15,
+        'sslverify' => false,
+    ));
+    
+    if (is_wp_error($response)) {
+        error_log('Operaton DMN: Error retrieving decision flow: ' . $response->get_error_message());
+        $result = '<div class="decision-flow-error">' .
+               '<h3>🔍 Decision Flow Results</h3>' .
+               '<p><em>Error retrieving decision flow: ' . $response->get_error_message() . '</em></p>' .
+               '</div>';
+        
+        // Cache error for 2 minutes (unless cache busting)
+        if (empty($cache_bust)) {
+            set_transient($cache_key, $result, 120);
+        }
+        return $result;
+    }
+    
+    $http_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    
+    if ($http_code !== 200) {
+        error_log('Operaton DMN: Decision flow API returned status: ' . $http_code);
+        $result = '<div class="decision-flow-error">' .
+               '<h3>🔍 Decision Flow Results</h3>' .
+               '<p><em>Error loading decision flow (HTTP ' . $http_code . '). Please try again.</em></p>' .
+               '</div>';
+        
+        // Cache error for 2 minutes (unless cache busting)
+        if (empty($cache_bust)) {
+            set_transient($cache_key, $result, 120);
+        }
+        return $result;
+    }
+    
+    $decision_instances = json_decode($body, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log('Operaton DMN: JSON decode error: ' . json_last_error_msg());
+        $result = '<div class="decision-flow-error">' .
+               '<h3>🔍 Decision Flow Results</h3>' .
+               '<p><em>Error parsing decision flow data.</em></p>' .
+               '</div>';
+        
+        // Cache error for 2 minutes (unless cache busting)
+        if (empty($cache_bust)) {
+            set_transient($cache_key, $result, 120);
+        }
+        return $result;
+    }
+    
+    error_log('Operaton DMN: Decision instances count: ' . count($decision_instances));
+    
+    $result = $this->format_decision_flow_summary($decision_instances, $process_instance_id);
+    
+    // Cache successful result for 10 minutes (unless cache busting)
+    if (empty($cache_bust)) {
+        set_transient($cache_key, $result, 600);
+    }
+    
+    return $result;
+}
+
+/**
+ * UPDATED: Format decision flow with Excel-style table layout
+ */
+private function format_decision_flow_summary($decision_instances, $process_instance_id) {
+    $html = '<h3>🔍 Decision Flow Results Summary</h3>';
+    $html .= '<p><strong>Process Instance:</strong> <code>' . esc_html($process_instance_id) . '</code></p>';
+    
+    if (empty($decision_instances) || !is_array($decision_instances)) {
+        $html .= '<div class="decision-flow-empty">';
+        $html .= '<p><em>No decision instances found for this process.</em></p>';
+        $html .= '</div>';
+        return $html;
+    }
+    
+    error_log('Operaton DMN: Processing ' . count($decision_instances) . ' decision instances');
+    
+    // FILTER 1: Only get instances from Activity_FinalResultCompilation if available
+    $filtered_instances = array();
+    $has_final_compilation = false;
+    
+    foreach ($decision_instances as $instance) {
+        if (isset($instance['activityId']) && $instance['activityId'] === 'Activity_FinalResultCompilation') {
+            $filtered_instances[] = $instance;
+            $has_final_compilation = true;
+        }
+    }
+    
+    // If no FinalResultCompilation activity, get the latest evaluation for each decision
+    if (!$has_final_compilation) {
+        error_log('Operaton DMN: No Activity_FinalResultCompilation found, using latest evaluations');
+        
+        // Group by decision definition key and get the latest evaluation time for each
+        $latest_by_decision = array();
+        
+        foreach ($decision_instances as $instance) {
+            if (isset($instance['decisionDefinitionKey']) && isset($instance['evaluationTime'])) {
+                $key = $instance['decisionDefinitionKey'];
+                $eval_time = $instance['evaluationTime'];
+                
+                if (!isset($latest_by_decision[$key]) || 
+                    strtotime($eval_time) > strtotime($latest_by_decision[$key]['evaluationTime'])) {
+                    $latest_by_decision[$key] = $instance;
+                }
+            }
+        }
+        
+        $filtered_instances = array_values($latest_by_decision);
+        error_log('Operaton DMN: Filtered to latest evaluations, count: ' . count($filtered_instances));
+    } else {
+        error_log('Operaton DMN: Using Activity_FinalResultCompilation instances, count: ' . count($filtered_instances));
+    }
+    
+    if (empty($filtered_instances)) {
+        $html .= '<p><em>No relevant decision instances found.</em></p>';
+        return $html;
+    }
+    
+    // Sort by evaluation time
+    usort($filtered_instances, function($a, $b) {
+        $timeA = isset($a['evaluationTime']) ? strtotime($a['evaluationTime']) : 0;
+        $timeB = isset($b['evaluationTime']) ? strtotime($b['evaluationTime']) : 0;
+        return $timeA - $timeB;
+    });
+    
+    // Group decisions by decision definition key for cleaner display
+    $decisions_by_key = array();
+    foreach ($filtered_instances as $instance) {
+        if (isset($instance['decisionDefinitionKey'])) {
+            $key = $instance['decisionDefinitionKey'];
+            if (!isset($decisions_by_key[$key])) {
+                $decisions_by_key[$key] = array();
+            }
+            $decisions_by_key[$key][] = $instance;
+        }
+    }
+    
+    // TOP SECTION: Summary Statistics + Status + Refresh Button
+    $html .= '<div class="decision-flow-header" style="background: #f0f8ff; padding: 15px; border-radius: 6px; border-left: 4px solid #0073aa; margin-bottom: 20px;">';
+    
+    // SUMMARY STATISTICS AT THE TOP
+    $html .= '<div class="decision-flow-summary-stats" style="margin-bottom: 15px;">';
+    $html .= '<h4 style="margin: 0 0 10px 0;">📊 Summary</h4>';
+    $html .= '<ul style="margin: 0; padding-left: 20px;">';
+    $html .= '<li><strong>Total Decision Types:</strong> ' . count($decisions_by_key) . '</li>';
+    $html .= '<li><strong>Total Evaluations Shown:</strong> ' . count($filtered_instances) . '</li>';
+    $html .= '<li><strong>Total Available:</strong> ' . count($decision_instances) . '</li>';
+    $html .= '<li><strong>Filter Applied:</strong> ' . ($has_final_compilation ? 'Activity_FinalResultCompilation only' : 'Latest evaluation per decision') . '</li>';
+    $html .= '</ul>';
+    $html .= '</div>';
+    
+    // STATUS LINE
+    $html .= '<p style="margin: 10px 0;"><strong>Showing:</strong> ' . ($has_final_compilation ? 'Final compilation results' : 'Latest evaluation for each decision') . '</p>';
+    
+    // REFRESH BUTTON
+    $html .= '<button type="button" class="button refresh-decision-flow-controlled" data-form-id="8" style="margin-top: 10px;">';
+    $html .= '🔄 Refresh Decision Flow';
+    $html .= '</button>';
+    $html .= '</div>';
+    
+    // MAIN SECTION: Excel-style Decision Tables
+    $html .= '<div class="decision-flow-tables">';
+    
+    $step = 1;
+    foreach ($decisions_by_key as $decision_key => $instances) {
+        // Only show the first instance for each decision (since we filtered to latest/final)
+        $instance = $instances[0];
+        
+        $html .= '<div class="decision-table-container">';
+        $html .= '<h4 class="decision-table-title">' . $step . '. ' . esc_html($decision_key) . '</h4>';
+        
+        // Create Excel-style table
+        $html .= '<table class="decision-table excel-style">';
+        
+        // Header row
+        $html .= '<thead>';
+        $html .= '<tr>';
+        $html .= '<th class="table-header"></th>'; // Empty top-left cell
+        $html .= '<th class="table-header">Variable</th>';
+        $html .= '<th class="table-header">Value</th>';
+        $html .= '</tr>';
+        $html .= '</thead>';
+        
+        $html .= '<tbody>';
+        
+        // INPUTS Section
+        if (isset($instance['inputs']) && is_array($instance['inputs']) && count($instance['inputs']) > 0) {
+            $input_count = count($instance['inputs']);
+            $first_input = true;
+            
+            foreach ($instance['inputs'] as $input) {
+                $html .= '<tr class="input-row">';
+                
+                // Row header (only on first input row)
+                if ($first_input) {
+                    $html .= '<td class="row-header inputs-header" rowspan="' . $input_count . '">📥 Inputs</td>';
+                    $first_input = false;
+                } else {
+                    // Empty cell for subsequent rows (handled by rowspan)
+                }
+                
+                // Variable name
+                $name = 'Unknown Input';
+                if (isset($input['clauseName']) && !empty($input['clauseName'])) {
+                    $name = $input['clauseName'];
+                } elseif (isset($input['name']) && !empty($input['name'])) {
+                    $name = $input['name'];
+                }
+                $html .= '<td class="variable-cell">' . esc_html($name) . '</td>';
+                
+                // Value
+                $value = 'null';
+                if (array_key_exists('value', $input)) {
+                    if (is_null($input['value']) || $input['value'] === '') {
+                        $value = '<em class="null-value">null</em>';
+                    } elseif (is_bool($input['value'])) {
+                        $icon = $input['value'] ? '✅' : '❌';
+                        $text = $input['value'] ? 'true' : 'false';
+                        $value = $icon . ' ' . $text;
+                    } elseif (is_array($input['value'])) {
+                        $value = esc_html(json_encode($input['value']));
+                    } else {
+                        $value = esc_html((string) $input['value']);
+                    }
+                }
+                $html .= '<td class="value-cell">' . $value . '</td>';
+                
+                $html .= '</tr>';
+            }
+        }
+        
+        // OUTPUTS Section
+        if (isset($instance['outputs']) && is_array($instance['outputs']) && count($instance['outputs']) > 0) {
+            $output_count = count($instance['outputs']);
+            $first_output = true;
+            
+            foreach ($instance['outputs'] as $output) {
+                $html .= '<tr class="output-row">';
+                
+                // Row header (only on first output row)
+                if ($first_output) {
+                    $html .= '<td class="row-header outputs-header" rowspan="' . $output_count . '">📤 Outputs</td>';
+                    $first_output = false;
+                } else {
+                    // Empty cell for subsequent rows (handled by rowspan)
+                }
+                
+                // Variable name
+                $name = 'Unknown Output';
+                if (isset($output['clauseName']) && !empty($output['clauseName'])) {
+                    $name = $output['clauseName'];
+                } elseif (isset($output['variableName']) && !empty($output['variableName'])) {
+                    $name = $output['variableName'];
+                } elseif (isset($output['name']) && !empty($output['name'])) {
+                    $name = $output['name'];
+                }
+                $html .= '<td class="variable-cell">' . esc_html($name) . '</td>';
+                
+                // Value with enhanced formatting
+                $value = '';
+                if (array_key_exists('value', $output)) {
+                    if (is_null($output['value']) || $output['value'] === '') {
+                        $value = '<em class="null-value">null</em>';
+                    } elseif (is_bool($output['value'])) {
+                        $icon = $output['value'] ? '✅' : '❌';
+                        $text = $output['value'] ? 'true' : 'false';
+                        $value = '<span class="boolean-value ' . ($output['value'] ? 'true' : 'false') . '">' . $icon . ' ' . $text . '</span>';
+                    } elseif (is_numeric($output['value'])) {
+                        $value = '<span class="numeric-value">' . esc_html((string) $output['value']) . '</span>';
+                    } elseif (is_array($output['value'])) {
+                        $value = '<span class="array-value">' . esc_html(json_encode($output['value'])) . '</span>';
+                    } else {
+                        $value = '<span class="string-value">' . esc_html((string) $output['value']) . '</span>';
+                    }
+                } else {
+                    $value = '<em class="no-value">no value</em>';
+                }
+                $html .= '<td class="value-cell">' . $value . '</td>';
+                
+                $html .= '</tr>';
+            }
+        }
+        
+        $html .= '</tbody>';
+        $html .= '</table>';
+        
+        // Metadata footer
+// Metadata footer (UPDATED with timezone conversion)
+$html .= '<div class="decision-metadata">';
+if (isset($instance['evaluationTime'])) {
+    $formatted_time = $this->format_evaluation_time($instance['evaluationTime']);
+    $html .= '<small><strong>⏱️ Evaluation Time:</strong> ' . esc_html($formatted_time) . '</small>';
+}
+if (isset($instance['activityId'])) {
+    $html .= '<small style="margin-left: 15px;"><strong>🔧 Activity:</strong> ' . esc_html($instance['activityId']) . '</small>';
+}
+$html .= '</div>';        
+        $html .= '</div>'; // Close decision-table-container
+        
+        $step++;
+    }
+    
+    $html .= '</div>'; // Close decision-flow-tables
+    
+    // Enhanced Excel-style CSS
+    $html .= '<style>
+        .decision-flow-tables { 
+            margin: 20px 0; 
+        }
+        
+        .decision-table-container { 
+            margin: 25px 0; 
+            padding: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .decision-table-title { 
+            margin: 0; 
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            border-bottom: none;
+        }
+        
+        .decision-table.excel-style {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 13px;
+            background: white;
+        }
+        
+        .decision-table.excel-style th {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .decision-table.excel-style td {
+            border: 1px solid #dee2e6;
+            padding: 10px 15px;
+            vertical-align: top;
+            line-height: 1.4;
+        }
+        
+        .row-header {
+            background: #e8f4f8 !important;
+            font-weight: 600;
+            text-align: center;
+            vertical-align: middle !important;
+            width: 100px;
+            min-width: 100px;
+            border-right: 2px solid #0073aa !important;
+        }
+        
+        .inputs-header {
+            color: #0073aa;
+        }
+        
+        .outputs-header {
+            color: #28a745;
+        }
+        
+        .variable-cell {
+            font-weight: 500;
+            color: #343a40;
+            background: #f8f9fa;
+            font-family: "Courier New", monospace;
+            width: 250px;
+        }
+        
+        .value-cell {
+            font-family: "Courier New", monospace;
+            color: #495057;
+            background: white;
+        }
+        
+        .input-row:hover {
+            background: rgba(0, 115, 170, 0.05);
+        }
+        
+        .output-row:hover {
+            background: rgba(40, 167, 69, 0.05);
+        }
+        
+        /* Value type styling */
+        .boolean-value.true {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .boolean-value.false {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        
+        .numeric-value {
+            color: #6f42c1;
+            font-weight: 600;
+        }
+        
+        .string-value {
+            color: #495057;
+        }
+        
+        .array-value {
+            color: #fd7e14;
+            font-style: italic;
+        }
+        
+        .null-value, .no-value {
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .decision-metadata {
+            padding: 12px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            font-size: 11px;
+            color: #6c757d;
+        }
+        
+        .decision-metadata small {
+            display: inline-block;
+        }
+        
+        /* Header styling */
+        .decision-flow-header {
+            border-left: 4px solid #0073aa !important;
+        }
+        
+        .decision-flow-summary-stats {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .decision-flow-summary-stats h4 {
+            color: #0073aa;
+            font-size: 14px;
+            margin: 0 0 8px 0;
+        }
+        
+        .decision-flow-summary-stats ul {
+            margin: 0;
+            padding-left: 18px;
+            font-size: 13px;
+        }
+        
+        .decision-flow-summary-stats li {
+            margin: 3px 0;
+        }
+        
+        .refresh-decision-flow-controlled {
+            background-color: #0073aa !important;
+            border-color: #0073aa !important;
+            color: white !important;
+            font-size: 12px;
+            padding: 8px 16px;
+        }
+        
+        .refresh-decision-flow-controlled:hover {
+            background-color: #005a87 !important;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .decision-table.excel-style {
+                font-size: 11px;
+            }
+            
+            .decision-table.excel-style th,
+            .decision-table.excel-style td {
+                padding: 8px 10px;
+            }
+            
+            .row-header {
+                width: 80px;
+                min-width: 80px;
+                font-size: 10px;
+            }
+            
+            .variable-cell {
+                width: 200px;
+            }
+            
+            .decision-table-title {
+                font-size: 14px;
+                padding: 12px 15px;
+            }
+        }
+        
+        /* Print styling */
+        @media print {
+            .decision-table-container {
+                break-inside: avoid;
+                box-shadow: none;
+                border: 1px solid #000;
+            }
+            
+            .refresh-decision-flow-controlled {
+                display: none;
+            }
+        }
+    </style>';
+    
+    return $html;
 }
 
     /**
@@ -1635,6 +2993,28 @@ public function check_version() {
         }
     }
 }
+
+/**
+ * NEW: Add REST endpoint for decision flow data
+ */
+add_action('rest_api_init', function() {
+    register_rest_route('operaton-dmn/v1', '/decision-flow/(?P<form_id>\d+)', array(
+        'methods' => 'GET',
+        'callback' => function($request) {
+            $form_id = $request['form_id'];
+            
+            // Get the plugin instance and call the public method
+            $plugin = OperatonDMNEvaluator::get_instance();
+            $html = $plugin->get_decision_flow_summary_html($form_id);
+            
+            return array(
+                'success' => true,
+                'html' => $html
+            );
+        },
+        'permission_callback' => '__return_true'
+    ));
+});
 
 // Add AJAX handler for clearing update cache
 add_action('wp_ajax_operaton_clear_update_cache', function() {

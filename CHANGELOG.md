@@ -1,8 +1,182 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-# Changelog
-All notable changes to this project will be documented in this file.
+## [1.0.0-beta.9] - 2025-07-19
+
+### 🚀 Major Feature: Process Execution with Decision Flow Analysis
+
+#### Revolutionary Enhancement: Dual Execution Modes
+
+##### 1. **Process Execution Mode** ✨ NEW
+- **Complete BPMN Process Integration**: Execute full business processes that call multiple DMN decisions
+- **Decision Flow Tracking**: Comprehensive tracking of all decision instances throughout process execution
+- **Process Instance Management**: Automatic storage and retrieval of process instance IDs
+- **Enhanced Result Extraction**: Advanced variable extraction from completed process instances using history API
+- **Multi-Decision Orchestration**: Single process execution can involve dozens of interconnected decisions
+
+##### 2. **Execution Mode Selection**
+- **Direct Decision Evaluation**: Original single-decision evaluation (backward compatible)
+- **Process Execution with Decision Flow**: New comprehensive process-based evaluation
+- **Admin Toggle**: Simple radio button selection in configuration interface
+- **Flexible Configuration**: Each form can use either mode based on complexity requirements
+
+#### 🔍 Decision Flow Summary System
+
+##### 1. **Excel-Style Results Display**
+- **Third Page Integration**: Comprehensive decision flow summary automatically appears on final form page
+- **Excel-Style Tables**: Clean, professional table layout with proper headers and borders
+- **Input/Output Organization**: Clear separation of decision inputs and outputs in structured rows
+- **Visual Data Typing**: Color-coded values (✅/❌ for booleans, purple for numbers, monospace for technical data)
+- **Responsive Design**: Mobile-friendly tables that adapt to different screen sizes
+
+##### 2. **Comprehensive Decision Analysis**
+- **Complete Process Timeline**: Shows every decision made during process execution in chronological order
+- **Variable Tracking**: Displays all input variables and output results for each decision
+- **Activity Context**: Shows which BPMN activity triggered each decision evaluation
+- **Evaluation Timestamps**: Precise timing information with timezone conversion
+- **Process Statistics**: Summary showing total decisions, evaluations, and applied filters
+
+##### 3. **Smart Data Filtering and Organization**
+- **Final Compilation Priority**: Automatically prioritizes Activity_FinalResultCompilation results when available
+- **Latest Evaluation Fallback**: Uses most recent evaluation for each decision when final compilation unavailable
+- **Duplicate Elimination**: Intelligent filtering to show only relevant decision instances
+- **Chronological Ordering**: Decisions displayed in execution order for logical flow understanding
+
+#### 🔧 Technical Architecture Enhancements
+
+##### Backend Process Integration
+- **Enhanced handle_evaluation()**: Dual-mode evaluation supporting both decision and process execution
+- **New handle_process_execution()**: Specialized method for BPMN process start and monitoring
+- **Process Instance Storage**: Session-based and user meta storage for process tracking
+- **Historical Variable Retrieval**: Advanced API integration for completed process variable extraction
+- **Multi-Strategy Result Extraction**: Comprehensive search through process variables for result mapping
+
+##### Database Schema Extensions
+- **use_process Column**: Boolean flag for execution mode selection
+- **process_key Column**: Storage for BPMN process definition keys
+- **show_decision_flow Column**: Toggle for decision flow summary display
+- **Automatic Migration**: Seamless database updates for existing installations
+- **Backward Compatibility**: All existing configurations continue working unchanged
+
+##### Frontend JavaScript Enhancements
+- **Dynamic Button Control**: Intelligent button placement based on execution mode and form page
+- **Process Data Management**: Session storage management for process instance tracking
+- **Decision Flow Loading**: AJAX-based decision flow summary retrieval with caching
+- **State Cleanup**: Automatic clearing of process data when form inputs change
+- **Progressive Enhancement**: Graceful degradation for non-process configurations
+
+#### 🎯 Enhanced User Experience
+
+##### Configuration Interface Improvements
+- **Execution Mode Selection**: Clear radio button interface for choosing evaluation approach
+- **Process Key Configuration**: Dedicated input field for BPMN process definition keys
+- **Decision Flow Toggle**: Optional decision flow summary enablement
+- **Endpoint Preview**: Real-time URL preview for both decision and process endpoints
+- **Enhanced Validation**: Mode-specific validation ensuring proper configuration
+
+##### Form Integration Enhancements
+- **Intelligent Button Placement**: Context-aware evaluation button positioning
+- **Page-Specific Behavior**: Different behavior on evaluation pages vs. summary pages
+- **Process Result Population**: Enhanced result extraction for complex process variables
+- **Decision Flow Summary**: Comprehensive third-page decision analysis display
+- **Emergency Button Recovery**: Automatic button visibility fixes for edge cases
+
+##### Visual and UX Improvements
+- **Professional Styling**: Excel-inspired table design with gradients and hover effects
+- **Enhanced Notifications**: Improved success messages with process instance information
+- **Loading States**: Professional loading indicators during decision flow retrieval
+- **Refresh Functionality**: Manual refresh capability for decision flow data
+- **Cache Management**: Intelligent caching with cache-busting support
+
+#### 📊 Decision Flow Features Deep Dive
+
+##### Summary Statistics Dashboard
+![Decision Summary](./assets/images/decisionsummary.png)
+
+##### Excel-Style Decision Tables
+- **Professional Headers**: Clean "Variable" and "Value" column structure
+- **Row Grouping**: Inputs and Outputs grouped with rowspan headers
+- **Type-Specific Formatting**: 
+  - Booleans: ✅ true / ❌ false with color coding
+  - Numbers: Purple highlighting for numeric values
+  - Strings: Standard text formatting
+  - Null values: Italicized "null" indication
+
+![Decision flow output](./assets/images/decisionflowoutput.png)
+
+##### Metadata and Context
+- **Evaluation Timestamps**: Timezone-converted timestamps (e.g., "2025-07-19 19:03:04 (CEST)")
+- **Activity Information**: BPMN activity context for each decision
+- **Process Instance ID**: Complete traceability to Operaton engine
+- **Refresh Controls**: Manual refresh capability with loading states
+
+#### 🔄 Enhanced API Integration
+
+##### Process Execution Flow
+1. **Process Start**: BPMN process initiation with input variables
+2. **Completion Detection**: Automatic detection of process completion
+3. **Variable Extraction**: Comprehensive variable retrieval from process history
+4. **Result Mapping**: Advanced mapping of process variables to form fields
+5. **Decision Flow Collection**: Gathering of all decision instances for summary
+
+##### History API Integration
+- **Historical Variable Access**: Complete process variable history retrieval
+- **Decision Instance Tracking**: All decision evaluations throughout process lifecycle
+- **Activity Context Preservation**: Maintaining BPMN activity information
+- **Comprehensive Data Collection**: Input variables, output results, and metadata
+
+#### 🔒 Compatibility and Migration
+
+##### Backward Compatibility
+- **Existing Configurations**: All existing direct decision evaluations continue working
+- **Database Migration**: Automatic schema updates with new columns
+- **Progressive Enhancement**: New features available without breaking existing functionality
+- **Configuration Preservation**: No reconfiguration required for existing setups
+
+##### Migration Features
+- **Automatic Database Updates**: Seamless column additions during plugin updates
+- **Default Mode Selection**: Direct decision evaluation remains default for existing configurations
+- **Optional Upgrade Path**: Users can optionally upgrade to process execution mode
+- **Zero Downtime**: Migration occurs transparently during normal plugin operation
+
+#### 🚀 Performance and Reliability
+
+##### Caching and Optimization
+- **Decision Flow Caching**: Intelligent caching of decision flow data with configurable expiration
+- **Cache Busting**: Manual cache refresh capability for real-time updates
+- **Rate Limiting**: API call throttling to prevent excessive requests
+- **Session Management**: Efficient process instance storage across form navigation
+
+##### Error Handling and Recovery
+- **Graceful Degradation**: Fallback to basic result display if decision flow fails
+- **Comprehensive Logging**: Detailed error logging for troubleshooting
+- **User-Friendly Messages**: Clear error messages for various failure scenarios
+- **Emergency Recovery**: Automatic retry mechanisms for transient failures
+
+#### 🔧 Developer Notes
+
+##### Key Methods Added/Enhanced
+- `handle_process_execution()`: New method for BPMN process execution
+- `get_decision_flow_summary_html()`: Decision flow summary generation
+- `format_decision_flow_summary()`: Excel-style formatting system
+- `store_process_instance_id()`: Process instance tracking
+- `format_evaluation_time()`: Timezone-aware timestamp formatting
+
+##### Frontend Enhancements
+- Enhanced button control with process-aware placement
+- Decision flow AJAX loading with cache management
+- Process data lifecycle management
+- Excel-style CSS framework for professional tables
+
+##### Configuration Extensions
+- Process execution mode selection
+- Process key configuration
+- Decision flow summary toggle
+- Enhanced endpoint URL construction
+
+---
+
+**Migration Notes**: Existing installations will automatically receive database schema updates. New "Process Execution" mode is available immediately without requiring reconfiguration of existing decision evaluations.
 
 ## [1.0.0-beta.8.1] - 2025-07-18
 

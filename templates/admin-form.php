@@ -1,13 +1,12 @@
 <?php
-// Safe admin-form.php with automatic migration handling
+// Enhanced admin-form.php with process execution support
 
 $editing = isset($config) && $config;
 $field_mappings = $editing ? json_decode($config->field_mappings, true) : array();
 
-// SAFE handling of result_mappings - check if property exists
+// Handle result_mappings safely
 $result_mappings = array();
 if ($editing) {
-    // Check if the property exists before accessing it
     if (property_exists($config, 'result_mappings') && !empty($config->result_mappings)) {
         $result_mappings = json_decode($config->result_mappings, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
@@ -38,6 +37,11 @@ global $wpdb;
 $table_name = $wpdb->prefix . 'operaton_dmn_configs';
 $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
 $needs_migration = !in_array('result_mappings', $columns);
+
+// Get current process settings
+$use_process = $editing && property_exists($config, 'use_process') ? $config->use_process : false;
+$process_key = $editing && property_exists($config, 'process_key') ? $config->process_key : '';
+$show_decision_flow = $editing && property_exists($config, 'show_decision_flow') ? $config->show_decision_flow : false;
 ?>
 <div class="wrap">
     <h1><?php echo $editing ? __('Edit Configuration', 'operaton-dmn') : __('Add New Configuration', 'operaton-dmn'); ?></h1>
@@ -110,51 +114,117 @@ $needs_migration = !in_array('result_mappings', $columns);
                 
                 <tr>
                     <th scope="row">
-                        <label for="dmn_endpoint"><?php _e('DMN Base Endpoint URL', 'operaton-dmn'); ?> <span class="required">*</span></label>
+                        <label for="dmn_endpoint"><?php _e('Operaton Base Endpoint URL', 'operaton-dmn'); ?> <span class="required">*</span></label>
                     </th>
                     <td>
                         <input type="url" name="dmn_endpoint" id="dmn_endpoint" class="regular-text" 
                                value="<?php echo $editing ? esc_attr($config->dmn_endpoint) : ''; ?>" required>
-                        <p class="description"><?php _e('Base URL to your Operaton DMN engine (without the decision key).', 'operaton-dmn'); ?></p>
-                        <p class="description"><strong><?php _e('Example:', 'operaton-dmn'); ?></strong> https://operatondev.open-regels.nl/engine-rest/decision-definition/key/</p>
+                        <p class="description"><?php _e('Base URL to your Operaton engine (without the specific endpoint path).', 'operaton-dmn'); ?></p>
+                        <p class="description"><strong><?php _e('Example:', 'operaton-dmn'); ?></strong> https://operatondev.open-regels.nl/engine-rest/</p>
                         <button type="button" id="test-endpoint" class="button button-secondary"><?php _e('Test Connection', 'operaton-dmn'); ?></button>
                         <div id="endpoint-test-result"></div>
                     </td>
                 </tr>
-                
+
+                <!-- NEW: Execution Mode Selection -->
                 <tr>
+                    <th scope="row">
+                        <label><?php _e('Execution Mode', 'operaton-dmn'); ?> <span class="required">*</span></label>
+                    </th>
+                    <td>
+                        <fieldset>
+                            <legend class="screen-reader-text"><?php _e('Choose execution mode', 'operaton-dmn'); ?></legend>
+                            
+                            <label>
+                                <input type="radio" name="use_process" value="0" id="mode-decision" 
+                                       <?php checked(!$use_process); ?> />
+                                <strong><?php _e('Direct Decision Evaluation', 'operaton-dmn'); ?></strong>
+                            </label>
+                            <p class="description" style="margin-left: 25px;">
+                                <?php _e('Directly evaluate a single DMN decision table. Best for simple decision logic.', 'operaton-dmn'); ?>
+                            </p>
+                            
+                            <label style="margin-top: 10px; display: block;">
+                                <input type="radio" name="use_process" value="1" id="mode-process" 
+                                       <?php checked($use_process); ?> />
+                                <strong><?php _e('Process Execution with Decision Flow', 'operaton-dmn'); ?></strong>
+                            </label>
+                            <p class="description" style="margin-left: 25px;">
+                                <?php _e('Execute a BPMN process that calls multiple decisions. Provides detailed decision flow summary.', 'operaton-dmn'); ?>
+                            </p>
+                        </fieldset>
+                    </td>
+                </tr>
+                
+                <!-- Decision Key (for direct evaluation) -->
+                <tr id="decision-key-row" style="<?php echo $use_process ? 'display: none;' : ''; ?>">
                     <th scope="row">
                         <label for="decision_key"><?php _e('Decision Key', 'operaton-dmn'); ?> <span class="required">*</span></label>
                     </th>
                     <td>
                         <input type="text" name="decision_key" id="decision_key" class="regular-text" 
-                               value="<?php echo $editing ? esc_attr($config->decision_key) : ''; ?>" required>
+                               value="<?php echo $editing ? esc_attr($config->decision_key) : ''; ?>">
                         <p class="description"><?php _e('The key/ID of your DMN decision table (e.g., "HeusdenpasAanvraagEindresultaat").', 'operaton-dmn'); ?></p>
-                        <div id="full-endpoint-preview" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 12px; color: #666; display: none;">
-                            <strong><?php _e('Full Evaluation URL:', 'operaton-dmn'); ?></strong><br>
-                            <span id="preview-url"></span>
+                        <div id="decision-endpoint-preview" class="endpoint-preview">
+                            <strong><?php _e('Decision Evaluation URL:', 'operaton-dmn'); ?></strong><br>
+                            <span class="preview-url"></span>
                         </div>
                     </td>
                 </tr>
-                
-                <tr>
+
+                <!-- Process Key (for process execution) -->
+                <tr id="process-key-row" style="<?php echo !$use_process ? 'display: none;' : ''; ?>">
                     <th scope="row">
-                        <label for="evaluation_step"><?php _e('Evaluation Step', 'operaton-dmn'); ?></label>
+                        <label for="process_key"><?php _e('Process Key', 'operaton-dmn'); ?> <span class="required">*</span></label>
                     </th>
                     <td>
-                        <select name="evaluation_step" id="evaluation_step" class="regular-text">
-                            <?php 
-                            $current_step = ($editing && property_exists($config, 'evaluation_step')) ? $config->evaluation_step : 'auto';
-                            ?>
-                            <option value="auto" <?php selected($current_step, 'auto'); ?>><?php _e('Auto-detect (recommended)', 'operaton-dmn'); ?></option>
-                            <option value="1" <?php selected($current_step, '1'); ?>>Step 1</option>
-                            <option value="2" <?php selected($current_step, '2'); ?>>Step 2</option>
-                            <option value="3" <?php selected($current_step, '3'); ?>>Step 3</option>
-                        </select>
-                        <p class="description"><?php _e('Choose which step of the form should show the evaluate button.', 'operaton-dmn'); ?></p>
+                        <input type="text" name="process_key" id="process_key" class="regular-text" 
+                               value="<?php echo esc_attr($process_key); ?>">
+                        <p class="description"><?php _e('The key/ID of your BPMN process (e.g., "HeusdenpasProcess").', 'operaton-dmn'); ?></p>
+                        <div id="process-endpoint-preview" class="endpoint-preview">
+                            <strong><?php _e('Process Start URL:', 'operaton-dmn'); ?></strong><br>
+                            <span class="preview-url"></span>
+                        </div>
                     </td>
                 </tr>
 
+                <!-- Decision Flow Summary Option -->
+                <tr id="decision-flow-row" style="<?php echo !$use_process ? 'display: none;' : ''; ?>">
+                    <th scope="row">
+                        <label for="show_decision_flow"><?php _e('Show Decision Flow Summary', 'operaton-dmn'); ?></label>
+                    </th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="show_decision_flow" id="show_decision_flow" value="1" 
+                                   <?php checked($show_decision_flow); ?> />
+                            <?php _e('Display detailed decision flow summary on the final form page', 'operaton-dmn'); ?>
+                        </label>
+                        <p class="description">
+                            <?php _e('When enabled, the final page of your form will show a comprehensive summary of all decisions made during the process execution, including inputs, outputs, and decision logic flow.', 'operaton-dmn'); ?>
+                        </p>
+                    </td>
+                </tr>
+                
+<tr>
+    <th scope="row">
+        <label for="evaluation_step"><?php _e('Evaluation Step', 'operaton-dmn'); ?></label>
+    </th>
+    <td>
+        <select name="evaluation_step" id="evaluation_step" class="regular-text">
+            <?php 
+            $current_step = ($editing && property_exists($config, 'evaluation_step')) ? $config->evaluation_step : '2';
+            // Convert legacy 'auto' to '2'
+            if ($current_step === 'auto') {
+                $current_step = '2';
+            }
+            ?>
+            <option value="1" <?php selected($current_step, '1'); ?>><?php _e('Page 1', 'operaton-dmn'); ?></option>
+            <option value="2" <?php selected($current_step, '2'); ?>><?php _e('Page 2', 'operaton-dmn'); ?></option>
+            <option value="3" <?php selected($current_step, '3'); ?>><?php _e('Page 3', 'operaton-dmn'); ?></option>
+        </select>
+        <p class="description"><?php _e('Choose which page of the form should show the evaluate button.', 'operaton-dmn'); ?></p>
+    </td>
+</tr>
                 <tr>
                     <th scope="row">
                         <label for="button_text"><?php _e('Button Text', 'operaton-dmn'); ?></label>
@@ -171,7 +241,7 @@ $needs_migration = !in_array('result_mappings', $columns);
         <!-- INPUT FIELD MAPPINGS SECTION -->
         <div class="field-mapping-section">
             <h2><?php _e('Input Field Mappings', 'operaton-dmn'); ?> <span class="required">*</span></h2>
-            <p><?php _e('Map your Gravity Form fields to DMN input variables.', 'operaton-dmn'); ?></p>
+            <p><?php _e('Map your Gravity Form fields to DMN/Process input variables.', 'operaton-dmn'); ?></p>
             
             <div id="form-not-selected-notice" style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; margin: 15px 0; border-radius: 4px;">
                 <p><strong><?php _e('Please select a Gravity Form first to enable field mapping.', 'operaton-dmn'); ?></strong></p>
@@ -179,7 +249,7 @@ $needs_migration = !in_array('result_mappings', $columns);
             
             <div id="field-mappings-container" style="display: none;">
                 <div class="mapping-header">
-                    <div class="column header-col"><?php _e('DMN Variable Name', 'operaton-dmn'); ?></div>
+                    <div class="column header-col"><?php _e('Variable Name', 'operaton-dmn'); ?></div>
                     <div class="column header-col"><?php _e('Gravity Form Field', 'operaton-dmn'); ?></div>
                     <div class="column header-col"><?php _e('Data Type', 'operaton-dmn'); ?></div>
                     <div class="column header-col"><?php _e('Radio Button Name (Optional)', 'operaton-dmn'); ?></div>
@@ -243,11 +313,11 @@ $needs_migration = !in_array('result_mappings', $columns);
         <!-- RESULT MAPPINGS SECTION -->
         <div class="result-mapping-section">
             <h2><?php _e('Result Field Mappings', 'operaton-dmn'); ?> <span class="required">*</span></h2>
-            <p><?php _e('Map DMN result fields to Gravity Form fields where results should be displayed.', 'operaton-dmn'); ?></p>
+            <p><?php _e('Map result variables to Gravity Form fields where results should be displayed.', 'operaton-dmn'); ?></p>
             
             <div id="result-mappings-container" style="display: none;">
                 <div class="mapping-header">
-                    <div class="column header-col"><?php _e('DMN Result Field Name', 'operaton-dmn'); ?></div>
+                    <div class="column header-col"><?php _e('Result Variable Name', 'operaton-dmn'); ?></div>
                     <div class="column header-col"><?php _e('Gravity Form Field', 'operaton-dmn'); ?></div>
                     <div class="column header-col"><?php _e('Actions', 'operaton-dmn'); ?></div>
                 </div>
@@ -311,6 +381,25 @@ jQuery(document).ready(function($) {
         
         return html;
     }
+    
+    // Execution mode change handler
+    $('input[name="use_process"]').change(function() {
+        var useProcess = $(this).val() === '1';
+        
+        if (useProcess) {
+            $('#decision-key-row').hide();
+            $('#process-key-row, #decision-flow-row').show();
+            $('#decision_key').prop('required', false);
+            $('#process_key').prop('required', true);
+        } else {
+            $('#decision-key-row').show();
+            $('#process-key-row, #decision-flow-row').hide();
+            $('#decision_key').prop('required', true);
+            $('#process_key').prop('required', false);
+        }
+        
+        updateEndpointPreviews();
+    });
     
     // Form selection change handler
     $('#form_id').change(function() {
@@ -448,46 +537,74 @@ jQuery(document).ready(function($) {
         }
     });
     
-    // Update endpoint preview when base URL or decision key changes
-    function updateEndpointPreview() {
-        var baseUrl = $('#dmn_endpoint').val().trim();
-        var decisionKey = $('#decision_key').val().trim();
-        
-        if (baseUrl && decisionKey) {
-            if (!baseUrl.endsWith('/')) {
-                baseUrl += '/';
-            }
-            
-            var fullUrl = baseUrl + decisionKey + '/evaluate';
-            $('#preview-url').text(fullUrl);
-            $('#full-endpoint-preview').show();
-        } else {
-            $('#full-endpoint-preview').hide();
-        }
-    }
+// FIX: Replace the updateEndpointPreviews function in admin-form.php
+function updateEndpointPreviews() {
+    var baseUrl = $('#dmn_endpoint').val().trim();
+    var decisionKey = $('#decision_key').val().trim();
+    var processKey = $('#process_key').val().trim();
+    var useProcess = $('input[name="use_process"]:checked').val() === '1';
     
-    $('#dmn_endpoint, #decision_key').on('input keyup', updateEndpointPreview);
+    if (baseUrl) {
+        // Normalize base URL - remove any trailing path components that shouldn't be there
+        var cleanBaseUrl = baseUrl;
+        
+        // Remove common endpoint paths that might be incorrectly included
+        cleanBaseUrl = cleanBaseUrl.replace(/\/decision-definition.*$/, '');
+        cleanBaseUrl = cleanBaseUrl.replace(/\/process-definition.*$/, '');
+        
+        // Ensure it ends with /engine-rest
+        if (!cleanBaseUrl.endsWith('/engine-rest')) {
+            if (cleanBaseUrl.endsWith('/')) {
+                cleanBaseUrl += 'engine-rest';
+            } else {
+                cleanBaseUrl += '/engine-rest';
+            }
+        }
+        
+        // Ensure trailing slash
+        if (!cleanBaseUrl.endsWith('/')) {
+            cleanBaseUrl += '/';
+        }
+        
+        if (!useProcess && decisionKey) {
+            // Decision evaluation URL
+            var decisionUrl = cleanBaseUrl + 'decision-definition/key/' + decisionKey + '/evaluate';
+            $('#decision-endpoint-preview .preview-url').text(decisionUrl);
+            $('#decision-endpoint-preview').show();
+        } else {
+            $('#decision-endpoint-preview').hide();
+        }
+        
+        if (useProcess && processKey) {
+            // FIXED: Process start URL (remove duplicate path components)
+            var processUrl = cleanBaseUrl + 'process-definition/key/' + processKey + '/start';
+            $('#process-endpoint-preview .preview-url').text(processUrl);
+            $('#process-endpoint-preview').show();
+        } else {
+            $('#process-endpoint-preview').hide();
+        }
+    } else {
+        $('.endpoint-preview').hide();
+    }
+}
+    
+    $('#dmn_endpoint, #decision_key, #process_key').on('input keyup', updateEndpointPreviews);
     
     // Test endpoint functionality
     $('#test-endpoint').click(function() {
         var baseEndpoint = $('#dmn_endpoint').val().trim();
-        var decisionKey = $('#decision_key').val().trim();
         
         if (!baseEndpoint) {
             alert('<?php _e('Please enter a base endpoint URL first.', 'operaton-dmn'); ?>');
             return;
         }
         
-        if (!decisionKey) {
-            alert('<?php _e('Please enter a decision key first.', 'operaton-dmn'); ?>');
-            return;
+        // Test basic connectivity to the engine
+        var testUrl = baseEndpoint;
+        if (!testUrl.endsWith('/')) {
+            testUrl += '/';
         }
-        
-        var fullEndpoint = baseEndpoint;
-        if (!fullEndpoint.endsWith('/')) {
-            fullEndpoint += '/';
-        }
-        fullEndpoint += decisionKey + '/evaluate';
+        testUrl += 'version'; // Test the version endpoint
         
         var $button = $(this);
         var originalText = $button.text();
@@ -498,7 +615,7 @@ jQuery(document).ready(function($) {
             type: 'POST',
             data: {
                 action: 'operaton_test_endpoint',
-                endpoint: fullEndpoint,
+                endpoint: testUrl,
                 nonce: '<?php echo wp_create_nonce('operaton_test_endpoint'); ?>'
             },
             success: function(response) {
@@ -526,6 +643,22 @@ jQuery(document).ready(function($) {
             return false;
         }
         
+        var useProcess = $('input[name="use_process"]:checked').val() === '1';
+        
+        if (useProcess) {
+            if (!$('#process_key').val().trim()) {
+                alert('<?php _e('Process key is required when using process execution.', 'operaton-dmn'); ?>');
+                e.preventDefault();
+                return false;
+            }
+        } else {
+            if (!$('#decision_key').val().trim()) {
+                alert('<?php _e('Decision key is required when using direct decision evaluation.', 'operaton-dmn'); ?>');
+                e.preventDefault();
+                return false;
+            }
+        }
+        
         var inputMappings = $('.field-mapping-row').length;
         if (inputMappings === 0) {
             alert('<?php _e('At least one input field mapping is required.', 'operaton-dmn'); ?>');
@@ -540,11 +673,8 @@ jQuery(document).ready(function($) {
             return false;
         }
         
-        // Validate input mappings
+        // Additional validation for complete mappings
         var hasEmptyInput = false;
-        var hasDuplicateFields = false;
-        var usedFields = [];
-        
         $('.field-mapping-row').each(function() {
             var dmnVar = $(this).find('.dmn-variable-input').val().trim();
             var fieldId = $(this).find('.field-id-select').val();
@@ -553,12 +683,6 @@ jQuery(document).ready(function($) {
                 hasEmptyInput = true;
                 return false;
             }
-            
-            if (usedFields.indexOf(fieldId) !== -1) {
-                hasDuplicateFields = true;
-                return false;
-            }
-            usedFields.push(fieldId);
         });
         
         if (hasEmptyInput) {
@@ -567,17 +691,7 @@ jQuery(document).ready(function($) {
             return false;
         }
         
-        if (hasDuplicateFields) {
-            alert('<?php _e('Each form field can only be mapped once in input mappings.', 'operaton-dmn'); ?>');
-            e.preventDefault();
-            return false;
-        }
-        
-        // Validate result mappings
         var hasEmptyResult = false;
-        var hasDuplicateResultFields = false;
-        var usedResultFields = [];
-        
         $('.result-mapping-row').each(function() {
             var dmnResult = $(this).find('.dmn-result-input').val().trim();
             var fieldId = $(this).find('.result-field-id-select').val();
@@ -586,12 +700,6 @@ jQuery(document).ready(function($) {
                 hasEmptyResult = true;
                 return false;
             }
-            
-            if (usedResultFields.indexOf(fieldId) !== -1) {
-                hasDuplicateResultFields = true;
-                return false;
-            }
-            usedResultFields.push(fieldId);
         });
         
         if (hasEmptyResult) {
@@ -599,16 +707,13 @@ jQuery(document).ready(function($) {
             e.preventDefault();
             return false;
         }
-        
-        if (hasDuplicateResultFields) {
-            alert('<?php _e('Each form field can only be mapped once in result mappings.', 'operaton-dmn'); ?>');
-            e.preventDefault();
-            return false;
-        }
     });
     
     // Initialize on page load
-    updateEndpointPreview();
+    updateEndpointPreviews();
+    
+    // Initialize execution mode display
+    $('input[name="use_process"]:checked').trigger('change');
     
     // Initialize for editing
     <?php if ($editing && $config->form_id): ?>
@@ -696,8 +801,25 @@ jQuery(document).ready(function($) {
     padding: 8px 12px;
 }
 
-#full-endpoint-preview {
+.endpoint-preview {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #666;
+    display: none;
     word-break: break-all;
+}
+
+.endpoint-preview.show {
+    display: block;
+}
+
+.endpoint-preview .preview-url {
+    color: #0073aa;
+    font-weight: bold;
 }
 
 #add-field-mapping,
@@ -711,6 +833,32 @@ jQuery(document).ready(function($) {
     cursor: not-allowed;
 }
 
+/* Execution mode styling */
+fieldset {
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+fieldset label {
+    display: block;
+    margin: 0 0 5px 0;
+    font-weight: normal;
+}
+
+fieldset input[type="radio"] {
+    margin-right: 8px;
+}
+
+/* Process-specific highlighting */
+#process-key-row.highlight,
+#decision-flow-row.highlight {
+    background: #f0f8ff;
+    border-left: 4px solid #0073aa;
+    padding-left: 10px;
+}
+
+/* Responsive design */
 @media (max-width: 1200px) {
     .mapping-header,
     .field-mapping-row,
@@ -718,5 +866,51 @@ jQuery(document).ready(function($) {
         grid-template-columns: 1fr;
         gap: 10px;
     }
+    
+    .header-col {
+        background: #e8f4f8;
+        padding: 8px;
+        margin: 2px 0;
+        border-radius: 3px;
+    }
+}
+
+/* Enhanced visual feedback */
+.notice {
+    border-radius: 4px;
+}
+
+.notice.notice-success {
+    border-left-color: #46b450;
+}
+
+.notice.notice-error {
+    border-left-color: #dc3232;
+}
+
+/* Better form organization */
+.form-table th {
+    vertical-align: top;
+    padding-top: 15px;
+}
+
+.form-table td {
+    padding-bottom: 20px;
+}
+
+/* Mode selection styling */
+fieldset legend {
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+/* Decision flow summary info */
+#decision-flow-row .description {
+    background: #e8f4f8;
+    padding: 10px;
+    border-radius: 4px;
+    border-left: 3px solid #0073aa;
+    margin-top: 8px;
 }
 </style>
+<?php
