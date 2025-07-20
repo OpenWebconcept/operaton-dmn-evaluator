@@ -590,49 +590,172 @@ function updateEndpointPreviews() {
     
     $('#dmn_endpoint, #decision_key, #process_key').on('input keyup', updateEndpointPreviews);
     
-    // Test endpoint functionality
-    $('#test-endpoint').click(function() {
-        var baseEndpoint = $('#dmn_endpoint').val().trim();
-        
-        if (!baseEndpoint) {
-            alert('<?php _e('Please enter a base endpoint URL first.', 'operaton-dmn'); ?>');
-            return;
+// Test endpoint functionality - ENHANCED VERSION
+$('#test-endpoint').click(function() {
+    var baseEndpoint = $('#dmn_endpoint').val().trim();
+    var decisionKey = $('#decision_key').val().trim();
+    var processKey = $('#process_key').val().trim();
+    var useProcess = $('input[name="use_process"]:checked').val() === '1';
+    
+    if (!baseEndpoint) {
+        alert('<?php _e('Please enter a base endpoint URL first.', 'operaton-dmn'); ?>');
+        return;
+    }
+    
+    var $button = $(this);
+    var originalText = $button.text();
+    $button.text('<?php _e('Testing...', 'operaton-dmn'); ?>').prop('disabled', true);
+    
+    // Clear previous results
+    $('#endpoint-test-result').html('');
+    
+    // FIXED: Proper URL construction for engine testing
+    var testPromises = [];
+    
+    // CORRECTED: Build proper engine base URL for version testing
+    var cleanBaseUrl = baseEndpoint;
+    
+    // Remove any decision/process specific paths
+    cleanBaseUrl = cleanBaseUrl.replace(/\/decision-definition.*$/, '');
+    cleanBaseUrl = cleanBaseUrl.replace(/\/process-definition.*$/, '');
+    
+    // Ensure it ends with /engine-rest (no trailing slash)
+    if (!cleanBaseUrl.endsWith('/engine-rest')) {
+        if (cleanBaseUrl.endsWith('/')) {
+            cleanBaseUrl += 'engine-rest';
+        } else {
+            cleanBaseUrl += '/engine-rest';
         }
-        
-        // Test basic connectivity to the engine
-        var testUrl = baseEndpoint;
-        if (!testUrl.endsWith('/')) {
-            testUrl += '/';
+    }
+    
+    // Test 1: Engine version endpoint (FIXED URL)
+    var engineTestUrl = cleanBaseUrl + '/version';
+    console.log('FIXED: Testing engine connectivity:', engineTestUrl);
+    
+    var engineTest = $.ajax({
+        url: ajaxurl,
+        type: 'POST',
+        data: {
+            action: 'operaton_test_endpoint',
+            endpoint: engineTestUrl,  // This should be the correct /version endpoint
+            nonce: '<?php echo wp_create_nonce('operaton_test_endpoint'); ?>'
         }
-        testUrl += 'version'; // Test the version endpoint
+    });
+    
+    testPromises.push(engineTest);
+    
+    // Test 2: Specific endpoint based on mode (FIXED URL construction)
+    if (useProcess && processKey) {
+        // Test process endpoint
+        var processTestUrl = cleanBaseUrl + '/process-definition/key/' + processKey;
+        console.log('Testing process endpoint:', processTestUrl);
         
-        var $button = $(this);
-        var originalText = $button.text();
-        $button.text('<?php _e('Testing...', 'operaton-dmn'); ?>').prop('disabled', true);
-        
-        $.ajax({
+        var processTest = $.ajax({
             url: ajaxurl,
             type: 'POST',
             data: {
                 action: 'operaton_test_endpoint',
-                endpoint: testUrl,
+                endpoint: processTestUrl,
                 nonce: '<?php echo wp_create_nonce('operaton_test_endpoint'); ?>'
-            },
-            success: function(response) {
-                if (response.success) {
-                    $('#endpoint-test-result').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
-                } else {
-                    $('#endpoint-test-result').html('<div class="notice notice-error"><p>' + response.data.message + '</p></div>');
-                }
-            },
-            error: function() {
-                $('#endpoint-test-result').html('<div class="notice notice-error"><p><?php _e('Connection test failed.', 'operaton-dmn'); ?></p></div>');
-            },
-            complete: function() {
-                $button.text(originalText).prop('disabled', false);
             }
         });
+        
+        testPromises.push(processTest);
+        
+    } else if (!useProcess && decisionKey) {
+        // Test decision endpoint
+        var decisionTestUrl = cleanBaseUrl + '/decision-definition/key/' + decisionKey;
+        console.log('Testing decision endpoint:', decisionTestUrl);
+        
+        var decisionTest = $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'operaton_test_endpoint',
+                endpoint: decisionTestUrl,
+                nonce: '<?php echo wp_create_nonce('operaton_test_endpoint'); ?>'
+            }
+        });
+        
+        testPromises.push(decisionTest);
+    }
+    
+    // Process all test results
+    $.when.apply($, testPromises).done(function() {
+        var results = Array.prototype.slice.call(arguments);
+        var allSuccess = true;
+        var resultHtml = '<div style="margin-top: 15px;">';
+        
+        // Process engine test result
+        if (results.length > 0) {
+            var engineResult = results[0];
+            if (Array.isArray(engineResult)) engineResult = engineResult[0]; // Handle multiple promises
+            
+            if (engineResult && engineResult.success) {
+                resultHtml += '<div class="notice notice-success" style="margin: 5px 0; padding: 8px 12px;">';
+                resultHtml += '<p><strong>✅ Engine Connection:</strong> ' + engineResult.data.message + '</p>';
+                resultHtml += '<p><small>Tested: ' + engineTestUrl + '</small></p>';
+                resultHtml += '</div>';
+            } else {
+                allSuccess = false;
+                var errorMsg = engineResult && engineResult.data ? engineResult.data.message : 'Engine connection failed';
+                resultHtml += '<div class="notice notice-error" style="margin: 5px 0; padding: 8px 12px;">';
+                resultHtml += '<p><strong>❌ Engine Connection:</strong> ' + errorMsg + '</p>';
+                resultHtml += '<p><small>Tested: ' + engineTestUrl + '</small></p>';
+                resultHtml += '</div>';
+            }
+        }
+        
+        // Process specific endpoint test result
+        if (results.length > 1) {
+            var specificResult = results[1];
+            if (Array.isArray(specificResult)) specificResult = specificResult[0];
+            
+            var endpointType = useProcess ? 'Process Definition' : 'Decision Definition';
+            var keyValue = useProcess ? processKey : decisionKey;
+            var testedUrl = useProcess ? 
+                (cleanBaseUrl + '/process-definition/key/' + processKey) : 
+                (cleanBaseUrl + '/decision-definition/key/' + decisionKey);
+            
+            if (specificResult && specificResult.success) {
+                resultHtml += '<div class="notice notice-success" style="margin: 5px 0; padding: 8px 12px;">';
+                resultHtml += '<p><strong>✅ ' + endpointType + ':</strong> "' + keyValue + '" found and accessible</p>';
+                resultHtml += '<p><small>Tested: ' + testedUrl + '</small></p>';
+                resultHtml += '</div>';
+            } else {
+                allSuccess = false;
+                var errorMsg = specificResult && specificResult.data ? specificResult.data.message : 'Definition not found';
+                resultHtml += '<div class="notice notice-error" style="margin: 5px 0; padding: 8px 12px;">';
+                resultHtml += '<p><strong>❌ ' + endpointType + ':</strong> "' + keyValue + '" - ' + errorMsg + '</p>';
+                resultHtml += '<p><small>Tested: ' + testedUrl + '</small></p>';
+                resultHtml += '</div>';
+            }
+        }
+        
+        // Overall status
+        if (allSuccess) {
+            resultHtml += '<div class="notice notice-success" style="margin: 10px 0; padding: 8px 12px; border-left: 4px solid #46b450;">';
+            resultHtml += '<p><strong>🎉 All Tests Passed!</strong> Your configuration appears to be working correctly.</p>';
+            resultHtml += '</div>';
+        } else {
+            resultHtml += '<div class="notice notice-warning" style="margin: 10px 0; padding: 8px 12px; border-left: 4px solid #ffb900;">';
+            resultHtml += '<p><strong>⚠️ Some Tests Failed</strong> Please check your configuration. The evaluation may still work if the engine is accessible.</p>';
+            resultHtml += '</div>';
+        }
+        
+        resultHtml += '</div>';
+        $('#endpoint-test-result').html(resultHtml);
+        
+    }).fail(function() {
+        $('#endpoint-test-result').html(
+            '<div class="notice notice-error" style="margin: 10px 0; padding: 8px 12px;">' +
+            '<p><strong>❌ Connection Test Failed</strong> Unable to test endpoints. Please check your configuration.</p>' +
+            '</div>'
+        );
+    }).always(function() {
+        $button.text(originalText).prop('disabled', false);
     });
+});
     
     // Form validation
     $('#operaton-config-form').submit(function(e) {
