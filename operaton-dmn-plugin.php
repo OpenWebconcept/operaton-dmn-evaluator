@@ -163,19 +163,6 @@ class OperatonDMNEvaluator {
         }
     });
 
-    // Add a button to clear cache
-    add_action('admin_notices', function() {
-        if (current_user_can('manage_options') && isset($_GET['page']) && $_GET['page'] === 'operaton-dmn') {
-            echo '<div class="notice notice-info">';
-            echo '<p><strong>Decision Flow Cache:</strong> ';
-            echo '<a href="' . admin_url('admin.php?page=operaton-dmn&clear_operaton_cache=1') . '" class="button">Clear Decision Flow Cache</a>';
-            echo '</p></div>';
-            
-            if (isset($_GET['cache_cleared'])) {
-                echo '<div class="notice notice-success"><p>Decision flow cache cleared!</p></div>';
-            }
-        }
-    });
             // IMMEDIATE database check on admin pages
             if (is_admin()) {
                 add_action('admin_init', array($this, 'check_and_update_database'), 5);
@@ -454,7 +441,7 @@ class OperatonDMNEvaluator {
         $configs = $this->get_all_configurations();
         
         // Show update management section
-        $this->show_update_management_section();
+        // $this->show_update_management_section();
         
         include OPERATON_DMN_PLUGIN_PATH . 'templates/admin/list.php';
     }

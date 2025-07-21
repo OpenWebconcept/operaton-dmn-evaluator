@@ -124,15 +124,8 @@ $show_decision_flow = $editing && property_exists($config, 'show_decision_flow')
                         <strong><?php _e('Example:', 'operaton-dmn'); ?></strong> https://operatondev.open-regels.nl/engine-rest/
                     </div>
                     
-                    <div class="operaton-endpoint-test">
-                        <h4><?php _e('Test Connection', 'operaton-dmn'); ?></h4>
-                        <div class="operaton-test-controls">
-                            <button type="button" id="test-endpoint" class="operaton-test-button">
-                                <?php _e('Test Connection', 'operaton-dmn'); ?>
-                            </button>
-                        </div>
-                        <div id="endpoint-test-result" class="operaton-test-result"></div>
-                    </div>
+                    <button type="button" id="test-endpoint" class="button button-secondary"><?php _e('Test Connection', 'operaton-dmn'); ?></button>
+                    <div id="endpoint-test-result"></div>
                 </div>
             </div>
 
@@ -589,55 +582,170 @@ jQuery(document).ready(function($) {
     
     $('#dmn_endpoint, #decision_key, #process_key').on('input keyup', updateEndpointPreviews);
     
-    // Test endpoint functionality
+    // Test endpoint functionality - ENHANCED VERSION
     $('#test-endpoint').click(function() {
         var baseEndpoint = $('#dmn_endpoint').val().trim();
+        var decisionKey = $('#decision_key').val().trim();
+        var processKey = $('#process_key').val().trim();
+        var useProcess = $('input[name="use_process"]:checked').val() === '1';
         
         if (!baseEndpoint) {
             alert('<?php _e('Please enter a base endpoint URL first.', 'operaton-dmn'); ?>');
             return;
         }
         
-        // Test basic connectivity to the engine
-        var testUrl = baseEndpoint;
-        if (!testUrl.endsWith('/')) {
-            testUrl += '/';
-        }
-        testUrl += 'version'; // Test the version endpoint
-        
         var $button = $(this);
         var originalText = $button.text();
         $button.text('<?php _e('Testing...', 'operaton-dmn'); ?>').prop('disabled', true);
         
-        // Update test result display
-        var $result = $('#endpoint-test-result');
-        $result.removeClass('success error').addClass('loading').show();
-        $result.html('<p><?php _e('Testing connection...', 'operaton-dmn'); ?></p>');
+        // Clear previous results
+        $('#endpoint-test-result').html('');
         
-        $.ajax({
+        // FIXED: Proper URL construction for engine testing
+        var testPromises = [];
+        
+        // CORRECTED: Build proper engine base URL for version testing
+        var cleanBaseUrl = baseEndpoint;
+        
+        // Remove any decision/process specific paths
+        cleanBaseUrl = cleanBaseUrl.replace(/\/decision-definition.*$/, '');
+        cleanBaseUrl = cleanBaseUrl.replace(/\/process-definition.*$/, '');
+        
+        // Ensure it ends with /engine-rest (no trailing slash)
+        if (!cleanBaseUrl.endsWith('/engine-rest')) {
+            if (cleanBaseUrl.endsWith('/')) {
+                cleanBaseUrl += 'engine-rest';
+            } else {
+                cleanBaseUrl += '/engine-rest';
+            }
+        }
+        
+        // Test 1: Engine version endpoint (FIXED URL)
+        var engineTestUrl = cleanBaseUrl + '/version';
+        console.log('FIXED: Testing engine connectivity:', engineTestUrl);
+        
+        var engineTest = $.ajax({
             url: ajaxurl,
             type: 'POST',
             data: {
                 action: 'operaton_test_endpoint',
-                endpoint: testUrl,
+                endpoint: engineTestUrl,  // This should be the correct /version endpoint
                 nonce: '<?php echo wp_create_nonce('operaton_test_endpoint'); ?>'
-            },
-            success: function(response) {
-                if (response.success) {
-                    $result.removeClass('loading error').addClass('success');
-                    $result.html('<p>' + response.data.message + '</p>');
-                } else {
-                    $result.removeClass('loading success').addClass('error');
-                    $result.html('<p>' + response.data.message + '</p>');
-                }
-            },
-            error: function() {
-                $result.removeClass('loading success').addClass('error');
-                $result.html('<p><?php _e('Connection test failed.', 'operaton-dmn'); ?></p>');
-            },
-            complete: function() {
-                $button.text(originalText).prop('disabled', false);
             }
+        });
+        
+        testPromises.push(engineTest);
+        
+        // Test 2: Specific endpoint based on mode (FIXED URL construction)
+        if (useProcess && processKey) {
+            // Test process endpoint
+            var processTestUrl = cleanBaseUrl + '/process-definition/key/' + processKey;
+            console.log('Testing process endpoint:', processTestUrl);
+            
+            var processTest = $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'operaton_test_endpoint',
+                    endpoint: processTestUrl,
+                    nonce: '<?php echo wp_create_nonce('operaton_test_endpoint'); ?>'
+                }
+            });
+            
+            testPromises.push(processTest);
+            
+        } else if (!useProcess && decisionKey) {
+            // Test decision endpoint
+            var decisionTestUrl = cleanBaseUrl + '/decision-definition/key/' + decisionKey;
+            console.log('Testing decision endpoint:', decisionTestUrl);
+            
+            var decisionTest = $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'operaton_test_endpoint',
+                    endpoint: decisionTestUrl,
+                    nonce: '<?php echo wp_create_nonce('operaton_test_endpoint'); ?>'
+                }
+            });
+            
+            testPromises.push(decisionTest);
+        }
+        
+        // Process all test results
+        $.when.apply($, testPromises).done(function() {
+            var results = Array.prototype.slice.call(arguments);
+            var allSuccess = true;
+            var resultHtml = '<div style="margin-top: 15px;">';
+            
+            // Process engine test result
+            if (results.length > 0) {
+                var engineResult = results[0];
+                if (Array.isArray(engineResult)) engineResult = engineResult[0]; // Handle multiple promises
+                
+                if (engineResult && engineResult.success) {
+                    resultHtml += '<div class="notice notice-success" style="margin: 5px 0; padding: 8px 12px;">';
+                    resultHtml += '<p><strong>✅ Engine Connection:</strong> ' + engineResult.data.message + '</p>';
+                    resultHtml += '<p><small>Tested: ' + engineTestUrl + '</small></p>';
+                    resultHtml += '</div>';
+                } else {
+                    allSuccess = false;
+                    var errorMsg = engineResult && engineResult.data ? engineResult.data.message : 'Engine connection failed';
+                    resultHtml += '<div class="notice notice-error" style="margin: 5px 0; padding: 8px 12px;">';
+                    resultHtml += '<p><strong>❌ Engine Connection:</strong> ' + errorMsg + '</p>';
+                    resultHtml += '<p><small>Tested: ' + engineTestUrl + '</small></p>';
+                    resultHtml += '</div>';
+                }
+            }
+            
+            // Process specific endpoint test result
+            if (results.length > 1) {
+                var specificResult = results[1];
+                if (Array.isArray(specificResult)) specificResult = specificResult[0];
+                
+                var endpointType = useProcess ? 'Process Definition' : 'Decision Definition';
+                var keyValue = useProcess ? processKey : decisionKey;
+                var testedUrl = useProcess ? 
+                    (cleanBaseUrl + '/process-definition/key/' + processKey) : 
+                    (cleanBaseUrl + '/decision-definition/key/' + decisionKey);
+                
+                if (specificResult && specificResult.success) {
+                    resultHtml += '<div class="notice notice-success" style="margin: 5px 0; padding: 8px 12px;">';
+                    resultHtml += '<p><strong>✅ ' + endpointType + ':</strong> "' + keyValue + '" found and accessible</p>';
+                    resultHtml += '<p><small>Tested: ' + testedUrl + '</small></p>';
+                    resultHtml += '</div>';
+                } else {
+                    allSuccess = false;
+                    var errorMsg = specificResult && specificResult.data ? specificResult.data.message : 'Definition not found';
+                    resultHtml += '<div class="notice notice-error" style="margin: 5px 0; padding: 8px 12px;">';
+                    resultHtml += '<p><strong>❌ ' + endpointType + ':</strong> "' + keyValue + '" - ' + errorMsg + '</p>';
+                    resultHtml += '<p><small>Tested: ' + testedUrl + '</small></p>';
+                    resultHtml += '</div>';
+                }
+            }
+            
+            // Overall status
+            if (allSuccess) {
+                resultHtml += '<div class="notice notice-success" style="margin: 10px 0; padding: 8px 12px; border-left: 4px solid #46b450;">';
+                resultHtml += '<p><strong>🎉 All Tests Passed!</strong> Your configuration appears to be working correctly.</p>';
+                resultHtml += '</div>';
+            } else {
+                resultHtml += '<div class="notice notice-warning" style="margin: 10px 0; padding: 8px 12px; border-left: 4px solid #ffb900;">';
+                resultHtml += '<p><strong>⚠️ Some Tests Failed</strong> Please check your configuration. The evaluation may still work if the engine is accessible.</p>';
+                resultHtml += '</div>';
+            }
+            
+            resultHtml += '</div>';
+            $('#endpoint-test-result').html(resultHtml);
+            
+        }).fail(function() {
+            $('#endpoint-test-result').html(
+                '<div class="notice notice-error" style="margin: 10px 0; padding: 8px 12px;">' +
+                '<p><strong>❌ Connection Test Failed</strong> Unable to test endpoints. Please check your configuration.</p>' +
+                '</div>'
+            );
+        }).always(function() {
+            $button.text(originalText).prop('disabled', false);
         });
     });
     
@@ -738,6 +846,191 @@ jQuery(document).ready(function($) {
 
 <style>
 /* Form-specific styles that complement admin.css */
+.operaton-config-form-wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.operaton-form-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: white;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.13);
+}
+
+.operaton-form-row {
+    margin-bottom: 20px;
+}
+
+.operaton-form-row input[type="text"],
+.operaton-form-row input[type="url"],
+.operaton-form-row select {
+    width: 100%;
+    max-width: 500px;
+    padding: 8px 12px;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.operaton-form-row label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.operaton-form-description {
+    margin-top: 5px;
+    font-size: 13px;
+    color: #646970;
+    line-height: 1.4;
+}
+
+.operaton-form-hint {
+    background: #f0f8ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 4px;
+    padding: 12px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: #0c5460;
+}
+
+.operaton-execution-mode {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.operaton-execution-mode label {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 4px;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.operaton-execution-mode label:hover {
+    background: rgba(0, 115, 170, 0.05);
+}
+
+.operaton-execution-mode input[type="radio"] {
+    margin-right: 10px;
+    margin-top: 2px;
+}
+
+.operaton-execution-mode-content {
+    flex: 1;
+}
+
+.operaton-execution-mode-title {
+    font-weight: 600;
+    color: #1d2327;
+    margin-bottom: 5px;
+}
+
+.operaton-execution-mode-description {
+    font-size: 13px;
+    color: #646970;
+    line-height: 1.4;
+}
+
+.operaton-mapping-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    overflow: hidden;
+    background: white;
+}
+
+.operaton-mapping-table th {
+    background: #f6f7f7;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    color: #1d2327;
+    border-bottom: 1px solid #c3c4c7;
+}
+
+.operaton-mapping-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #dcdcde;
+    vertical-align: middle;
+}
+
+.operaton-mapping-table tr:hover {
+    background: #f8f9fa;
+}
+
+.operaton-mapping-table input[type="text"],
+.operaton-mapping-table select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #8c8f94;
+    border-radius: 3px;
+    font-size: 13px;
+    margin: 0;
+    box-shadow: none;
+}
+
+.button-remove {
+    background: #d63638;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.button-remove:hover {
+    background: #a00;
+}
+
+.operaton-add-mapping {
+    margin-top: 10px;
+    background: #46b450;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.operaton-add-mapping:hover {
+    background: #3a8b40;
+}
+
+.operaton-add-mapping:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.operaton-form-actions {
+    background: #f6f7f7;
+    padding: 20px;
+    border-top: 1px solid #c3c4c7;
+    text-align: right;
+    margin-top: 20px;
+}
+
+.operaton-form-actions .button {
+    margin-left: 10px;
+}
+
 .endpoint-preview {
     margin-top: 10px;
     padding: 10px;
@@ -765,24 +1058,25 @@ jQuery(document).ready(function($) {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 }
 
-/* Override WordPress default table styles for our mapping tables */
-.operaton-mapping-table {
-    background: white;
+#endpoint-test-result {
+    margin-top: 10px;
 }
 
-.operaton-mapping-table th,
-.operaton-mapping-table td {
-    border: 1px solid var(--operaton-admin-border);
-}
-
-.operaton-mapping-table input[type="text"],
-.operaton-mapping-table select {
+#endpoint-test-result .notice {
     margin: 0;
-    box-shadow: none;
+    padding: 8px 12px;
 }
 
 /* Responsive adjustments */
 @media (max-width: 782px) {
+    .operaton-config-form-wrap {
+        margin: 0 10px;
+    }
+    
+    .operaton-form-section {
+        padding: 15px;
+    }
+    
     .operaton-mapping-table {
         font-size: 12px;
     }
@@ -792,18 +1086,21 @@ jQuery(document).ready(function($) {
         padding: 6px 8px;
     }
     
-    .operaton-test-controls {
-        flex-direction: column;
-        align-items: stretch;
+    .operaton-form-row input[type="text"],
+    .operaton-form-row input[type="url"],
+    .operaton-form-row select {
+        max-width: 100%;
     }
     
-    .operaton-test-button {
+    .operaton-form-actions {
+        text-align: center;
+    }
+    
+    .operaton-form-actions .button {
+        margin: 5px;
+        display: block;
         width: 100%;
-        margin-bottom: 10px;
-    }
-    
-    .endpoint-preview {
-        font-size: 11px;
+        max-width: 200px;
     }
 }
 </style>

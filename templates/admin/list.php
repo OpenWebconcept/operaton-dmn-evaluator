@@ -21,6 +21,24 @@ if (!defined('ABSPATH')) {
         <p><?php _e('Manage your DMN decision table configurations for Gravity Forms integration.', 'operaton-dmn'); ?></p>
     </div>
 
+    <!-- Decision Flow Cache Management Section -->
+    <div class="operaton-update-section">
+        <h3><?php _e('Decision Flow Cache', 'operaton-dmn'); ?></h3>
+        <p><?php _e('Clear cached decision flow data to force fresh retrieval from Operaton engine.', 'operaton-dmn'); ?></p>
+        
+        <?php if (isset($_GET['cache_cleared'])): ?>
+            <div class="operaton-notice success" style="margin: 10px 0; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; color: #155724; border-radius: 4px;">
+                <p>✅ <?php _e('Decision flow cache cleared successfully!', 'operaton-dmn'); ?></p>
+            </div>
+        <?php endif; ?>
+        
+        <p>
+            <a href="<?php echo admin_url('admin.php?page=operaton-dmn&clear_operaton_cache=1'); ?>" class="button">
+                <?php _e('Clear Decision Flow Cache', 'operaton-dmn'); ?>
+            </a>
+        </p>
+    </div>
+
     <!-- Update Management Section -->
     <?php if (current_user_can('manage_options')): ?>
     <div class="operaton-update-section">
