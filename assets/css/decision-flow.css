@@ -1,0 +1,446 @@
+/*!
+ * Operaton DMN Decision Flow Styles
+ * 
+ * Excel-style table layout for decision flow summary display
+ * Extracted from embedded PHP to improve performance and maintainability
+ * 
+ * @package OperatonDMN
+ * @version 1.0.0-beta.9
+ */
+
+/* CSS Custom Properties for Theming */
+:root {
+    --operaton-primary: #0073aa;
+    --operaton-primary-dark: #005a87;
+    --operaton-success: #28a745;
+    --operaton-danger: #dc3545;
+    --operaton-warning: #ffc107;
+    --operaton-info: #17a2b8;
+    --operaton-light: #f8f9fa;
+    --operaton-dark: #343a40;
+    --operaton-border: #dee2e6;
+    --operaton-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    --operaton-border-radius: 8px;
+    --operaton-font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    --operaton-mono-font: "Courier New", monospace;
+    --operaton-transition: 0.2s ease;
+}
+
+/* =============================================================================
+   DECISION FLOW CONTAINERS
+   ============================================================================= */
+
+.decision-flow-tables { 
+    margin: 20px 0; 
+}
+
+.decision-table-container { 
+    margin: 25px 0; 
+    padding: 0;
+    background: white;
+    border-radius: var(--operaton-border-radius);
+    box-shadow: var(--operaton-shadow);
+    overflow: hidden;
+}
+
+.decision-table-title { 
+    margin: 0; 
+    padding: 15px 20px;
+    background: linear-gradient(135deg, var(--operaton-primary) 0%, var(--operaton-primary-dark) 100%);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    border-bottom: none;
+}
+
+/* =============================================================================
+   EXCEL-STYLE TABLE
+   ============================================================================= */
+
+.decision-table.excel-style {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+    font-family: var(--operaton-font-family);
+    font-size: 13px;
+    background: white;
+}
+
+.decision-table.excel-style th {
+    background: var(--operaton-light);
+    border: 1px solid var(--operaton-border);
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.decision-table.excel-style td {
+    border: 1px solid var(--operaton-border);
+    padding: 10px 15px;
+    vertical-align: top;
+    line-height: 1.4;
+}
+
+/* =============================================================================
+   ROW HEADERS
+   ============================================================================= */
+
+.row-header {
+    background: #e8f4f8 !important;
+    font-weight: 600;
+    text-align: center;
+    vertical-align: middle !important;
+    width: 100px;
+    min-width: 100px;
+    border-right: 2px solid var(--operaton-primary) !important;
+}
+
+.inputs-header {
+    color: var(--operaton-primary);
+}
+
+.outputs-header {
+    color: var(--operaton-success);
+}
+
+/* =============================================================================
+   CELL TYPES
+   ============================================================================= */
+
+.variable-cell {
+    font-weight: 500;
+    color: var(--operaton-dark);
+    background: var(--operaton-light);
+    font-family: var(--operaton-mono-font);
+    width: 250px;
+}
+
+.value-cell {
+    font-family: var(--operaton-mono-font);
+    color: #495057;
+    background: white;
+}
+
+/* =============================================================================
+   ROW HOVER EFFECTS
+   ============================================================================= */
+
+.input-row:hover {
+    background: rgba(0, 115, 170, 0.05);
+    transition: background-color var(--operaton-transition);
+}
+
+.output-row:hover {
+    background: rgba(40, 167, 69, 0.05);
+    transition: background-color var(--operaton-transition);
+}
+
+/* =============================================================================
+   VALUE TYPE STYLING
+   ============================================================================= */
+
+.boolean-value.true {
+    color: var(--operaton-success);
+    font-weight: 600;
+}
+
+.boolean-value.false {
+    color: var(--operaton-danger);
+    font-weight: 600;
+}
+
+.numeric-value {
+    color: #6f42c1;
+    font-weight: 600;
+}
+
+.string-value {
+    color: #495057;
+}
+
+.array-value {
+    color: #fd7e14;
+    font-style: italic;
+}
+
+.null-value, 
+.no-value {
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* =============================================================================
+   DECISION METADATA FOOTER
+   ============================================================================= */
+
+.decision-metadata {
+    padding: 12px 20px;
+    background: var(--operaton-light);
+    border-top: 1px solid var(--operaton-border);
+    font-size: 11px;
+    color: #6c757d;
+}
+
+.decision-metadata small {
+    display: inline-block;
+}
+
+/* =============================================================================
+   HEADER SECTION
+   ============================================================================= */
+
+.decision-flow-header {
+    background: #f0f8ff;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 4px solid var(--operaton-primary);
+    margin-bottom: 20px;
+}
+
+.decision-flow-summary-stats {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 12px;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+    margin-bottom: 15px;
+}
+
+.decision-flow-summary-stats h4 {
+    color: var(--operaton-primary);
+    font-size: 14px;
+    margin: 0 0 8px 0;
+}
+
+.decision-flow-summary-stats ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13px;
+}
+
+.decision-flow-summary-stats li {
+    margin: 3px 0;
+}
+
+/* =============================================================================
+   BUTTONS
+   ============================================================================= */
+
+.refresh-decision-flow-controlled {
+    background-color: var(--operaton-primary) !important;
+    border-color: var(--operaton-primary) !important;
+    color: white !important;
+    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color var(--operaton-transition);
+    border: none;
+}
+
+.refresh-decision-flow-controlled:hover {
+    background-color: var(--operaton-primary-dark) !important;
+}
+
+.refresh-decision-flow-controlled:focus {
+    outline: 2px solid var(--operaton-primary);
+    outline-offset: 2px;
+}
+
+/* =============================================================================
+   DECISION FLOW SUMMARY CONTAINER
+   ============================================================================= */
+
+.decision-flow-summary { 
+    margin: 20px 0;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: var(--operaton-border-radius);
+    border-left: 4px solid var(--operaton-primary);
+}
+
+.decision-flow-summary.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+/* =============================================================================
+   STATE INDICATORS
+   ============================================================================= */
+
+.decision-flow-placeholder,
+.decision-flow-loading,
+.decision-flow-error,
+.decision-flow-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+    border-radius: var(--operaton-border-radius);
+}
+
+.decision-flow-error {
+    border-left-color: var(--operaton-danger);
+    background: #fff5f5;
+    color: var(--operaton-danger);
+}
+
+.decision-flow-loading::before {
+    content: "⏳ ";
+    margin-right: 8px;
+}
+
+.decision-flow-placeholder::before {
+    content: "🔍 ";
+    margin-right: 8px;
+}
+
+.decision-flow-error::before {
+    content: "❌ ";
+    margin-right: 8px;
+}
+
+/* =============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================= */
+
+@media (max-width: 768px) {
+    .decision-table.excel-style {
+        font-size: 11px;
+    }
+    
+    .decision-table.excel-style th,
+    .decision-table.excel-style td {
+        padding: 8px 10px;
+    }
+    
+    .row-header {
+        width: 80px;
+        min-width: 80px;
+        font-size: 10px;
+    }
+    
+    .variable-cell {
+        width: 200px;
+    }
+    
+    .decision-table-title {
+        font-size: 14px;
+        padding: 12px 15px;
+    }
+    
+    .decision-flow-header {
+        padding: 12px;
+    }
+    
+    .decision-flow-summary-stats {
+        padding: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .decision-table.excel-style {
+        font-size: 10px;
+    }
+    
+    .decision-table.excel-style th,
+    .decision-table.excel-style td {
+        padding: 6px 8px;
+    }
+    
+    .row-header {
+        width: 60px;
+        min-width: 60px;
+        font-size: 9px;
+    }
+    
+    .variable-cell {
+        width: 150px;
+    }
+    
+    .decision-flow-tables {
+        margin: 10px 0;
+    }
+    
+    .decision-table-container {
+        margin: 15px 0;
+    }
+}
+
+/* =============================================================================
+   PRINT STYLES
+   ============================================================================= */
+
+@media print {
+    .decision-table-container {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #000;
+        margin: 10px 0;
+    }
+    
+    .refresh-decision-flow-controlled {
+        display: none;
+    }
+    
+    .decision-flow-header {
+        background: white !important;
+        border: 1px solid #000;
+        color: black !important;
+    }
+    
+    .decision-table-title {
+        background: #f0f0f0 !important;
+        color: black !important;
+    }
+    
+    .decision-flow-summary {
+        background: white !important;
+        border: 1px solid #000;
+    }
+    
+    /* Ensure good contrast in print */
+    .boolean-value.true {
+        color: #000 !important;
+    }
+    
+    .boolean-value.false {
+        color: #000 !important;
+    }
+    
+    .numeric-value,
+    .string-value,
+    .array-value {
+        color: #000 !important;
+    }
+}
+
+/* =============================================================================
+   ACCESSIBILITY
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .input-row,
+    .output-row,
+    .refresh-decision-flow-controlled {
+        transition: none;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .decision-table.excel-style {
+        border: 2px solid;
+    }
+    
+    .decision-table.excel-style th,
+    .decision-table.excel-style td {
+        border: 1px solid;
+    }
+    
+    .row-header {
+        border-right: 3px solid !important;
+    }
+}

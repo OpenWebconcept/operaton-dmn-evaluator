@@ -92,7 +92,10 @@ if (is_admin()) {
 class OperatonDMNEvaluator {
     
     private static $instance = null;
-    
+
+    // NEW: Add this property
+    private $assets;
+
     public static function get_instance() {
         if (null === self::$instance) {
             self::$instance = new self();
@@ -111,6 +114,9 @@ class OperatonDMNEvaluator {
      * @since 1.0.0
      */
     private function __construct() {
+        // NEW: Add this line at the very beginning
+        $this->load_assets_manager();
+
         add_action('init', array($this, 'init'));
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
@@ -177,6 +183,12 @@ class OperatonDMNEvaluator {
 
             register_activation_hook(__FILE__, array($this, 'activate'));
             register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+    }
+
+    // NEW: Add this method
+    private function load_assets_manager() {
+        require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-assets.php';
+        $this->assets = new Operaton_DMN_Assets(OPERATON_DMN_PLUGIN_URL, OPERATON_DMN_VERSION);
     }
 
     /**
@@ -761,12 +773,16 @@ class OperatonDMNEvaluator {
      * @param bool $is_ajax Whether the form is being loaded via AJAX
      * @since 1.0.0
      */
+    // UPDATED: Replace your enqueue_gravity_scripts method with this
     public function enqueue_gravity_scripts($form, $is_ajax) {
         $config = $this->get_config_by_form_id($form['id']);
         if (!$config) {
             return;
         }
         
+        // NEW: Use assets manager instead of manual enqueuing
+        $this->assets->enqueue_gravity_form_assets($form, $config);
+
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN: Enqueuing Gravity Forms scripts for form ' . $form['id']);
         }
@@ -875,356 +891,8 @@ class OperatonDMNEvaluator {
 
 // FIXED JavaScript for dynamic button placement and decision flow
 $script = '
-<script>
-jQuery(document).ready(function($) {
-    var formId = ' . $form['id'] . ';
-    var targetPage = ' . intval($evaluation_step) . ';
-    var totalPages = ' . $total_pages . ';
-    var showDecisionFlow = ' . ($show_decision_flow ? 'true' : 'false') . ';
-    var useProcess = ' . (isset($config->use_process) && $config->use_process ? 'true' : 'false') . ';
-    var decisionFlowLoaded = false;
-    
-    function getCurrentPage() {
-        // Check URL parameter first
-        var urlParams = new URLSearchParams(window.location.search);
-        var gfPage = urlParams.get("gf_page");
-        if (gfPage) {
-            return parseInt(gfPage);
-        }
-        
-        // Check Gravity Forms page field
-        var pageField = $("#gform_source_page_number_" + formId);
-        if (pageField.length && pageField.val()) {
-            return parseInt(pageField.val());
-        }
-        
-        // Check visible elements
-        var form = $("#gform_" + formId);
-        
-        // Page 1: Personal info
-        if (form.find("#input_" + formId + "_6:visible, #input_" + formId + "_5:visible").length > 0) {
-            return 1;
-        }
-        
-        // Page 2: Radio button table
-        if (form.find(".gf-table-row:visible").length > 0) {
-            return 2;
-        }
-        
-        // Page 3: Summary
-        if (form.find("#field_" + formId + "_40:visible").length > 0) {
-            return 3;
-        }
-        
-        return 1;
-    }
-    
-    // CLEAR PROCESS DATA WHEN USER NAVIGATES OR CHANGES FORM
-    function clearProcessData() {
-        console.log("Clearing process data due to form changes");
-        
-        // Clear all stored process data
-        sessionStorage.removeItem("operaton_process_" + formId);
-        sessionStorage.removeItem("operaton_dmn_eval_data_" + formId);
-        
-        // Clear global variables
-        if (window["operaton_process_" + formId]) {
-            delete window["operaton_process_" + formId];
-        }
-        
-        // Reset decision flow loaded flag
-        decisionFlowLoaded = false;
-        
-        // Clear the summary container
-        $("#decision-flow-summary-" + formId).html("");
-    }
-    
-    function handleButtonAndSummary() {
-        var currentPage = getCurrentPage();
-        var evaluateBtn = $("#operaton-evaluate-" + formId);
-        var summaryContainer = $("#decision-flow-summary-" + formId);
-        
-        console.log("=== BUTTON CONTROL ===");
-        console.log("Current page:", currentPage, "Target page:", targetPage);
-        console.log("Use process:", useProcess, "Show decision flow:", showDecisionFlow);
-        
-        // Always hide first
-        evaluateBtn.hide();
-        summaryContainer.hide();
-        
-        // Show button ONLY on page 2
-        if (currentPage === 2 && targetPage === 2) {
-            console.log("✅ Showing evaluate button on page 2");
-            
-            var form = $("#gform_" + formId);
-            
-            // SOLUTION: Move button to a guaranteed visible container
-            // Try multiple containers in order of preference
-            var containers = [
-                form.find(".gform_body"),                    // Form body (most reliable)
-                form.find(".gform-page"),                    // Current page
-                form.find(".gform_wrapper"),                 // Form wrapper
-                form                                         // Form itself
-            ];
-            
-            var targetContainer = null;
-            for (var i = 0; i < containers.length; i++) {
-                if (containers[i].length > 0 && containers[i].is(":visible")) {
-                    targetContainer = containers[i];
-                    console.log("Using container " + i + ":", targetContainer[0]);
-                    break;
-                }
-            }
-            
-            if (!targetContainer) {
-                console.log("No visible container found, using form body");
-                targetContainer = form.find(".gform_body");
-            }
-            
-            // Remove button from any hidden parent and add to visible container
-            evaluateBtn.detach().appendTo(targetContainer);
-            
-            // FORCE ALL PARENT ELEMENTS TO BE VISIBLE
-            evaluateBtn.parents().each(function() {
-                $(this).css({
-                    "display": "block",
-                    "visibility": "visible",
-                    "opacity": "1"
-                });
-            });
-            
-            // Apply button styles
-            evaluateBtn.show().css({
-                "display": "inline-block !important",
-                "visibility": "visible !important",
-                "opacity": "1 !important",
-                "position": "relative !important",
-                "margin": "15px 10px !important",
-                "padding": "12px 24px !important",
-                "background": "#007ba7 !important",
-                "color": "white !important",
-                "border": "1px solid #007ba7 !important",
-                "border-radius": "4px !important",
-                "font-size": "14px !important",
-                "font-weight": "normal !important",
-                "cursor": "pointer !important",
-                "z-index": "1000 !important"
-            });
-            
-            // Force inline styles as backup
-            evaluateBtn.attr("style", 
-                "display: inline-block !important; " +
-                "visibility: visible !important; " +
-                "opacity: 1 !important; " +
-                "position: relative !important; " +
-                "margin: 15px 10px !important; " +
-                "padding: 12px 24px !important; " +
-                "background: #007ba7 !important; " +
-                "color: white !important; " +
-                "border: 1px solid #007ba7 !important; " +
-                "border-radius: 4px !important; " +
-                "font-size: 14px !important; " +
-                "cursor: pointer !important; " +
-                "z-index: 1000 !important;"
-            );
-            
-            console.log("Button styling complete");
-            
-        } else if (currentPage === 3 && showDecisionFlow && useProcess) {
-            // FIXED: Only show decision flow if BOTH conditions are met:
-            // 1. showDecisionFlow is enabled
-            // 2. useProcess is true (process execution mode)
-            console.log("📋 Page 3: showing decision flow (process execution mode)");
-            
-            evaluateBtn.remove(); // Remove completely on page 3
-            summaryContainer.show();
-            
-            if (!decisionFlowLoaded) {
-                loadDecisionFlowSummary();
-                decisionFlowLoaded = true;
-            }
-            
-        } else if (currentPage === 3 && (!useProcess || !showDecisionFlow)) {
-            // NEW: Hide decision flow on page 3 if not using process execution
-            console.log("⏹️ Page 3: hiding decision flow (direct decision evaluation or disabled)");
-            
-            evaluateBtn.remove();
-            summaryContainer.hide();
-            
-            // Show a simple message instead
-            if (!useProcess) {
-                console.log("Direct decision evaluation - no decision flow available");
-            }
-            
-        } else {
-            console.log("⏹️ Other page - hiding everything");
-            evaluateBtn.hide();
-            summaryContainer.hide();
-            
-            if (currentPage !== 3) {
-                decisionFlowLoaded = false;
-            }
-        }
-    }
-    
-    function loadDecisionFlowSummary() {
-        var container = $("#decision-flow-summary-" + formId);
-        
-        if (container.hasClass("loading")) {
-            return;
-        }
-        
-        container.addClass("loading");
-        container.html("<p>⏳ Loading decision flow summary...</p>");
-        
-        // FIXED: Add cache busting to always get fresh data
-        $.ajax({
-            url: "' . home_url() . '/wp-json/operaton-dmn/v1/decision-flow/" + formId + "?cache_bust=" + Date.now(),
-            type: "GET",
-            cache: false,
-            success: function(response) {
-                if (response.success && response.html) {
-                    container.html(response.html);
-                } else {
-                    container.html("<p><em>No decision flow data available.</em></p>");
-                }
-            },
-            error: function() {
-                container.html("<p><em>Error loading decision flow summary.</em></p>");
-            },
-            complete: function() {
-                container.removeClass("loading");
-            }
-        });
-    }
-    
-    // Refresh button handler
-    $(document).on("click", ".refresh-decision-flow-controlled", function(e) {
-        e.preventDefault();
-        
-        var button = $(this);
-        var originalText = button.text();
-        button.text("🔄 Refreshing...").prop("disabled", true);
-        
-        decisionFlowLoaded = false;
-        
-        setTimeout(function() {
-            loadDecisionFlowSummary();
-            button.text(originalText).prop("disabled", false);
-        }, 500);
-    });
-    
-    // Initialize after short delay
-    setTimeout(handleButtonAndSummary, 500);
-    
-    // Handle Gravity Forms events
-    $(document).on("gform_page_loaded", function(event, form_id, current_page) {
-        if (form_id == formId) {
-            console.log("GF page loaded:", current_page);
-            
-            // CLEAR PROCESS DATA when navigating between pages
-            if (current_page < 3) {
-                clearProcessData();
-            }
-            
-            decisionFlowLoaded = false;
-            setTimeout(handleButtonAndSummary, 200);
-        }
-    });
-    
-    // CLEAR PROCESS DATA when form inputs change
-    $("form#gform_" + formId).on("change", "input, select, textarea", function() {
-        console.log("Form input changed, clearing process data");
-        clearProcessData();
-    });
-    
-    // Emergency fix for hidden parents
-    setInterval(function() {
-        var currentPage = getCurrentPage();
-        if (currentPage === 2) {
-            var btn = $("#operaton-evaluate-" + formId);
-            if (btn.length > 0 && !btn.is(":visible")) {
-                console.log("Emergency: fixing hidden button");
-                
-                // Force all parents to be visible
-                btn.parents().css({
-                    "display": "block !important",
-                    "visibility": "visible !important",
-                    "opacity": "1 !important"
-                });
-                
-                // Re-apply button styles
-                btn.css({
-                    "display": "inline-block !important",
-                    "visibility": "visible !important",
-                    "opacity": "1 !important"
-                });
-            }
-        }
-        
-        // Remove button on page 3
-        if (currentPage === 3) {
-            var btn = $("#operaton-evaluate-" + formId);
-            if (btn.length > 0) {
-                btn.remove();
-            }
-        }
-    }, 2000);
-    
-    console.log("Button control initialized");
-});
-</script>
 
-<style>
-/* AGGRESSIVE BUTTON AND PARENT VISIBILITY */
-#operaton-evaluate-' . $form['id'] . ' {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: relative !important;
-    margin: 15px 10px !important;
-    padding: 12px 24px !important;
-    background: #007ba7 !important;
-    color: white !important;
-    border: 1px solid #007ba7 !important;
-    border-radius: 4px !important;
-    font-size: 14px !important;
-    cursor: pointer !important;
-    z-index: 1000 !important;
-}
-
-#operaton-evaluate-' . $form['id'] . ':hover {
-    background: #005a7a !important;
-}
-
-/* FORCE PARENT CONTAINERS TO BE VISIBLE */
-.gform-page-footer,
-.gform_page_footer,
-.gform_footer {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
-.operaton-evaluate-btn {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
-.decision-flow-summary { 
-    margin: 20px 0;
-    padding: 20px;
-    background: #f9f9f9;
-    border-radius: 8px;
-    border-left: 4px solid #0073aa;
-}
-
-.decision-flow-summary.loading {
-    opacity: 0.7;
-    pointer-events: none;
-}
-</style>
+console.log("Styling now handled by decision-flow.css");
 ';
 
         // Always return button + hidden elements + script
