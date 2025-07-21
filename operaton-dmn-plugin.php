@@ -456,7 +456,7 @@ class OperatonDMNEvaluator {
         // Show update management section
         $this->show_update_management_section();
         
-        include OPERATON_DMN_PLUGIN_PATH . 'templates/admin-list.php';
+        include OPERATON_DMN_PLUGIN_PATH . 'templates/admin/list.php';
     }
 
     /**
@@ -495,7 +495,7 @@ class OperatonDMNEvaluator {
         
         $gravity_forms = $this->get_gravity_forms();
         $config = isset($_GET['edit']) ? $this->get_configuration($_GET['edit']) : null;
-        include OPERATON_DMN_PLUGIN_PATH . 'templates/admin-form.php';
+        include OPERATON_DMN_PLUGIN_PATH . 'templates/admin/form.php';
     }
 
     /**
