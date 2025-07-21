@@ -890,10 +890,154 @@ class OperatonDMNEvaluator {
         );
 
 // FIXED JavaScript for dynamic button placement and decision flow
+// FIXED JavaScript for dynamic button placement and decision flow
 $script = '
-
-console.log("Styling now handled by decision-flow.css");
-';
+<script>
+jQuery(document).ready(function($) {
+    var formId = ' . $form['id'] . ';
+    var targetPage = ' . intval($evaluation_step) . ';
+    var showDecisionFlow = ' . ($show_decision_flow ? 'true' : 'false') . ';
+    var useProcess = ' . (isset($config->use_process) && $config->use_process ? 'true' : 'false') . ';
+    
+    console.log("Styling now handled by decision-flow.css");
+    console.log("Target page for button:", targetPage);
+    console.log("Show decision flow:", showDecisionFlow, "Use process:", useProcess);
+    
+    function getCurrentPage() {
+        // Check URL parameter first
+        var urlParams = new URLSearchParams(window.location.search);
+        var gfPage = urlParams.get("gf_page");
+        if (gfPage) {
+            return parseInt(gfPage);
+        }
+        
+        // Check Gravity Forms page field
+        var pageField = $("#gform_source_page_number_" + formId);
+        if (pageField.length && pageField.val()) {
+            return parseInt(pageField.val());
+        }
+        
+        // Check visible elements to determine page
+        var form = $("#gform_" + formId);
+        
+        // Page 1: Personal info fields
+        if (form.find("#input_" + formId + "_6:visible, #input_" + formId + "_5:visible").length > 0) {
+            return 1;
+        }
+        
+        // Page 2: Radio button table (your form data)
+        if (form.find(".gf-table-row:visible").length > 0) {
+            return 2;
+        }
+        
+        // Page 3: Summary page
+        if (form.find("#field_" + formId + "_40:visible").length > 0) {
+            return 3;
+        }
+        
+        return 1; // Default to page 1
+    }
+    
+    function handleButtonAndSummary() {
+        var currentPage = getCurrentPage();
+        var evaluateBtn = $("#operaton-evaluate-" + formId);
+        var summaryContainer = $("#decision-flow-summary-" + formId);
+        
+        console.log("=== BUTTON CONTROL ===");
+        console.log("Current page:", currentPage, "Target page:", targetPage);
+        
+        // ALWAYS hide both first
+        evaluateBtn.hide();
+        summaryContainer.hide();
+        
+        if (currentPage === 2 && targetPage === 2) {
+            // SHOW button ONLY on page 2
+            console.log("✅ Showing evaluate button on page 2");
+            
+            var form = $("#gform_" + formId);
+            var targetContainer = form.find(".gform_body");
+            
+            evaluateBtn.detach().appendTo(targetContainer);
+            evaluateBtn.show();
+            
+        } else if (currentPage === 3) {
+            // Page 3 logic
+            console.log("📋 Page 3 detected");
+            
+            // ALWAYS hide button on page 3
+            evaluateBtn.hide();
+            evaluateBtn.remove(); // Remove completely to prevent showing
+            
+            // Only show decision flow if both conditions are met
+            if (showDecisionFlow && useProcess) {
+                console.log("✅ Showing decision flow (process mode enabled)");
+                summaryContainer.show();
+                loadDecisionFlowSummary();
+            } else {
+                console.log("⏹️ Decision flow disabled or not in process mode");
+                summaryContainer.hide();
+            }
+            
+        } else {
+            // Other pages - hide everything
+            console.log("⏹️ Other page - hiding everything");
+            evaluateBtn.hide();
+            summaryContainer.hide();
+        }
+    }
+    
+    function loadDecisionFlowSummary() {
+        var container = $("#decision-flow-summary-" + formId);
+        
+        if (container.hasClass("loading")) {
+            return;
+        }
+        
+        console.log("Loading decision flow summary...");
+        container.addClass("loading");
+        container.html("<p>⏳ Loading decision flow summary...</p>");
+        
+        $.ajax({
+            url: "' . home_url() . '/wp-json/operaton-dmn/v1/decision-flow/" + formId + "?cache_bust=" + Date.now(),
+            type: "GET",
+            cache: false,
+            success: function(response) {
+                console.log("Decision flow response:", response);
+                if (response.success && response.html) {
+                    container.html(response.html);
+                } else {
+                    container.html("<p><em>No decision flow data available.</em></p>");
+                }
+            },
+            error: function(xhr, status, error) {
+                console.log("Decision flow error:", error);
+                container.html("<p><em>Error loading decision flow summary.</em></p>");
+            },
+            complete: function() {
+                container.removeClass("loading");
+            }
+        });
+    }
+    
+    // Initialize after short delay
+    setTimeout(handleButtonAndSummary, 500);
+    
+    // Handle Gravity Forms page changes
+    $(document).on("gform_page_loaded", function(event, form_id, current_page) {
+        if (form_id == formId) {
+            console.log("GF page loaded:", current_page);
+            setTimeout(handleButtonAndSummary, 200);
+        }
+    });
+    
+    // Remove button on page 3 (safety check)
+    if (getCurrentPage() === 3) {
+        $("#operaton-evaluate-" + formId).remove();
+    }
+    
+    console.log("Button control initialized - button should show ONLY on page 2");
+});
+</script>';
 
         // Always return button + hidden elements + script
         return $button . $evaluate_button . $decision_flow_container . $script;
