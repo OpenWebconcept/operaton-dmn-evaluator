@@ -576,7 +576,7 @@ private function __construct() {
         <?php
     }
 
-    /**
+/**
      * Temporary debug page for testing debug menu functionality.
      * Displays debug status and class availability information for troubleshooting.
      * 
@@ -587,14 +587,56 @@ private function __construct() {
             error_log('Operaton DMN: Displaying temporary debug page');
         }
         
-        echo '<div class="wrap">';
+        echo '<div class="wrap operaton-debug-page">';
         echo '<h1>Debug Menu Test</h1>';
-        echo '<p>✅ Debug menu is working! The debug system is properly integrated.</p>';
-        echo '<p>OperatonDMNUpdateDebugger class exists: ' . (class_exists('OperatonDMNUpdateDebugger') ? 'YES' : 'NO') . '</p>';
-        echo '<p>If the class exists, the full debug interface should work.</p>';
+        
+        echo '<div class="debug-section">';
+        echo '<div class="debug-section-header">';
+        echo '<h3>Debug System Status</h3>';
+        echo '</div>';
+        echo '<div class="debug-section-content">';
+        echo '<p class="debug-status-success">Debug menu is working! The debug system is properly integrated.</p>';
+        echo '<p><strong>OperatonDMNUpdateDebugger class exists:</strong> <span class="debug-badge ' . (class_exists('OperatonDMNUpdateDebugger') ? 'success">YES' : 'error">NO') . '</span></p>';
+        echo '<p class="debug-text-muted">If the class exists, the full debug interface should work.</p>';
+        echo '</div>';
+        echo '</div>';
+        
+        // Add debug information table
+        echo '<div class="debug-section">';
+        echo '<div class="debug-section-header">';
+        echo '<h3>System Information</h3>';
+        echo '</div>';
+        echo '<div class="debug-section-content">';
+        echo '<table class="debug-table">';
+        echo '<tr><th>Plugin Version</th><td>' . OPERATON_DMN_VERSION . '</td></tr>';
+        echo '<tr><th>WordPress Version</th><td>' . get_bloginfo('version') . '</td></tr>';
+        echo '<tr><th>PHP Version</th><td>' . PHP_VERSION . '</td></tr>';
+        echo '<tr><th>WP_DEBUG Status</th><td><span class="debug-badge ' . (defined('WP_DEBUG') && WP_DEBUG ? 'success">Enabled' : 'warning">Disabled') . '</span></td></tr>';
+        echo '<tr><th>Assets Manager</th><td><span class="debug-badge ' . (isset($this->assets) ? 'success">Loaded' : 'error">Not Found') . '</span></td></tr>';
+        echo '</table>';
+        echo '</div>';
+        echo '</div>';
+        
+        // Add CSS test section
+        echo '<div class="debug-section">';
+        echo '<div class="debug-section-header">';
+        echo '<h3>CSS Test Section</h3>';
+        echo '</div>';
+        echo '<div class="debug-section-content">';
+        echo '<div class="debug-alert success">This is a success alert</div>';
+        echo '<div class="debug-alert warning">This is a warning alert</div>';
+        echo '<div class="debug-alert error">This is an error alert</div>';
+        echo '<div class="debug-alert info">This is an info alert</div>';
+        echo '<div class="debug-code">Sample debug code block</div>';
+        echo '<button class="debug-button">Primary Button</button>';
+        echo '<button class="debug-button secondary">Secondary Button</button>';
+        echo '<button class="debug-button danger">Danger Button</button>';
+        echo '</div>';
+        echo '</div>';
+        
         echo '</div>';
     }
-
+    
     /**
      * Enqueue admin-specific CSS and JavaScript files for plugin configuration pages.
      * Loads admin scripts and localizes AJAX endpoints for backend functionality.
