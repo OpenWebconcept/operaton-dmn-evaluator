@@ -113,16 +113,16 @@ class OperatonDMNEvaluator {
      * 
      * @since 1.0.0
      */
-    private function __construct() {
-        // NEW: Add this line at the very beginning
-        $this->load_assets_manager();
+private function __construct() {
+    // NEW: Add this line at the very beginning
+    $this->load_assets_manager();
 
-        add_action('init', array($this, 'init'));
-        add_action('admin_menu', array($this, 'add_admin_menu'));
-        add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
-        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
-        add_action('rest_api_init', array($this, 'register_rest_routes'));
-        
+    add_action('init', array($this, 'init'));
+    add_action('admin_menu', array($this, 'add_admin_menu'));
+    add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
+    add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+    add_action('rest_api_init', array($this, 'register_rest_routes'));
+ 
         // CRITICAL: Check database on every admin page load
         if (is_admin()) {
             add_action('admin_init', array($this, 'check_and_update_database'), 1);
@@ -153,7 +153,7 @@ class OperatonDMNEvaluator {
             // Version check for upgrades
             add_action('admin_init', array($this, 'check_version'));
 
-    // TEMPORARY: Clear decision flow cache
+            // TEMPORARY: Clear decision flow cache
     add_action('admin_init', function() {
         if (isset($_GET['clear_operaton_cache'])) {
             global $wpdb;
@@ -719,110 +719,125 @@ class OperatonDMNEvaluator {
      * 
      * @since 1.0.0
      */
-    public function enqueue_frontend_scripts() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Enqueuing frontend scripts');
-        }
-        
-        // Only enqueue on frontend
-        if (!is_admin()) {
-            wp_enqueue_script('jquery');
-            wp_enqueue_script(
-                'operaton-dmn-frontend',
-                OPERATON_DMN_PLUGIN_URL . 'assets/js/frontend.js',
-                array('jquery'),
-                OPERATON_DMN_VERSION,
-                true
-            );
-            
-            // Enqueue frontend styles
-            wp_enqueue_style(
-                'operaton-dmn-frontend',
-                OPERATON_DMN_PLUGIN_URL . 'assets/css/frontend.css',
-                array(),
-                OPERATON_DMN_VERSION
-            );
-
-            // Fixed REST API URL - make sure it matches the registered route
-            wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
-                'url' => rest_url('operaton-dmn/v1/evaluate'),
-                'nonce' => wp_create_nonce('wp_rest'),
-                'debug' => defined('WP_DEBUG') && WP_DEBUG
-            ));
+public function enqueue_frontend_scripts() {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN: Frontend scripts handled by assets manager');
+    }
+    
+    // The assets manager now handles frontend script enqueuing automatically
+    // This method is kept for backward compatibility and additional logic if needed
+    
+    // Only enqueue on frontend
+    if (!is_admin()) {
+        // Check if we're on a page with Gravity Forms
+        if ($this->assets && method_exists($this->assets, 'maybe_enqueue_frontend_assets')) {
+            // The assets manager will handle the conditional loading
+            // This is already called via the init_hooks() in the assets manager
         }
     }
+}
 
-    /**
-     * Enqueue Gravity Forms-specific scripts with configuration data for DMN evaluation.
-     * Loads form-specific JavaScript configuration and evaluation button functionality.
-     * 
-     * @param array $form Gravity Forms form array
-     * @param bool $is_ajax Whether the form is being loaded via AJAX
-     * @since 1.0.0
-     */
-    // UPDATED: Replace your enqueue_gravity_scripts method with this
-    public function enqueue_gravity_scripts($form, $is_ajax) {
-        $config = $this->get_config_by_form_id($form['id']);
-        if (!$config) {
-            return;
-        }
+/**
+ * Ensure frontend assets are loaded when Gravity Forms renders
+ * This is a safety net to ensure operaton_ajax is always available
+ * 
+ * @since 1.0.0
+ */
+public function force_frontend_assets_on_gravity_forms() {
+    if (!is_admin() && class_exists('GFForms')) {
+        // Add debug call
+        $this->debug_assets_loading();
         
-        // NEW: Use assets manager instead of manual enqueuing
-        $this->assets->enqueue_gravity_form_assets($form, $config);
-
+        // Force load frontend assets which includes operaton_ajax localization
+        $this->assets->enqueue_frontend_assets();
+        
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Enqueuing Gravity Forms scripts for form ' . $form['id']);
+            error_log('Operaton DMN: Forced frontend assets loading due to Gravity Forms presence');
         }
-        
-        // Ensure jQuery is loaded
-        wp_enqueue_script('jquery');
-        
-        // Enqueue our frontend script
-        wp_enqueue_script(
-            'operaton-dmn-frontend',
-            OPERATON_DMN_PLUGIN_URL . 'assets/js/frontend.js',
-            array('jquery', 'gform_gravityforms'),
-            OPERATON_DMN_VERSION,
-            true
-        );
-        
-        // Enqueue styles
-        wp_enqueue_style(
-            'operaton-dmn-frontend',
-            OPERATON_DMN_PLUGIN_URL . 'assets/css/frontend.css',
-            array(),
-            OPERATON_DMN_VERSION
-        );
-        
-        // Localize script
-        wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
-            'url' => rest_url('operaton-dmn/v1/evaluate'),
-            'nonce' => wp_create_nonce('wp_rest'),
-            'debug' => defined('WP_DEBUG') && WP_DEBUG
-        ));
-        
-        // Form-specific configuration
-        $field_mappings = json_decode($config->field_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $field_mappings = array();
-        }
-        
-        $result_mappings = json_decode($config->result_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $result_mappings = array();
-        }
-        
-        wp_localize_script('operaton-dmn-frontend', 'operaton_config_' . $form['id'], array(
-            'config_id' => $config->id,
-            'button_text' => $config->button_text,
-            'field_mappings' => $field_mappings,
-            'result_mappings' => $result_mappings,
-            'form_id' => $form['id'],
-            'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto'
-        ));
     }
+}
 
-    /**
+/**
+ * Enqueue Gravity Forms-specific scripts with configuration data for DMN evaluation.
+ * FIXED VERSION: Ensures operaton_ajax is always available
+ * 
+ * @param array $form Gravity Forms form array
+ * @param bool $is_ajax Whether the form is being loaded via AJAX
+ * @since 1.0.0
+ */
+public function enqueue_gravity_scripts($form, $is_ajax) {
+    $config = $this->get_config_by_form_id($form['id']);
+    if (!$config) {
+        return;
+    }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN: Enqueuing Gravity Forms scripts for form ' . $form['id']);
+    }
+    
+    // STEP 1: Ensure jQuery is loaded
+    wp_enqueue_script('jquery');
+    
+    // STEP 2: Enqueue frontend script
+    wp_enqueue_script(
+        'operaton-dmn-frontend',
+        OPERATON_DMN_PLUGIN_URL . 'assets/js/frontend.js',
+        array('jquery'),
+        OPERATON_DMN_VERSION,
+        true
+    );
+    
+    // STEP 3: Enqueue frontend CSS
+    wp_enqueue_style(
+        'operaton-dmn-frontend',
+        OPERATON_DMN_PLUGIN_URL . 'assets/css/frontend.css',
+        array(),
+        OPERATON_DMN_VERSION
+    );
+    
+    // STEP 4: CRITICAL - Localize operaton_ajax (this was missing!)
+    wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
+        'url' => rest_url('operaton-dmn/v1/evaluate'),
+        'nonce' => wp_create_nonce('wp_rest'),
+        'debug' => defined('WP_DEBUG') && WP_DEBUG,
+        'strings' => array(
+            'evaluating' => __('Evaluating...', 'operaton-dmn'),
+            'error' => __('Evaluation failed', 'operaton-dmn'),
+            'success' => __('Evaluation completed', 'operaton-dmn'),
+            'loading' => __('Loading...', 'operaton-dmn')
+        )
+    ));
+    
+    // STEP 5: Process form configuration for JavaScript
+    $field_mappings = json_decode($config->field_mappings, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        $field_mappings = array();
+    }
+    
+    $result_mappings = json_decode($config->result_mappings, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        $result_mappings = array();
+    }
+    
+    // STEP 6: Localize form-specific configuration
+    wp_localize_script('operaton-dmn-frontend', 'operaton_config_' . $form['id'], array(
+        'config_id' => $config->id,
+        'button_text' => $config->button_text,
+        'field_mappings' => $field_mappings,
+        'result_mappings' => $result_mappings,
+        'form_id' => $form['id'],
+        'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto',
+        'use_process' => isset($config->use_process) ? $config->use_process : false,
+        'show_decision_flow' => isset($config->show_decision_flow) ? $config->show_decision_flow : false,
+        'debug' => defined('WP_DEBUG') && WP_DEBUG
+    ));
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN: Successfully localized operaton_ajax and operaton_config_' . $form['id']);
+    }
+}
+
+/**
      * Add DMN evaluation button to Gravity Forms with dynamic placement and decision flow support.
      * Injects evaluation button and decision flow summary container into form submission flow.
      * 
@@ -831,54 +846,54 @@ class OperatonDMNEvaluator {
      * @return string Modified button HTML with evaluation functionality
      * @since 1.0.0
      */
-    public function add_evaluate_button($button, $form) {
-        if (is_admin() || (defined('DOING_AJAX') && DOING_AJAX)) {
-            return $button;
+public function add_evaluate_button($button, $form) {
+    if (is_admin() || (defined('DOING_AJAX') && DOING_AJAX)) {
+        return $button;
+    }
+    
+    $config = $this->get_config_by_form_id($form['id']);
+    if (!$config) {
+        return $button;
+    }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN: Adding evaluate button for form ' . $form['id']);
+    }
+    
+    // Get evaluation step from config
+    $evaluation_step = isset($config->evaluation_step) ? $config->evaluation_step : '2';
+    if ($evaluation_step === 'auto') {
+        $evaluation_step = '2';
+    }
+    
+    // Count total pages
+    $total_pages = 1;
+    foreach ($form['fields'] as $field) {
+        if ($field->type === 'page') {
+            $total_pages++;
         }
-        
-        $config = $this->get_config_by_form_id($form['id']);
-        if (!$config) {
-            return $button;
-        }
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Adding evaluate button for form ' . $form['id']);
-        }
-        
-        // Get evaluation step from config
-        $evaluation_step = isset($config->evaluation_step) ? $config->evaluation_step : '2';
-        if ($evaluation_step === 'auto') {
-            $evaluation_step = '2';
-        }
-        
-        // Count total pages
-        $total_pages = 1;
-        foreach ($form['fields'] as $field) {
-            if ($field->type === 'page') {
-                $total_pages++;
-            }
-        }
-        
-        // Check for decision flow summary
-        $show_decision_flow = isset($config->show_decision_flow) ? $config->show_decision_flow : false;
-        
-        // Create the evaluate button (always add it, let JavaScript control placement)
-        $evaluate_button = sprintf(
-            '<input type="button" id="operaton-evaluate-%1$d" value="%2$s" class="gform_button gform-theme-button operaton-evaluate-btn" data-form-id="%1$d" data-config-id="%3$d" style="display: none;">',
-            $form['id'],
-            esc_attr($config->button_text),
-            $config->id
-        );
-        
-        // Decision flow summary container (always add it)
-        $decision_flow_container = sprintf(
-            '<div id="decision-flow-summary-%d" class="decision-flow-summary" style="display: none;"></div>',
-            $form['id']
-        );
+    }
+    
+    // Check for decision flow summary
+    $show_decision_flow = isset($config->show_decision_flow) ? $config->show_decision_flow : false;
+    
+    // Create the evaluate button (always add it, let JavaScript control placement)
+    $evaluate_button = sprintf(
+        '<input type="button" id="operaton-evaluate-%1$d" value="%2$s" class="gform_button gform-theme-button operaton-evaluate-btn" data-form-id="%1$d" data-config-id="%3$d" style="display: none;">',
+        $form['id'],
+        esc_attr($config->button_text),
+        $config->id
+    );
+    
+    // Decision flow summary container (always add it)
+    $decision_flow_container = sprintf(
+        '<div id="decision-flow-summary-%d" class="decision-flow-summary" style="display: none;"></div>',
+        $form['id']
+    );
 
-// FIXED JavaScript for dynamic button placement and decision flow
-// FIXED JavaScript for dynamic button placement and decision flow
-$script = '
+    // JavaScript for dynamic button placement and decision flow
+    // All styling is now handled by frontend.css - no inline CSS here
+    $script = '
 <script>
 jQuery(document).ready(function($) {
     var formId = ' . $form['id'] . ';
@@ -886,7 +901,7 @@ jQuery(document).ready(function($) {
     var showDecisionFlow = ' . ($show_decision_flow ? 'true' : 'false') . ';
     var useProcess = ' . (isset($config->use_process) && $config->use_process ? 'true' : 'false') . ';
     
-    console.log("Styling now handled by decision-flow.css");
+    console.log("All styling now handled by frontend.css via assets manager");
     console.log("Target page for button:", targetPage);
     console.log("Show decision flow:", showDecisionFlow, "Use process:", useProcess);
     
@@ -1022,13 +1037,13 @@ jQuery(document).ready(function($) {
         $("#operaton-evaluate-" + formId).remove();
     }
     
-    console.log("Button control initialized - button should show ONLY on page 2");
+    console.log("Button control initialized - all styling handled by frontend.css");
 });
 </script>';
 
-        // Always return button + hidden elements + script
-        return $button . $evaluate_button . $decision_flow_container . $script;
-    }
+    // Return button + hidden elements + script (no inline CSS styling)
+    return $button . $evaluate_button . $decision_flow_container . $script;
+}
 
     // =============================================================================
     // API/EXTERNAL SERVICE METHODS

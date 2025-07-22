@@ -187,17 +187,24 @@ class Operaton_DMN_Assets {
      * 
      * @since 1.0.0
      */
-    public function maybe_enqueue_frontend_assets() {
-        // Skip if admin
-        if (is_admin()) {
-            return;
-        }
-        
-        // Check if we're on a page with Gravity Forms
-        if ($this->has_gravity_forms_on_page()) {
-            $this->enqueue_frontend_assets();
-        }
+public function maybe_enqueue_frontend_assets() {
+    // Skip if admin
+    if (is_admin()) {
+        return;
     }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: Checking if frontend assets should be loaded');
+    }
+    
+    // Check if we're on a page with Gravity Forms
+    if ($this->has_gravity_forms_on_page()) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Gravity Forms detected, loading frontend assets');
+        }
+        $this->enqueue_frontend_assets();
+    }
+}
 
     /**
      * Conditionally enqueue admin assets based on current admin page
@@ -219,37 +226,47 @@ class Operaton_DMN_Assets {
      * 
      * @since 1.0.0
      */
-    public function enqueue_frontend_assets() {
-        // Prevent duplicate loading
-        if (isset($this->loaded_assets['frontend'])) {
-            return;
-        }
-        
+public function enqueue_frontend_assets() {
+    // Prevent duplicate loading
+    if (isset($this->loaded_assets['frontend'])) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: Enqueuing frontend assets');
+            error_log('Operaton DMN Assets: Frontend assets already loaded, skipping');
         }
-        
-        // Enqueue frontend CSS
-        wp_enqueue_style('operaton-dmn-frontend');
-        
-        // Enqueue frontend JavaScript
-        wp_enqueue_script('operaton-dmn-frontend');
-        
-        // Localize frontend script
-        wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
-            'url' => rest_url('operaton-dmn/v1/evaluate'),
-            'nonce' => wp_create_nonce('wp_rest'),
-            'debug' => defined('WP_DEBUG') && WP_DEBUG,
-            'strings' => array(
-                'evaluating' => __('Evaluating...', 'operaton-dmn'),
-                'error' => __('Evaluation failed', 'operaton-dmn'),
-                'success' => __('Evaluation completed', 'operaton-dmn'),
-                'loading' => __('Loading...', 'operaton-dmn')
-            )
-        ));
-        
-        $this->loaded_assets['frontend'] = true;
+        return;
     }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: Enqueuing frontend assets');
+    }
+    
+    // Enqueue frontend CSS
+    wp_enqueue_style('operaton-dmn-frontend');
+    
+    // Enqueue frontend JavaScript
+    wp_enqueue_script('operaton-dmn-frontend');
+    
+    // CRITICAL: Localize frontend script with AJAX configuration
+    wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
+        'url' => rest_url('operaton-dmn/v1/evaluate'),
+        'nonce' => wp_create_nonce('wp_rest'),
+        'debug' => defined('WP_DEBUG') && WP_DEBUG,
+        'strings' => array(
+            'evaluating' => __('Evaluating...', 'operaton-dmn'),
+            'error' => __('Evaluation failed', 'operaton-dmn'),
+            'success' => __('Evaluation completed', 'operaton-dmn'),
+            'loading' => __('Loading...', 'operaton-dmn'),
+            'no_config' => __('Configuration not found', 'operaton-dmn'),
+            'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
+            'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
+        )
+    ));
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: operaton_ajax localized with URL: ' . rest_url('operaton-dmn/v1/evaluate'));
+    }
+    
+    $this->loaded_assets['frontend'] = true;
+}
 
     /**
      * Enqueue admin assets for plugin configuration pages
@@ -310,45 +327,51 @@ class Operaton_DMN_Assets {
      * @param object $config DMN configuration object
      * @since 1.0.0
      */
-    public function enqueue_gravity_form_assets($form, $config) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: Enqueuing Gravity Forms assets for form: ' . $form['id']);
-        }
-        
-        // Ensure frontend assets are loaded first
-        $this->enqueue_frontend_assets();
-        
-        // Enqueue Gravity Forms integration script
-        wp_enqueue_script('operaton-dmn-gravity');
-        
-        // Process configuration for JavaScript
-        $field_mappings = json_decode($config->field_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $field_mappings = array();
-        }
-        
-        $result_mappings = json_decode($config->result_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $result_mappings = array();
-        }
-        
-        // Localize form-specific configuration
-        wp_localize_script('operaton-dmn-gravity', 'operaton_config_' . $form['id'], array(
-            'config_id' => $config->id,
-            'button_text' => $config->button_text,
-            'field_mappings' => $field_mappings,
-            'result_mappings' => $result_mappings,
-            'form_id' => $form['id'],
-            'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto',
-            'use_process' => isset($config->use_process) ? $config->use_process : false,
-            'show_decision_flow' => isset($config->show_decision_flow) ? $config->show_decision_flow : false
-        ));
-        
-        // Enqueue decision flow assets if needed
-        if (isset($config->show_decision_flow) && $config->show_decision_flow) {
-            $this->enqueue_decision_flow_assets();
-        }
+public function enqueue_gravity_form_assets($form, $config) {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: Enqueuing Gravity Forms assets for form: ' . $form['id']);
     }
+    
+    // Ensure frontend assets are loaded first
+    $this->enqueue_frontend_assets();
+    
+    // Enqueue Gravity Forms integration script
+    wp_enqueue_script('operaton-dmn-gravity');
+    
+    // Process configuration for JavaScript
+    $field_mappings = json_decode($config->field_mappings, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        $field_mappings = array();
+    }
+    
+    $result_mappings = json_decode($config->result_mappings, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        $result_mappings = array();
+    }
+    
+    // Localize form-specific configuration
+    wp_localize_script('operaton-dmn-gravity', 'operaton_config_' . $form['id'], array(
+        'config_id' => $config->id,
+        'button_text' => $config->button_text,
+        'field_mappings' => $field_mappings,
+        'result_mappings' => $result_mappings,
+        'form_id' => $form['id'],
+        'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto',
+        'use_process' => isset($config->use_process) ? $config->use_process : false,
+        'show_decision_flow' => isset($config->show_decision_flow) ? $config->show_decision_flow : false,
+        'debug' => defined('WP_DEBUG') && WP_DEBUG
+    ));
+    
+    // Enqueue decision flow assets if needed
+    if (isset($config->show_decision_flow) && $config->show_decision_flow) {
+        $this->enqueue_decision_flow_assets();
+    }
+    
+    // Add any custom styles if configured
+    if (isset($config->custom_styles) && !empty($config->custom_styles)) {
+        $this->add_inline_styles($form['id'], json_decode($config->custom_styles, true));
+    }
+}
 
     /**
      * Enqueue decision flow CSS and JavaScript for process execution results
@@ -444,26 +467,49 @@ class Operaton_DMN_Assets {
      * @return bool True if page has relevant Gravity Forms
      * @since 1.0.0
      */
-    private function has_gravity_forms_on_page() {
-        // Check if Gravity Forms is active
-        if (!class_exists('GFForms')) {
-            return false;
+private function has_gravity_forms_on_page() {
+    // Check if Gravity Forms is active
+    if (!class_exists('GFForms')) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Gravity Forms not active');
         }
-        
-        // Check for shortcodes in post content
-        global $post;
-        if ($post && has_shortcode($post->post_content, 'gravityform')) {
-            return true;
-        }
-        
-        // Check for Gravity Forms blocks (Gutenberg)
-        if ($post && has_block('gravityforms/form', $post)) {
-            return true;
-        }
-        
-        // Allow other plugins/themes to indicate GF presence
-        return apply_filters('operaton_dmn_has_gravity_forms', false);
+        return false;
     }
+    
+    // Check for shortcodes in post content
+    global $post;
+    if ($post && has_shortcode($post->post_content, 'gravityform')) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Found gravityform shortcode in post content');
+        }
+        return true;
+    }
+    
+    // Check for Gravity Forms blocks (Gutenberg)
+    if ($post && has_block('gravityforms/form', $post)) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Found Gravity Forms block in post');
+        }
+        return true;
+    }
+    
+    // Check if we're on a Gravity Forms preview page
+    if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: On Gravity Forms preview page');
+        }
+        return true;
+    }
+    
+    // Allow other plugins/themes to indicate GF presence
+    $has_gf = apply_filters('operaton_dmn_has_gravity_forms', false);
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: Filter result for has_gravity_forms: ' . ($has_gf ? 'true' : 'false'));
+    }
+    
+    return $has_gf;
+}
 
     /**
      * Get asset loading status for debugging and diagnostics
