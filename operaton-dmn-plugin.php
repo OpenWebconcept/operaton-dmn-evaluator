@@ -93,8 +93,8 @@ class OperatonDMNEvaluator {
     
     private static $instance = null;
 
-    // NEW: Add this property
     private $assets;
+    private $admin;
 
     public static function get_instance() {
         if (null === self::$instance) {
@@ -114,46 +114,26 @@ class OperatonDMNEvaluator {
      * @since 1.0.0
      */
 private function __construct() {
-    // NEW: Add this line at the very beginning
+    // 1. Load assets manager first
     $this->load_assets_manager();
+    
+    // 2. Load admin manager second (depends on assets)
+    $this->load_admin_manager();
 
+    // Core WordPress hooks
     add_action('init', array($this, 'init'));
-    add_action('admin_menu', array($this, 'add_admin_menu'));
-    add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
-    add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
     add_action('rest_api_init', array($this, 'register_rest_routes'));
  
-        // CRITICAL: Check database on every admin page load
-        if (is_admin()) {
-            add_action('admin_init', array($this, 'check_and_update_database'), 1);
-        }
-        
-        // Version check for upgrades
+    // Database and version checks (admin only)
+    if (is_admin()) {
+        add_action('admin_init', array($this, 'check_and_update_database'), 1);
         add_action('admin_init', array($this, 'check_version'), 5);
-            
-        // Add AJAX handlers
-        add_action('wp_ajax_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
-        add_action('wp_ajax_nopriv_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
-        add_action('wp_ajax_operaton_test_full_config', array($this, 'ajax_test_full_config'));
-        add_action('wp_ajax_operaton_clear_update_cache', array($this, 'ajax_clear_update_cache')); // ADD THIS LINE
-            // Add manual database update handler
-            add_action('wp_ajax_operaton_manual_db_update', array($this, 'ajax_manual_database_update'));
-        
-            // Admin notices and health checks
-            add_action('admin_notices', array($this, 'admin_notices'));
-            add_action('operaton_dmn_cleanup', array($this, 'cleanup_old_data'));
-            
-            // Add settings link to plugin page
-            $plugin_basename = plugin_basename(__FILE__);
-            add_filter("plugin_action_links_$plugin_basename", array($this, 'add_settings_link'));
-            
-            // Gravity Forms integration - fixed to always load when GF is available
-            add_action('init', array($this, 'init_gravity_forms_integration'));
-            
-            // Version check for upgrades
-            add_action('admin_init', array($this, 'check_version'));
-
-            // TEMPORARY: Clear decision flow cache
+    }
+    
+    // Cleanup scheduled task
+    add_action('operaton_dmn_cleanup', array($this, 'cleanup_old_data'));
+    
+    // TEMPORARY: Clear decision flow cache
     add_action('admin_init', function() {
         if (isset($_GET['clear_operaton_cache'])) {
             global $wpdb;
@@ -163,19 +143,21 @@ private function __construct() {
         }
     });
 
-            // IMMEDIATE database check on admin pages
-            if (is_admin()) {
-                add_action('admin_init', array($this, 'check_and_update_database'), 5);
-            }
-
-            register_activation_hook(__FILE__, array($this, 'activate'));
-            register_deactivation_hook(__FILE__, array($this, 'deactivate'));
-    }
+    // Plugin lifecycle hooks
+    register_activation_hook(__FILE__, array($this, 'activate'));
+    register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+}
 
     // NEW: Add this method
     private function load_assets_manager() {
         require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-assets.php';
         $this->assets = new Operaton_DMN_Assets(OPERATON_DMN_PLUGIN_URL, OPERATON_DMN_VERSION);
+    }
+
+    // NEW: Add this after loading the assets manager (around line 85)
+    private function load_admin_manager() {
+        require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-admin.php';
+        $this->admin = new Operaton_DMN_Admin($this, $this->assets);
     }
 
     /**
@@ -190,28 +172,6 @@ private function __construct() {
         }
         
         load_plugin_textdomain('operaton-dmn', false, dirname(plugin_basename(__FILE__)) . '/languages/');
-    }
-
-    /**
-     * Initialize Gravity Forms integration hooks when GF is available.
-     * Sets up form editor integration and button placement for DMN evaluation.
-     * 
-     * @since 1.0.0
-     */
-    public function init_gravity_forms_integration() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Checking Gravity Forms integration');
-        }
-        
-        // Check if Gravity Forms is active before adding hooks
-        if (class_exists('GFForms')) {
-            add_action('gform_enqueue_scripts', array($this, 'enqueue_gravity_scripts'), 10, 2);
-            add_filter('gform_submit_button', array($this, 'add_evaluate_button'), 10, 2);
-            
-            // Add form editor integration
-            add_action('gform_editor_js', array($this, 'editor_script'));
-            add_action('gform_field_advanced_settings', array($this, 'field_advanced_settings'), 10, 2);
-        }
     }
 
     /**
@@ -322,463 +282,6 @@ private function __construct() {
         }
     }
 
-    // =============================================================================
-    // ADMIN INTERFACE METHODS
-    // =============================================================================
-
-    /**
-     * Add plugin admin menu pages and submenus to WordPress dashboard.
-     * Creates main configuration page and debug interface for plugin management.
-     * 
-     * @since 1.0.0
-     */
-    public function add_admin_menu() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Adding admin menu pages');
-        }
-        
-        add_menu_page(
-            __('Operaton DMN', 'operaton-dmn'),
-            __('Operaton DMN', 'operaton-dmn'),
-            'manage_options',
-            'operaton-dmn',
-            array($this, 'admin_page'),
-            'dashicons-analytics',
-            30
-        );
-        
-        add_submenu_page(
-            'operaton-dmn',
-            __('Configurations', 'operaton-dmn'),
-            __('Configurations', 'operaton-dmn'),
-            'manage_options',
-            'operaton-dmn',
-            array($this, 'admin_page')
-        );
-        
-        add_submenu_page(
-            'operaton-dmn',
-            __('Add Configuration', 'operaton-dmn'),
-            __('Add Configuration', 'operaton-dmn'),
-            'manage_options',
-            'operaton-dmn-add',
-            array($this, 'add_config_page')
-        );
-        
-        // Add debug menu directly (temporary for testing)
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Adding debug menu directly from main plugin');
-            
-            // Check if debug class exists and use it, otherwise use temp page
-            if (class_exists('OperatonDMNUpdateDebugger')) {
-                // Create an instance to call the debug page method
-                global $operaton_debug_instance;
-                if (!$operaton_debug_instance) {
-                    $operaton_debug_instance = new OperatonDMNUpdateDebugger();
-                }
-                
-                add_submenu_page(
-                    'operaton-dmn',
-                    __('Update Debug', 'operaton-dmn'),
-                    __('Update Debug', 'operaton-dmn'),
-                    'manage_options',
-                    'operaton-dmn-update-debug',
-                    array($operaton_debug_instance, 'debug_page')
-                );
-                error_log('Operaton DMN: Debug menu added using OperatonDMNUpdateDebugger class');
-            } else {
-                add_submenu_page(
-                    'operaton-dmn',
-                    __('Update Debug', 'operaton-dmn'),
-                    __('Update Debug', 'operaton-dmn'),
-                    'manage_options',
-                    'operaton-dmn-update-debug',
-                    array($this, 'temp_debug_page')
-                );
-                error_log('Operaton DMN: Debug menu added using temp page (class not found)');
-            }
-        }
-    }
-
-    /**
-     * Main admin page that displays configuration list and database status.
-     * Shows all DMN configurations with update management and handles deletion.
-     * 
-     * @since 1.0.0
-     */
-    public function admin_page() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Loading main admin page');
-        }
-        
-        // Force database check when accessing admin pages
-        $this->check_and_update_database();
-        
-        // Check for any database issues and show user-friendly message
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
-        
-        if (!in_array('result_mappings', $columns)) {
-            echo '<div class="notice notice-error">';
-            echo '<p><strong>Database Update Failed</strong></p>';
-            echo '<p>The plugin attempted to update the database but it failed. Please contact your administrator.</p>';
-            echo '<p>Error: Missing result_mappings column in database table.</p>';
-            echo '</div>';
-            return;
-        }
-        
-        // Check for database update success message
-        if (isset($_GET['database_updated'])) {
-            echo '<div class="notice notice-success is-dismissible"><p>' . __('Database schema updated successfully!', 'operaton-dmn') . '</p></div>';
-        }
-        
-        // Handle configuration deletion
-        if (isset($_POST['delete_config']) && wp_verify_nonce($_POST['_wpnonce'], 'delete_config')) {
-            $this->delete_config($_POST['config_id']);
-        }
-        
-        $configs = $this->get_all_configurations();
-        
-        // Show update management section
-        // $this->show_update_management_section();
-        
-        include OPERATON_DMN_PLUGIN_PATH . 'templates/admin/list.php';
-    }
-
-    /**
-     * Configuration creation/editing page with database migration check.
-     * Handles form submission for saving DMN configurations and displays the form interface.
-     * 
-     * @since 1.0.0
-     */
-    public function add_config_page() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Loading configuration edit page');
-        }
-        
-        // Force database check
-        $this->check_and_update_database();
-        
-        // Check if migration was successful
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
-        
-        if (!in_array('result_mappings', $columns)) {
-            echo '<div class="wrap">';
-            echo '<h1>Database Update Required</h1>';
-            echo '<div class="notice notice-error">';
-            echo '<p><strong>Database update failed.</strong> Please deactivate and reactivate the plugin, or contact your administrator.</p>';
-            echo '</div>';
-            echo '</div>';
-            return;
-        }
-        
-        // Rest of existing add_config_page method...
-        if (isset($_POST['save_config']) && wp_verify_nonce($_POST['_wpnonce'], 'save_config')) {
-            $this->save_configuration($_POST);
-        }
-        
-        $gravity_forms = $this->get_gravity_forms();
-        $config = isset($_GET['edit']) ? $this->get_configuration($_GET['edit']) : null;
-        include OPERATON_DMN_PLUGIN_PATH . 'templates/admin/form.php';
-    }
-
-    /**
-     * Display update management section in admin interface with version checking.
-     * Shows current version status, available updates, and manual update trigger functionality.
-     * 
-     * @since 1.0.0
-     */
-    private function show_update_management_section() {
-        if (!current_user_can('manage_options')) {
-            return;
-        }
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Displaying update management section');
-        }
-        
-        $current_version = OPERATON_DMN_VERSION;
-        $update_plugins = get_site_transient('update_plugins');
-        $has_update = false;
-        $new_version = '';
-        
-        if (isset($update_plugins->response)) {
-            foreach ($update_plugins->response as $plugin => $data) {
-                if (strpos($plugin, 'operaton-dmn') !== false) {
-                    $has_update = true;
-                    $new_version = $data->new_version;
-                    break;
-                }
-            }
-        }
-        
-        ?>
-        <div class="operaton-update-section" style="background: #f9f9f9; padding: 15px; margin: 20px 0; border-left: 4px solid #0073aa;">
-            <h3><?php _e('Plugin Updates', 'operaton-dmn'); ?></h3>
-            
-            <p><strong><?php _e('Current Version:', 'operaton-dmn'); ?></strong> <?php echo esc_html($current_version); ?></p>
-            
-            <?php if ($has_update): ?>
-                <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px 0;">
-                    <p><strong><?php _e('Update Available:', 'operaton-dmn'); ?></strong> <?php echo esc_html($new_version); ?></p>
-                    <p>
-                        <a href="<?php echo admin_url('plugins.php'); ?>" class="button button-primary">
-                            <?php _e('Go to Plugins Page to Update', 'operaton-dmn'); ?>
-                        </a>
-                    </p>
-                </div>
-            <?php else: ?>
-                <p style="color: #46b450;">✓ <?php _e('You are running the latest version', 'operaton-dmn'); ?></p>
-            <?php endif; ?>
-            
-            <p>
-                <button type="button" id="operaton-check-updates" class="button">
-                    <?php _e('Check for Updates Now', 'operaton-dmn'); ?>
-                </button>
-                <span id="operaton-update-status" style="margin-left: 10px;"></span>
-            </p>
-            
-            <script>
-            jQuery(document).ready(function($) {
-                $('#operaton-check-updates').click(function() {
-                    var button = $(this);
-                    var status = $('#operaton-update-status');
-                    
-                    button.prop('disabled', true).text('<?php _e('Checking...', 'operaton-dmn'); ?>');
-                    status.html('<span style="color: #666;">⏳ Checking for updates...</span>');
-                    
-                    // Clear update transients to force fresh check
-                    $.post(ajaxurl, {
-                        action: 'operaton_clear_update_cache',
-                        _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
-                    }, function(response) {
-                        if (response.success) {
-                            // Reload page to show updated status
-                            setTimeout(function() {
-                                location.reload();
-                            }, 1000);
-                            status.html('<span style="color: #46b450;">✓ Update check completed</span>');
-                        } else {
-                            status.html('<span style="color: #dc3232;">✗ Update check failed</span>');
-                            button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
-                        }
-                    }).fail(function() {
-                        status.html('<span style="color: #dc3232;">✗ Update check failed</span>');
-                        button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
-                    });
-                });
-            });
-            </script>
-        </div>
-        <?php
-    }
-
-/**
-     * Temporary debug page for testing debug menu functionality.
-     * Displays debug status and class availability information for troubleshooting.
-     * 
-     * @since 1.0.0
-     */
-    public function temp_debug_page() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Displaying temporary debug page');
-        }
-        
-        echo '<div class="wrap operaton-debug-page">';
-        echo '<h1>Debug Menu Test</h1>';
-        
-        echo '<div class="debug-section">';
-        echo '<div class="debug-section-header">';
-        echo '<h3>Debug System Status</h3>';
-        echo '</div>';
-        echo '<div class="debug-section-content">';
-        echo '<p class="debug-status-success">Debug menu is working! The debug system is properly integrated.</p>';
-        echo '<p><strong>OperatonDMNUpdateDebugger class exists:</strong> <span class="debug-badge ' . (class_exists('OperatonDMNUpdateDebugger') ? 'success">YES' : 'error">NO') . '</span></p>';
-        echo '<p class="debug-text-muted">If the class exists, the full debug interface should work.</p>';
-        echo '</div>';
-        echo '</div>';
-        
-        // Add debug information table
-        echo '<div class="debug-section">';
-        echo '<div class="debug-section-header">';
-        echo '<h3>System Information</h3>';
-        echo '</div>';
-        echo '<div class="debug-section-content">';
-        echo '<table class="debug-table">';
-        echo '<tr><th>Plugin Version</th><td>' . OPERATON_DMN_VERSION . '</td></tr>';
-        echo '<tr><th>WordPress Version</th><td>' . get_bloginfo('version') . '</td></tr>';
-        echo '<tr><th>PHP Version</th><td>' . PHP_VERSION . '</td></tr>';
-        echo '<tr><th>WP_DEBUG Status</th><td><span class="debug-badge ' . (defined('WP_DEBUG') && WP_DEBUG ? 'success">Enabled' : 'warning">Disabled') . '</span></td></tr>';
-        echo '<tr><th>Assets Manager</th><td><span class="debug-badge ' . (isset($this->assets) ? 'success">Loaded' : 'error">Not Found') . '</span></td></tr>';
-        echo '</table>';
-        echo '</div>';
-        echo '</div>';
-        
-        // Add CSS test section
-        echo '<div class="debug-section">';
-        echo '<div class="debug-section-header">';
-        echo '<h3>CSS Test Section</h3>';
-        echo '</div>';
-        echo '<div class="debug-section-content">';
-        echo '<div class="debug-alert success">This is a success alert</div>';
-        echo '<div class="debug-alert warning">This is a warning alert</div>';
-        echo '<div class="debug-alert error">This is an error alert</div>';
-        echo '<div class="debug-alert info">This is an info alert</div>';
-        echo '<div class="debug-code">Sample debug code block</div>';
-        echo '<button class="debug-button">Primary Button</button>';
-        echo '<button class="debug-button secondary">Secondary Button</button>';
-        echo '<button class="debug-button danger">Danger Button</button>';
-        echo '</div>';
-        echo '</div>';
-        
-        echo '</div>';
-    }
-    
-    /**
-     * Enqueue admin-specific CSS and JavaScript files for plugin configuration pages.
-     * Loads admin scripts and localizes AJAX endpoints for backend functionality.
-     * 
-     * @param string $hook Current admin page hook
-     * @since 1.0.0
-     */
-    public function enqueue_admin_scripts($hook) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Enqueuing admin scripts for hook: ' . $hook);
-        }
-        
-        // Only enqueue admin styles on our plugin pages
-        if (strpos($hook, 'operaton-dmn') !== false) {
-            wp_enqueue_style(
-                'operaton-dmn-admin',
-                OPERATON_DMN_PLUGIN_URL . 'assets/css/admin.css',
-                array(),
-                OPERATON_DMN_VERSION
-            );
-            
-            wp_enqueue_script('jquery');
-            wp_enqueue_script(
-                'operaton-dmn-admin',
-                OPERATON_DMN_PLUGIN_URL . 'assets/js/admin.js',
-                array('jquery'),
-                OPERATON_DMN_VERSION,
-                true
-            );
-            
-            // Localize script for admin AJAX
-            wp_localize_script('operaton-dmn-admin', 'operaton_admin_ajax', array(
-                'url' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('operaton_admin_nonce')
-            ));
-        }
-    }
-
-    /**
-     * Show admin notices for plugin health issues and status messages.
-     * Displays warnings for missing dependencies and configuration problems.
-     * 
-     * @since 1.0.0
-     */
-    public function admin_notices() {
-        if (current_user_can('manage_options')) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Checking for admin notices');
-            }
-            
-            $issues = $this->health_check();
-            if (!empty($issues)) {
-                echo '<div class="notice notice-warning"><p><strong>' . __('Operaton DMN Plugin Issues:', 'operaton-dmn') . '</strong></p><ul>';
-                foreach ($issues as $issue) {
-                    echo '<li>' . esc_html($issue) . '</li>';
-                }
-                echo '</ul></div>';
-            }
-        }
-    }
-
-    /**
-     * Add plugin settings link to the WordPress plugins page.
-     * Provides quick access to plugin configuration from the plugins list.
-     * 
-     * @param array $links Existing plugin action links
-     * @return array Modified links array with settings link added
-     * @since 1.0.0
-     */
-    public function add_settings_link($links) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Adding settings link to plugin page');
-        }
-        
-        $settings_link = '<a href="admin.php?page=operaton-dmn">' . __('Settings', 'operaton-dmn') . '</a>';
-        array_unshift($links, $settings_link);
-        return $links;
-    }
-
-    /**
-     * Add compatibility script for Gravity Forms form editor integration.
-     * Ensures proper field settings display in the GF form builder interface.
-     * 
-     * @since 1.0.0
-     */
-    public function editor_script() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Adding Gravity Forms editor script');
-        }
-        
-        ?>
-        <script type='text/javascript'>
-        jQuery(document).ready(function($) {
-            // Add compatibility for form editor
-            if (typeof fieldSettings !== 'undefined') {
-                fieldSettings.operaton_dmn = '.label_setting, .description_setting, .admin_label_setting, .size_setting, .default_value_textarea_setting, .error_message_setting, .css_class_setting, .visibility_setting';
-            }
-        });
-        </script>
-        <?php
-    }
-
-    /**
-     * Placeholder for future field-specific advanced settings in Gravity Forms.
-     * Reserved for potential field-level configuration options.
-     * 
-     * @param int $position Setting position in the form editor
-     * @param int $form_id Gravity Forms form ID
-     * @since 1.0.0
-     */
-    public function field_advanced_settings($position, $form_id) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Field advanced settings called for form ' . $form_id);
-        }
-        
-        // Placeholder for future field-specific settings
-    }
-
-    /**
-     * Enqueue frontend CSS and JavaScript for DMN evaluation functionality.
-     * Loads client-side scripts and styles for form evaluation on public pages.
-     * 
-     * @since 1.0.0
-     */
-public function enqueue_frontend_scripts() {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN: Frontend scripts handled by assets manager');
-    }
-    
-    // The assets manager now handles frontend script enqueuing automatically
-    // This method is kept for backward compatibility and additional logic if needed
-    
-    // Only enqueue on frontend
-    if (!is_admin()) {
-        // Check if we're on a page with Gravity Forms
-        if ($this->assets && method_exists($this->assets, 'maybe_enqueue_frontend_assets')) {
-            // The assets manager will handle the conditional loading
-            // This is already called via the init_hooks() in the assets manager
-        }
-    }
-}
-
 /**
  * Ensure frontend assets are loaded when Gravity Forms renders
  * This is a safety net to ensure operaton_ajax is always available
@@ -797,294 +300,6 @@ public function force_frontend_assets_on_gravity_forms() {
             error_log('Operaton DMN: Forced frontend assets loading due to Gravity Forms presence');
         }
     }
-}
-
-/**
- * Enqueue Gravity Forms-specific scripts with configuration data for DMN evaluation.
- * FIXED VERSION: Ensures operaton_ajax is always available
- * 
- * @param array $form Gravity Forms form array
- * @param bool $is_ajax Whether the form is being loaded via AJAX
- * @since 1.0.0
- */
-public function enqueue_gravity_scripts($form, $is_ajax) {
-    $config = $this->get_config_by_form_id($form['id']);
-    if (!$config) {
-        return;
-    }
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN: Enqueuing Gravity Forms scripts for form ' . $form['id']);
-    }
-    
-    // STEP 1: Ensure jQuery is loaded
-    wp_enqueue_script('jquery');
-    
-    // STEP 2: Enqueue frontend script
-    wp_enqueue_script(
-        'operaton-dmn-frontend',
-        OPERATON_DMN_PLUGIN_URL . 'assets/js/frontend.js',
-        array('jquery'),
-        OPERATON_DMN_VERSION,
-        true
-    );
-    
-    // STEP 3: Enqueue frontend CSS
-    wp_enqueue_style(
-        'operaton-dmn-frontend',
-        OPERATON_DMN_PLUGIN_URL . 'assets/css/frontend.css',
-        array(),
-        OPERATON_DMN_VERSION
-    );
-    
-    // STEP 4: CRITICAL - Localize operaton_ajax (this was missing!)
-    wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
-        'url' => rest_url('operaton-dmn/v1/evaluate'),
-        'nonce' => wp_create_nonce('wp_rest'),
-        'debug' => defined('WP_DEBUG') && WP_DEBUG,
-        'strings' => array(
-            'evaluating' => __('Evaluating...', 'operaton-dmn'),
-            'error' => __('Evaluation failed', 'operaton-dmn'),
-            'success' => __('Evaluation completed', 'operaton-dmn'),
-            'loading' => __('Loading...', 'operaton-dmn')
-        )
-    ));
-    
-    // STEP 5: Process form configuration for JavaScript
-    $field_mappings = json_decode($config->field_mappings, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        $field_mappings = array();
-    }
-    
-    $result_mappings = json_decode($config->result_mappings, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        $result_mappings = array();
-    }
-    
-    // STEP 6: Localize form-specific configuration
-    wp_localize_script('operaton-dmn-frontend', 'operaton_config_' . $form['id'], array(
-        'config_id' => $config->id,
-        'button_text' => $config->button_text,
-        'field_mappings' => $field_mappings,
-        'result_mappings' => $result_mappings,
-        'form_id' => $form['id'],
-        'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto',
-        'use_process' => isset($config->use_process) ? $config->use_process : false,
-        'show_decision_flow' => isset($config->show_decision_flow) ? $config->show_decision_flow : false,
-        'debug' => defined('WP_DEBUG') && WP_DEBUG
-    ));
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN: Successfully localized operaton_ajax and operaton_config_' . $form['id']);
-    }
-}
-
-/**
-     * Add DMN evaluation button to Gravity Forms with dynamic placement and decision flow support.
-     * Injects evaluation button and decision flow summary container into form submission flow.
-     * 
-     * @param string $button Existing form submit button HTML
-     * @param array $form Gravity Forms form array
-     * @return string Modified button HTML with evaluation functionality
-     * @since 1.0.0
-     */
-public function add_evaluate_button($button, $form) {
-    if (is_admin() || (defined('DOING_AJAX') && DOING_AJAX)) {
-        return $button;
-    }
-    
-    $config = $this->get_config_by_form_id($form['id']);
-    if (!$config) {
-        return $button;
-    }
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN: Adding evaluate button for form ' . $form['id']);
-    }
-    
-    // Get evaluation step from config
-    $evaluation_step = isset($config->evaluation_step) ? $config->evaluation_step : '2';
-    if ($evaluation_step === 'auto') {
-        $evaluation_step = '2';
-    }
-    
-    // Count total pages
-    $total_pages = 1;
-    foreach ($form['fields'] as $field) {
-        if ($field->type === 'page') {
-            $total_pages++;
-        }
-    }
-    
-    // Check for decision flow summary
-    $show_decision_flow = isset($config->show_decision_flow) ? $config->show_decision_flow : false;
-    
-    // Create the evaluate button (always add it, let JavaScript control placement)
-    $evaluate_button = sprintf(
-        '<input type="button" id="operaton-evaluate-%1$d" value="%2$s" class="gform_button gform-theme-button operaton-evaluate-btn" data-form-id="%1$d" data-config-id="%3$d" style="display: none;">',
-        $form['id'],
-        esc_attr($config->button_text),
-        $config->id
-    );
-    
-    // Decision flow summary container (always add it)
-    $decision_flow_container = sprintf(
-        '<div id="decision-flow-summary-%d" class="decision-flow-summary" style="display: none;"></div>',
-        $form['id']
-    );
-
-    // JavaScript for dynamic button placement and decision flow
-    // All styling is now handled by frontend.css - no inline CSS here
-    $script = '
-<script>
-jQuery(document).ready(function($) {
-    var formId = ' . $form['id'] . ';
-    var targetPage = ' . intval($evaluation_step) . ';
-    var showDecisionFlow = ' . ($show_decision_flow ? 'true' : 'false') . ';
-    var useProcess = ' . (isset($config->use_process) && $config->use_process ? 'true' : 'false') . ';
-    
-    console.log("All styling now handled by frontend.css via assets manager");
-    console.log("Target page for button:", targetPage);
-    console.log("Show decision flow:", showDecisionFlow, "Use process:", useProcess);
-    
-    function getCurrentPage() {
-        // Check URL parameter first
-        var urlParams = new URLSearchParams(window.location.search);
-        var gfPage = urlParams.get("gf_page");
-        if (gfPage) {
-            return parseInt(gfPage);
-        }
-        
-        // Check Gravity Forms page field
-        var pageField = $("#gform_source_page_number_" + formId);
-        if (pageField.length && pageField.val()) {
-            return parseInt(pageField.val());
-        }
-        
-        // Check visible elements to determine page
-        var form = $("#gform_" + formId);
-        
-        // Page 1: Personal info fields
-        if (form.find("#input_" + formId + "_6:visible, #input_" + formId + "_5:visible").length > 0) {
-            return 1;
-        }
-        
-        // Page 2: Radio button table (your form data)
-        if (form.find(".gf-table-row:visible").length > 0) {
-            return 2;
-        }
-        
-        // Page 3: Summary page
-        if (form.find("#field_" + formId + "_40:visible").length > 0) {
-            return 3;
-        }
-        
-        return 1; // Default to page 1
-    }
-    
-    function handleButtonAndSummary() {
-        var currentPage = getCurrentPage();
-        var evaluateBtn = $("#operaton-evaluate-" + formId);
-        var summaryContainer = $("#decision-flow-summary-" + formId);
-        
-        console.log("=== BUTTON CONTROL ===");
-        console.log("Current page:", currentPage, "Target page:", targetPage);
-        
-        // ALWAYS hide both first
-        evaluateBtn.hide();
-        summaryContainer.hide();
-        
-        if (currentPage === 2 && targetPage === 2) {
-            // SHOW button ONLY on page 2
-            console.log("✅ Showing evaluate button on page 2");
-            
-            var form = $("#gform_" + formId);
-            var targetContainer = form.find(".gform_body");
-            
-            evaluateBtn.detach().appendTo(targetContainer);
-            evaluateBtn.show();
-            
-        } else if (currentPage === 3) {
-            // Page 3 logic
-            console.log("📋 Page 3 detected");
-            
-            // ALWAYS hide button on page 3
-            evaluateBtn.hide();
-            evaluateBtn.remove(); // Remove completely to prevent showing
-            
-            // Only show decision flow if both conditions are met
-            if (showDecisionFlow && useProcess) {
-                console.log("✅ Showing decision flow (process mode enabled)");
-                summaryContainer.show();
-                loadDecisionFlowSummary();
-            } else {
-                console.log("⏹️ Decision flow disabled or not in process mode");
-                summaryContainer.hide();
-            }
-            
-        } else {
-            // Other pages - hide everything
-            console.log("⏹️ Other page - hiding everything");
-            evaluateBtn.hide();
-            summaryContainer.hide();
-        }
-    }
-    
-    function loadDecisionFlowSummary() {
-        var container = $("#decision-flow-summary-" + formId);
-        
-        if (container.hasClass("loading")) {
-            return;
-        }
-        
-        console.log("Loading decision flow summary...");
-        container.addClass("loading");
-        container.html("<p>⏳ Loading decision flow summary...</p>");
-        
-        $.ajax({
-            url: "' . home_url() . '/wp-json/operaton-dmn/v1/decision-flow/" + formId + "?cache_bust=" + Date.now(),
-            type: "GET",
-            cache: false,
-            success: function(response) {
-                console.log("Decision flow response:", response);
-                if (response.success && response.html) {
-                    container.html(response.html);
-                } else {
-                    container.html("<p><em>No decision flow data available.</em></p>");
-                }
-            },
-            error: function(xhr, status, error) {
-                console.log("Decision flow error:", error);
-                container.html("<p><em>Error loading decision flow summary.</em></p>");
-            },
-            complete: function() {
-                container.removeClass("loading");
-            }
-        });
-    }
-    
-    // Initialize after short delay
-    setTimeout(handleButtonAndSummary, 500);
-    
-    // Handle Gravity Forms page changes
-    $(document).on("gform_page_loaded", function(event, form_id, current_page) {
-        if (form_id == formId) {
-            console.log("GF page loaded:", current_page);
-            setTimeout(handleButtonAndSummary, 200);
-        }
-    });
-    
-    // Remove button on page 3 (safety check)
-    if (getCurrentPage() === 3) {
-        $("#operaton-evaluate-" + formId).remove();
-    }
-    
-    console.log("Button control initialized - all styling handled by frontend.css");
-});
-</script>';
-
-    // Return button + hidden elements + script (no inline CSS styling)
-    return $button . $evaluate_button . $decision_flow_container . $script;
 }
 
     // =============================================================================
@@ -1605,139 +820,6 @@ jQuery(document).ready(function($) {
     }
 
     /**
-     * AJAX handler for testing DMN endpoint connectivity and basic response validation.
-     * Validates endpoint accessibility using OPTIONS or HEAD requests for configuration testing.
-     * 
-     * @since 1.0.0
-     */
-    public function ajax_test_endpoint() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Testing endpoint connectivity');
-        }
-        
-        // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'], 'operaton_test_endpoint')) {
-            wp_die('Security check failed');
-        }
-        
-        // Check user permissions
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
-        }
-        
-        $endpoint = sanitize_url($_POST['endpoint']);
-        
-        if (empty($endpoint)) {
-            wp_send_json_error(array('message' => __('Endpoint URL is required.', 'operaton-dmn')));
-        }
-        
-        // Test the endpoint with a simple OPTIONS request first
-        $response = wp_remote_request($endpoint, array(
-            'method' => 'OPTIONS',
-            'timeout' => 10,
-            'sslverify' => false, // Only for development
-        ));
-        
-        if (is_wp_error($response)) {
-            // Try a HEAD request if OPTIONS fails
-            $response = wp_remote_head($endpoint, array(
-                'timeout' => 10,
-                'sslverify' => false,
-            ));
-            
-            if (is_wp_error($response)) {
-                wp_send_json_error(array(
-                    'message' => sprintf(__('Connection failed: %s', 'operaton-dmn'), $response->get_error_message())
-                ));
-            }
-        }
-        
-        $http_code = wp_remote_retrieve_response_code($response);
-        
-        if ($http_code >= 200 && $http_code < 300) {
-            wp_send_json_success(array(
-                'message' => __('Connection successful! Endpoint is reachable.', 'operaton-dmn')
-            ));
-        } elseif ($http_code === 405) {
-            // Method not allowed is actually good - means endpoint exists
-            wp_send_json_success(array(
-                'message' => __('Endpoint is reachable (Method Not Allowed is expected for evaluation endpoints).', 'operaton-dmn')
-            ));
-        } elseif ($http_code === 404) {
-            wp_send_json_error(array(
-                'message' => sprintf(__('Endpoint not found (404). Please check your base URL and decision key.', 'operaton-dmn'))
-            ));
-        } else {
-            wp_send_json_error(array(
-                'message' => sprintf(__('Endpoint returned status code: %d. This may indicate a configuration issue.', 'operaton-dmn'), $http_code)
-            ));
-        }
-    }
-
-    /**
-     * AJAX handler for comprehensive endpoint configuration testing with DMN payload validation.
-     * Tests complete endpoint setup including decision key validation and response parsing.
-     * 
-     * @since 1.0.0
-     */
-    public function ajax_test_full_config() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Testing full configuration');
-        }
-        
-        // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'], 'operaton_test_endpoint')) {
-            wp_die('Security check failed');
-        }
-        
-        // Check user permissions
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
-        }
-        
-        $base_endpoint = sanitize_url($_POST['base_endpoint']);
-        $decision_key = sanitize_text_field($_POST['decision_key']);
-        
-        if (empty($base_endpoint) || empty($decision_key)) {
-            wp_send_json_error(array('message' => __('Both base endpoint and decision key are required.', 'operaton-dmn')));
-        }
-        
-        $test_result = $this->test_full_endpoint_configuration($base_endpoint, $decision_key);
-        
-        if ($test_result['success']) {
-            wp_send_json_success($test_result);
-        } else {
-            wp_send_json_error($test_result);
-        }
-    }
-
-    /**
-     * AJAX handler for clearing WordPress update cache and forcing update checks.
-     * Removes cached update information to trigger fresh plugin update detection.
-     * 
-     * @since 1.0.0
-     */
-    public function ajax_clear_update_cache() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Clearing update cache');
-        }
-        
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce')) {
-            wp_send_json_error(array('message' => 'Insufficient permissions'));
-        }
-        
-        // Clear WordPress update transients
-        delete_site_transient('update_plugins');
-        delete_transient('operaton_dmn_updater');
-        delete_transient('operaton_dmn_fallback_check');
-        
-        // Force WordPress to check for updates
-        wp_update_plugins();
-        
-        wp_send_json_success(array('message' => 'Update cache cleared'));
-    }
-
-    /**
      * Test complete endpoint configuration with minimal DMN payload for validation.
      * Sends test data to verify decision key exists and endpoint responds correctly.
      * 
@@ -2098,45 +1180,13 @@ jQuery(document).ready(function($) {
     }
 
     /**
-     * AJAX handler for manual database update triggered from admin interface.
-     * Provides manual database migration option for administrators when automatic migration fails.
-     * 
-     * @since 1.0.0
-     */
-    public function ajax_manual_database_update() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Manual database update requested');
-        }
-        
-        // Verify nonce
-        if (!wp_verify_nonce($_GET['_wpnonce'], 'operaton_manual_db_update')) {
-            wp_die('Security check failed');
-        }
-        
-        // Check user permissions
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
-        }
-        
-        // Perform database update
-        $this->check_and_update_database();
-        
-        // Redirect back with success message
-        wp_redirect(add_query_arg(array(
-            'page' => 'operaton-dmn',
-            'database_updated' => '1'
-        ), admin_url('admin.php')));
-        exit;
-    }
-
-    /**
      * Retrieve all DMN configurations from database with ordering by creation date.
      * Gets complete list of plugin configurations for admin display and management.
      * 
      * @return array Array of configuration objects from database
      * @since 1.0.0
      */
-    private function get_all_configurations() {
+    public function get_all_configurations() {
         global $wpdb;
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
         
@@ -2155,7 +1205,7 @@ jQuery(document).ready(function($) {
      * @return object|null Configuration object or null if not found
      * @since 1.0.0
      */
-    private function get_configuration($id) {
+    public function get_configuration($id) {
         global $wpdb;
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
         
@@ -2174,7 +1224,7 @@ jQuery(document).ready(function($) {
      * @return bool Success status of deletion operation
      * @since 1.0.0
      */
-    private function delete_config($id) {
+    public function delete_config($id) {
         global $wpdb;
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
         
@@ -2206,7 +1256,7 @@ jQuery(document).ready(function($) {
      * @return bool Success status of save operation
      * @since 1.0.0
      */
-    private function save_configuration($data) {
+    public function save_configuration($data) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN: Saving configuration');
         }
@@ -2407,7 +1457,7 @@ jQuery(document).ready(function($) {
      * @return object|null Configuration object or null if not found
      * @since 1.0.0
      */
-    private function get_config_by_form_id($form_id, $use_cache = true) {
+    public function get_config_by_form_id($form_id, $use_cache = true) {
         static $cache = array();
         
         if ($use_cache && isset($cache[$form_id])) {
@@ -2453,46 +1503,6 @@ jQuery(document).ready(function($) {
         }
     }
 
-    /**
-     * Improved Gravity Forms retrieval with field information for better mapping.
-     * Gets all available Gravity Forms with their field details for configuration interface.
-     * 
-     * @return array Array of Gravity Forms with field information
-     * @since 1.0.0
-     */
-    private function get_gravity_forms() {
-        if (!class_exists('GFAPI')) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: GFAPI class not available');
-            }
-            return array();
-        }
-        
-        try {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Retrieving Gravity Forms');
-            }
-            
-            $forms = GFAPI::get_forms();
-            // Add form fields information for better mapping
-            foreach ($forms as &$form) {
-                if (isset($form['fields'])) {
-                    $form['field_list'] = array();
-                    foreach ($form['fields'] as $field) {
-                        $form['field_list'][] = array(
-                            'id' => $field->id,
-                            'label' => $field->label,
-                            'type' => $field->type
-                        );
-                    }
-                }
-            }
-            return $forms;
-        } catch (Exception $e) {
-            error_log('Operaton DMN: Error getting Gravity Forms: ' . $e->getMessage());
-            return array();
-        }
-    }
 
     /**
      * Build the full DMN evaluation endpoint URL from base endpoint and decision key.
