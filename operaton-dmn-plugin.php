@@ -95,6 +95,7 @@ class OperatonDMNEvaluator {
 
     private $assets;
     private $admin;
+    private $database;
 
     public static function get_instance() {
         if (null === self::$instance) {
@@ -120,18 +121,21 @@ private function __construct() {
     // 2. Load admin manager second (depends on assets)
     $this->load_admin_manager();
 
+    // 3. Load database manager third
+    $this->load_database_manager();
+
     // Core WordPress hooks
     add_action('init', array($this, 'init'));
     add_action('rest_api_init', array($this, 'register_rest_routes'));
  
     // Database and version checks (admin only)
     if (is_admin()) {
-        add_action('admin_init', array($this, 'check_and_update_database'), 1);
+        add_action('admin_init', array($this->database, 'check_and_update_database'), 1);
         add_action('admin_init', array($this, 'check_version'), 5);
     }
     
     // Cleanup scheduled task
-    add_action('operaton_dmn_cleanup', array($this, 'cleanup_old_data'));
+    add_action('operaton_dmn_cleanup', array($this->database, 'cleanup_old_data'));
     
     // TEMPORARY: Clear decision flow cache
     add_action('admin_init', function() {
@@ -154,10 +158,27 @@ private function __construct() {
         $this->assets = new Operaton_DMN_Assets(OPERATON_DMN_PLUGIN_URL, OPERATON_DMN_VERSION);
     }
 
-    // NEW: Add this after loading the assets manager (around line 85)
+    // NEW: Add this after loading the assets manager
     private function load_admin_manager() {
         require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-admin.php';
         $this->admin = new Operaton_DMN_Admin($this, $this->assets);
+    }
+
+    // NEW: Add this method after load_admin_manager()
+    private function load_database_manager() {
+        require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-database.php';
+        $this->database = new Operaton_DMN_Database(OPERATON_DMN_VERSION);
+    }
+
+    /**
+    * Get database instance for external access
+    * Provides access to database manager for other components
+    * 
+    * @return Operaton_DMN_Database Database manager instance
+    * @since 1.0.0
+    */
+    public function get_database_instance() {
+        return $this->database;
     }
 
     /**
@@ -185,8 +206,8 @@ private function __construct() {
             error_log('Operaton DMN: Plugin activation started');
         }
         
-        // Create/update database tables
-        $this->create_database_tables();
+        // Create/update database tables - NOW USES DATABASE CLASS
+        $this->database->create_database_tables();
         
         // Set default options
         add_option('operaton_dmn_version', OPERATON_DMN_VERSION);
@@ -214,8 +235,8 @@ private function __construct() {
         // Clear scheduled events
         wp_clear_scheduled_hook('operaton_dmn_cleanup');
         
-        // Clear any cached data
-        $this->clear_config_cache();
+        // Clear any cached data - NOW USES DATABASE CLASS
+        $this->database->clear_configuration_cache();
         
         flush_rewrite_rules();
     }
@@ -272,8 +293,8 @@ private function __construct() {
                 error_log('Operaton DMN: Version upgrade detected from ' . $installed_version . ' to ' . OPERATON_DMN_VERSION);
             }
             
-            // Run database migration for any version upgrade
-            $this->check_and_update_database();
+            // Run database migration for any version upgrade - NOW USES DATABASE CLASS
+            $this->database->check_and_update_database();
             
             // Update stored version
             update_option('operaton_dmn_version', OPERATON_DMN_VERSION);
@@ -326,7 +347,7 @@ public function force_frontend_assets_on_gravity_forms() {
                 return new WP_Error('missing_params', 'Configuration ID and form data are required', array('status' => 400));
             }
             
-            $config = $this->get_configuration($params['config_id']);
+            $config = $this->database->get_configuration($params['config_id']);
             if (!$config) {
                 return new WP_Error('invalid_config', 'Configuration not found', array('status' => 404));
             }
@@ -635,7 +656,7 @@ public function force_frontend_assets_on_gravity_forms() {
     }
 
     // Store process instance ID for decision flow retrieval
-    $this->store_process_instance_id($config->form_id, $process_instance_id);
+    $this->database->store_process_instance_id($config->form_id, $process_instance_id);
 
     return array(
         'success' => true,
@@ -914,7 +935,7 @@ public function force_frontend_assets_on_gravity_forms() {
         }
         
         // CHECK: Only show decision flow for process execution
-        $config = $this->get_config_by_form_id($form_id);
+        $config = $this->database->get_config_by_form_id($form_id);
         if (!$config || !$config->show_decision_flow || !$config->use_process) {
             error_log('Operaton DMN: Decision flow not available - not using process execution or disabled');
             $result = '<div class="decision-flow-placeholder">' .
@@ -944,7 +965,7 @@ public function force_frontend_assets_on_gravity_forms() {
         
         error_log('Operaton DMN: Loading fresh decision flow for form ' . $form_id);
         
-        $process_instance_id = $this->get_process_instance_id($form_id);
+        $process_instance_id = $this->database->get_process_instance_id($form_id);
         if (!$process_instance_id) {
             $result = '<div class="decision-flow-placeholder">' .
                    '<h3>🔍 Decision Flow Results</h3>' .
@@ -1055,396 +1076,6 @@ public function force_frontend_assets_on_gravity_forms() {
     }
 
     // =============================================================================
-    // DATABASE METHODS
-    // =============================================================================
-
-    /**
-     * Enhanced database table creation with process support and automatic migration capability.
-     * Creates or updates the plugin's configuration table with all necessary columns for DMN and process execution.
-     * 
-     * @since 1.0.0
-     */
-    private function create_database_tables() {
-        global $wpdb;
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Creating/updating database tables');
-        }
-        
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        
-        // Check if table already exists
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name) {
-            // Check if new columns exist, add them if not
-            $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
-            
-            if (!in_array('result_mappings', $columns)) {
-                $wpdb->query("ALTER TABLE $table_name ADD COLUMN result_mappings longtext NOT NULL");
-            }
-            
-            if (!in_array('evaluation_step', $columns)) {
-                $wpdb->query("ALTER TABLE $table_name ADD COLUMN evaluation_step varchar(10) DEFAULT 'auto'");
-            }
-            
-            // NEW: Add process integration columns
-            if (!in_array('use_process', $columns)) {
-                $wpdb->query("ALTER TABLE $table_name ADD COLUMN use_process boolean DEFAULT false");
-            }
-            
-            if (!in_array('process_key', $columns)) {
-                $wpdb->query("ALTER TABLE $table_name ADD COLUMN process_key varchar(255) DEFAULT NULL");
-            }
-            
-            if (!in_array('show_decision_flow', $columns)) {
-                $wpdb->query("ALTER TABLE $table_name ADD COLUMN show_decision_flow boolean DEFAULT false");
-            }
-            
-            return;
-        }
-        
-        $charset_collate = $wpdb->get_charset_collate();
-        
-        $sql = "CREATE TABLE $table_name (
-            id int(11) NOT NULL AUTO_INCREMENT,
-            name varchar(255) NOT NULL,
-            form_id int(11) NOT NULL,
-            dmn_endpoint varchar(500) NOT NULL,
-            decision_key varchar(255) NOT NULL,
-            field_mappings longtext NOT NULL,
-            result_mappings longtext NOT NULL,
-            evaluation_step varchar(10) DEFAULT 'auto',
-            button_text varchar(255) DEFAULT 'Evaluate',
-            use_process boolean DEFAULT false,
-            process_key varchar(255) DEFAULT NULL,
-            show_decision_flow boolean DEFAULT false,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY unique_form_id (form_id),
-            KEY idx_form_id (form_id)
-        ) $charset_collate;";
-        
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        return dbDelta($sql);
-    }
-
-    /**
-     * Automatic database migration on plugin updates with comprehensive column checking.
-     * Ensures database schema stays current with plugin version requirements during updates.
-     * 
-     * @since 1.0.0
-     */
-    public function check_and_update_database() {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Checking database schema for updates');
-        }
-        
-        // Check if table exists at all
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") !== $table_name) {
-            // Table doesn't exist, create it with new schema
-            $this->create_database_tables();
-            return;
-        }
-        
-        // Get current columns
-        $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
-        
-        // Add missing columns
-        if (!in_array('result_mappings', $columns)) {
-            $sql = "ALTER TABLE $table_name ADD COLUMN result_mappings longtext NOT NULL DEFAULT '{}'";
-            $result = $wpdb->query($sql);
-            
-            if ($result === false) {
-                error_log('Operaton DMN: Error adding result_mappings column: ' . $wpdb->last_error);
-            } else {
-                error_log('Operaton DMN: Successfully added result_mappings column');
-            }
-        }
-        
-        if (!in_array('evaluation_step', $columns)) {
-            $sql = "ALTER TABLE $table_name ADD COLUMN evaluation_step varchar(10) DEFAULT 'auto'";
-            $result = $wpdb->query($sql);
-            
-            if ($result === false) {
-                error_log('Operaton DMN: Error adding evaluation_step column: ' . $wpdb->last_error);
-            } else {
-                error_log('Operaton DMN: Successfully added evaluation_step column');
-            }
-        }
-        
-        // Migration successful
-        error_log('Operaton DMN: Database migration completed successfully');
-    }
-
-    /**
-     * Retrieve all DMN configurations from database with ordering by creation date.
-     * Gets complete list of plugin configurations for admin display and management.
-     * 
-     * @return array Array of configuration objects from database
-     * @since 1.0.0
-     */
-    public function get_all_configurations() {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Retrieving all configurations from database');
-        }
-        
-        return $wpdb->get_results("SELECT * FROM $table_name ORDER BY created_at DESC");
-    }
-
-    /**
-     * Retrieve single configuration by ID from database with error handling.
-     * Gets specific DMN configuration for editing or processing form evaluation.
-     * 
-     * @param int $id Configuration ID to retrieve
-     * @return object|null Configuration object or null if not found
-     * @since 1.0.0
-     */
-    public function get_configuration($id) {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Retrieving configuration with ID: ' . $id);
-        }
-        
-        return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $id));
-    }
-
-    /**
-     * Enhanced configuration deletion with cleanup and error handling.
-     * Removes DMN configuration from database and clears associated cached data.
-     * 
-     * @param int $id Configuration ID to delete
-     * @return bool Success status of deletion operation
-     * @since 1.0.0
-     */
-    public function delete_config($id) {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Deleting configuration with ID: ' . $id);
-        }
-        
-        $result = $wpdb->delete(
-            $table_name, 
-            array('id' => intval($id)),
-            array('%d')
-        );
-        
-        if ($result !== false) {
-            $this->clear_config_cache();
-            echo '<div class="notice notice-success"><p>' . __('Configuration deleted successfully!', 'operaton-dmn') . '</p></div>';
-        } else {
-            echo '<div class="notice notice-error"><p>' . __('Error deleting configuration: ', 'operaton-dmn') . $wpdb->last_error . '</p></div>';
-        }
-        
-        return $result;
-    }
-
-    /**
-     * Enhanced configuration saving with process support and comprehensive validation.
-     * Saves new or updated DMN configuration with field mappings and result mappings to database.
-     * 
-     * @param array $data Posted form data containing configuration settings
-     * @return bool Success status of save operation
-     * @since 1.0.0
-     */
-    public function save_configuration($data) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Saving configuration');
-        }
-        
-        // Validate data
-        $validation_errors = $this->validate_configuration_data($data);
-        
-        if (!empty($validation_errors)) {
-            echo '<div class="notice notice-error"><ul>';
-            foreach ($validation_errors as $error) {
-                echo '<li>' . esc_html($error) . '</li>';
-            }
-            echo '</ul></div>';
-            return false;
-        }
-        
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        
-        // Process field mappings
-        $field_mappings = array();
-        
-        if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
-            $dmn_variables = $data['field_mappings_dmn_variable'];
-            $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
-            $types = isset($data['field_mappings_type']) ? $data['field_mappings_type'] : array();
-            $radio_names = isset($data['field_mappings_radio_name']) ? $data['field_mappings_radio_name'] : array();
-            
-            for ($i = 0; $i < count($dmn_variables); $i++) {
-                $dmn_var = sanitize_text_field(trim($dmn_variables[$i]));
-                $field_id = isset($field_ids[$i]) ? sanitize_text_field(trim($field_ids[$i])) : '';
-                $type = isset($types[$i]) ? sanitize_text_field($types[$i]) : 'String';
-                $radio_name = isset($radio_names[$i]) ? sanitize_text_field(trim($radio_names[$i])) : '';
-                
-                if (!empty($dmn_var) && !empty($field_id)) {
-                    $field_mappings[$dmn_var] = array(
-                        'field_id' => $field_id,
-                        'type' => $type,
-                        'radio_name' => $radio_name
-                    );
-                }
-            }
-        }
-        
-        // Process result mappings
-        $result_mappings = array();
-        
-        if (isset($data['result_mappings_dmn_result']) && is_array($data['result_mappings_dmn_result'])) {
-            $dmn_results = $data['result_mappings_dmn_result'];
-            $result_field_ids = isset($data['result_mappings_field_id']) ? $data['result_mappings_field_id'] : array();
-            
-            for ($i = 0; $i < count($dmn_results); $i++) {
-                $dmn_result = sanitize_text_field(trim($dmn_results[$i]));
-                $field_id = isset($result_field_ids[$i]) ? sanitize_text_field(trim($result_field_ids[$i])) : '';
-                
-                if (!empty($dmn_result) && !empty($field_id)) {
-                    $result_mappings[$dmn_result] = array(
-                        'field_id' => $field_id
-                    );
-                }
-            }
-        }
-        
-            $config_data = array(
-                'name' => sanitize_text_field($data['name']),
-                'form_id' => intval($data['form_id']),
-                'dmn_endpoint' => esc_url_raw($data['dmn_endpoint']),
-                'decision_key' => sanitize_text_field($data['decision_key'] ?? ''),
-                'field_mappings' => wp_json_encode($field_mappings),
-                'result_mappings' => wp_json_encode($result_mappings),
-                'evaluation_step' => sanitize_text_field($data['evaluation_step'] ?? 'auto'),
-                'button_text' => sanitize_text_field($data['button_text'] ?: 'Evaluate'),
-                // NEW: Process-related fields
-                'use_process' => isset($data['use_process']) ? (bool)$data['use_process'] : false,
-                'process_key' => sanitize_text_field($data['process_key'] ?? ''),
-                'show_decision_flow' => isset($data['show_decision_flow']) ? (bool)$data['show_decision_flow'] : false
-            );
-        
-        $config_id = isset($data['config_id']) ? intval($data['config_id']) : 0;
-        
-        if ($config_id > 0) {
-            // Update existing configuration
-            $result = $wpdb->update(
-                $table_name, 
-                $config_data, 
-                array('id' => $config_id),
-                array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s'),
-                array('%d')
-            );
-            
-            if ($result !== false) {
-                $message = __('Configuration updated successfully!', 'operaton-dmn');
-                $this->clear_config_cache();
-            } else {
-                echo '<div class="notice notice-error"><p>' . __('Error updating configuration: ', 'operaton-dmn') . $wpdb->last_error . '</p></div>';
-                return false;
-            }
-        } else {
-            // Check for duplicate form_id
-            $existing = $wpdb->get_var($wpdb->prepare(
-                "SELECT id FROM $table_name WHERE form_id = %d", 
-                $config_data['form_id']
-            ));
-            
-            if ($existing) {
-                echo '<div class="notice notice-error"><p>' . __('A configuration for this form already exists. Please edit the existing configuration or choose a different form.', 'operaton-dmn') . '</p></div>';
-                return false;
-            }
-            
-            // Insert new configuration
-            $result = $wpdb->insert(
-                $table_name, 
-                $config_data,
-                array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s')
-            );
-            
-            if ($result !== false) {
-                $message = __('Configuration saved successfully!', 'operaton-dmn');
-                $this->clear_config_cache();
-            } else {
-                echo '<div class="notice notice-error"><p>' . __('Error saving configuration: ', 'operaton-dmn') . $wpdb->last_error . '</p></div>';
-                return false;
-            }
-        }
-        
-        echo '<div class="notice notice-success"><p>' . $message . '</p></div>';
-        return true;
-    }
-
-    /**
-     * Store process instance ID for later retrieval in session and user meta.
-     * Saves process execution ID for decision flow tracking and summary display.
-     * 
-     * @param int $form_id Gravity Forms form ID
-     * @param string $process_instance_id Operaton process instance identifier
-     * @since 1.0.0
-     */
-    private function store_process_instance_id($form_id, $process_instance_id) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Storing process instance ID: ' . $process_instance_id . ' for form: ' . $form_id);
-        }
-        
-        // Store in session or user meta for later retrieval
-        if (session_status() == PHP_SESSION_NONE) {
-            session_start();
-        }
-        $_SESSION['operaton_process_' . $form_id] = $process_instance_id;
-        
-        // Also store in user meta if user is logged in
-        if (is_user_logged_in()) {
-            update_user_meta(get_current_user_id(), 'operaton_process_' . $form_id, $process_instance_id);
-        }
-    }
-
-    /**
-     * Get stored process instance ID from session or user meta.
-     * Retrieves previously stored process ID for decision flow summary access.
-     * 
-     * @param int $form_id Gravity Forms form ID
-     * @return string|null Process instance ID or null if not found
-     * @since 1.0.0
-     */
-    private function get_process_instance_id($form_id) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Retrieving process instance ID for form: ' . $form_id);
-        }
-        
-        // Try session first
-        if (session_status() == PHP_SESSION_NONE) {
-            session_start();
-        }
-        
-        if (isset($_SESSION['operaton_process_' . $form_id])) {
-            return $_SESSION['operaton_process_' . $form_id];
-        }
-        
-        // Try user meta if logged in
-        if (is_user_logged_in()) {
-            $process_id = get_user_meta(get_current_user_id(), 'operaton_process_' . $form_id, true);
-            if ($process_id) {
-                return $process_id;
-            }
-        }
-        
-        return null;
-    }
-
-    // =============================================================================
     // UTILITY/HELPER METHODS
     // =============================================================================
 
@@ -1458,51 +1089,8 @@ public function force_frontend_assets_on_gravity_forms() {
      * @since 1.0.0
      */
     public function get_config_by_form_id($form_id, $use_cache = true) {
-        static $cache = array();
-        
-        if ($use_cache && isset($cache[$form_id])) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Using cached config for form: ' . $form_id);
-            }
-            return $cache[$form_id];
-        }
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Loading config from database for form: ' . $form_id);
-        }
-        
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        
-        $config = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM $table_name WHERE form_id = %d", 
-            $form_id
-        ));
-        
-        if ($use_cache) {
-            $cache[$form_id] = $config;
-        }
-        
-        return $config;
+        return $this->database->get_config_by_form_id($form_id, $use_cache);
     }
-
-    /**
-     * Clear configuration cache to force fresh database queries.
-     * Removes cached configuration data after save/delete operations.
-     * 
-     * @since 1.0.0
-     */
-    private function clear_config_cache() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Clearing configuration cache');
-        }
-        
-        // This method can be called after saving/deleting configurations
-        if (function_exists('wp_cache_delete')) {
-            wp_cache_delete('operaton_dmn_configs', 'operaton_dmn');
-        }
-    }
-
 
     /**
      * Build the full DMN evaluation endpoint URL from base endpoint and decision key.
@@ -1524,156 +1112,6 @@ public function force_frontend_assets_on_gravity_forms() {
         }
         
         return $base_endpoint . $decision_key . '/evaluate';
-    }
-
-    /**
-     * Enhanced validation with process support and comprehensive field checking.
-     * Validates configuration data including field mappings and process/decision settings.
-     * 
-     * @param array $data Configuration data to validate
-     * @return array Array of validation error messages
-     * @since 1.0.0
-     */
-    private function validate_configuration_data($data) {
-        $errors = array();
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Validating configuration data');
-        }
-        
-        // Required field validation
-        $required_fields = array(
-            'name' => __('Configuration Name', 'operaton-dmn'),
-            'form_id' => __('Gravity Form', 'operaton-dmn'),
-            'dmn_endpoint' => __('DMN Base Endpoint URL', 'operaton-dmn'),
-        );
-        
-        // Decision key OR process key is required
-        $use_process = isset($data['use_process']) && $data['use_process'];
-        
-        if ($use_process) {
-            if (empty($data['process_key'])) {
-                $errors[] = __('Process Key is required when using process execution.', 'operaton-dmn');
-            }
-        } else {
-            if (empty($data['decision_key'])) {
-                $errors[] = __('Decision Key is required when using direct decision evaluation.', 'operaton-dmn');
-            }
-        }
-        
-        foreach ($required_fields as $field => $label) {
-            if (empty($data[$field])) {
-                $errors[] = sprintf(__('%s is required.', 'operaton-dmn'), $label);
-            }
-        }
-        
-        // URL validation
-        if (!empty($data['dmn_endpoint']) && !filter_var($data['dmn_endpoint'], FILTER_VALIDATE_URL)) {
-            $errors[] = __('DMN Base Endpoint URL is not valid.', 'operaton-dmn');
-        }
-        
-        // Key validation
-        $key_to_validate = $use_process ? $data['process_key'] : $data['decision_key'];
-        if (!empty($key_to_validate)) {
-            if (!preg_match('/^[a-zA-Z0-9_-]+$/', trim($key_to_validate))) {
-                $key_type = $use_process ? 'Process key' : 'Decision key';
-                $errors[] = sprintf(__('%s should only contain letters, numbers, hyphens, and underscores.', 'operaton-dmn'), $key_type);
-            }
-        }
-    
-        // Form ID validation
-        if (!empty($data['form_id'])) {
-            if (class_exists('GFAPI')) {
-                $form = GFAPI::get_form($data['form_id']);
-                if (!$form) {
-                    $errors[] = __('Selected Gravity Form does not exist.', 'operaton-dmn');
-                }
-            }
-        }
-        
-        // Input field mappings validation
-        $has_input_mappings = false;
-        if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
-            $dmn_variables = $data['field_mappings_dmn_variable'];
-            $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
-            
-            for ($i = 0; $i < count($dmn_variables); $i++) {
-                $dmn_var = trim($dmn_variables[$i]);
-                $field_id = isset($field_ids[$i]) ? trim($field_ids[$i]) : '';
-                
-                if (!empty($dmn_var) && !empty($field_id)) {
-                    $has_input_mappings = true;
-                    
-                    if (!is_numeric($field_id)) {
-                        $errors[] = sprintf(__('Field ID "%s" must be numeric.', 'operaton-dmn'), $field_id);
-                    }
-                    
-                    // Validate field exists in form
-                    if (class_exists('GFAPI') && !empty($data['form_id'])) {
-                        $form = GFAPI::get_form($data['form_id']);
-                        if ($form) {
-                            $field_exists = false;
-                            foreach ($form['fields'] as $form_field) {
-                                if ($form_field->id == $field_id) {
-                                    $field_exists = true;
-                                    break;
-                                }
-                            }
-                            if (!$field_exists) {
-                                $errors[] = sprintf(__('Input field ID "%s" does not exist in the selected form.', 'operaton-dmn'), $field_id);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        if (!$has_input_mappings) {
-            $errors[] = __('At least one input field mapping is required.', 'operaton-dmn');
-        }
-        
-        // Result mappings validation
-        $has_result_mappings = false;
-        if (isset($data['result_mappings_dmn_result']) && is_array($data['result_mappings_dmn_result'])) {
-            $dmn_results = $data['result_mappings_dmn_result'];
-            $result_field_ids = isset($data['result_mappings_field_id']) ? $data['result_mappings_field_id'] : array();
-            
-            for ($i = 0; $i < count($dmn_results); $i++) {
-                $dmn_result = trim($dmn_results[$i]);
-                $field_id = isset($result_field_ids[$i]) ? trim($result_field_ids[$i]) : '';
-                
-                if (!empty($dmn_result) && !empty($field_id)) {
-                    $has_result_mappings = true;
-                    
-                    if (!is_numeric($field_id)) {
-                        $errors[] = sprintf(__('Result field ID "%s" must be numeric.', 'operaton-dmn'), $field_id);
-                    }
-                    
-                    // Validate field exists in form
-                    if (class_exists('GFAPI') && !empty($data['form_id'])) {
-                        $form = GFAPI::get_form($data['form_id']);
-                        if ($form) {
-                            $field_exists = false;
-                            foreach ($form['fields'] as $form_field) {
-                                if ($form_field->id == $field_id) {
-                                    $field_exists = true;
-                                    break;
-                                }
-                            }
-                            if (!$field_exists) {
-                                $errors[] = sprintf(__('Result field ID "%s" does not exist in the selected form.', 'operaton-dmn'), $field_id);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        if (!$has_result_mappings) {
-            $errors[] = __('At least one result field mapping is required.', 'operaton-dmn');
-        }
-        
-        return $errors;
     }
 
     /**
@@ -2254,42 +1692,6 @@ public function force_frontend_assets_on_gravity_forms() {
         }
         
         return $issues;
-    }
-
-    /**
-     * Cleanup old data scheduled task for maintenance and performance optimization.
-     * Removes expired cache entries and temporary data to maintain plugin performance.
-     * 
-     * @since 1.0.0
-     */
-    public function cleanup_old_data() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Running cleanup task');
-        }
-        
-        // This could clean up old logs, temporary data, etc.
-        // For now, just clear cache
-        $this->clear_config_cache();
-    }
-
-    /**
-     * Handle database upgrades between versions for future plugin updates.
-     * Manages schema changes and data migration for version-specific database requirements.
-     * 
-     * @param string $from_version Previous plugin version
-     * @since 1.0.0
-     */
-    private function upgrade_database($from_version) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Upgrading database from version: ' . $from_version);
-        }
-        
-        // Add any database schema changes here for future versions
-        
-        if (version_compare($from_version, '1.0.0-beta.3', '<')) {
-            // Any upgrade logic for beta.3
-            error_log('Operaton DMN: Upgraded to version ' . OPERATON_DMN_VERSION);
-        }
     }
 }
 
