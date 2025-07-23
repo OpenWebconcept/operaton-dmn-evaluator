@@ -184,11 +184,44 @@ private function __construct() {
         }
     });
 
+    // FORCE LOAD FRONTEND ASSETS - This should fix operaton_ajax issue
+    add_action('wp_enqueue_scripts', array($this, 'force_frontend_assets_on_gravity_forms'), 20);
+
     // Plugin lifecycle hooks
     register_activation_hook(__FILE__, array($this, 'activate'));
     register_deactivation_hook(__FILE__, array($this, 'deactivate'));
 }
 
+    /**
+     * Ensure frontend assets are loaded when Gravity Forms renders
+     * This is a safety net to ensure operaton_ajax is always available
+     * 
+     * @since 1.0.0
+     */
+public function force_frontend_assets_on_gravity_forms() {
+    error_log('🚀 OPERATON DMN: force_frontend_assets_on_gravity_forms called!');
+    error_log('🚀 OPERATON DMN: is_admin() = ' . (is_admin() ? 'TRUE' : 'FALSE'));
+    error_log('🚀 OPERATON DMN: GFForms class exists = ' . (class_exists('GFForms') ? 'TRUE' : 'FALSE'));
+    
+    if (!is_admin() && class_exists('GFForms')) {
+        error_log('🚀 OPERATON DMN: Conditions met, forcing frontend assets load');
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: Forcing frontend assets load due to Gravity Forms presence');
+        }
+        
+        // Force load frontend assets which includes operaton_ajax localization
+        if (isset($this->assets)) {
+            error_log('🚀 OPERATON DMN: Assets manager available, calling enqueue_frontend_assets()');
+            $this->assets->enqueue_frontend_assets();
+            error_log('🚀 OPERATON DMN: enqueue_frontend_assets() completed');
+        } else {
+            error_log('🚀 OPERATON DMN: ❌ Assets manager NOT available!');
+        }
+    } else {
+        error_log('🚀 OPERATON DMN: Conditions not met, skipping force load');
+    }
+}
     // NEW: Add this method
     private function load_assets_manager() {
         require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-assets.php';
@@ -365,26 +398,6 @@ public function register_rest_routes() {
         }
     }
 
-/**
- * Ensure frontend assets are loaded when Gravity Forms renders
- * This is a safety net to ensure operaton_ajax is always available
- * 
- * @since 1.0.0
- */
-public function force_frontend_assets_on_gravity_forms() {
-    if (!is_admin() && class_exists('GFForms')) {
-        // Add debug call
-        $this->debug_assets_loading();
-        
-        // Force load frontend assets which includes operaton_ajax localization
-        $this->assets->enqueue_frontend_assets();
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Forced frontend assets loading due to Gravity Forms presence');
-        }
-    }
-}
-
     // =============================================================================
     // UTILITY/HELPER METHODS
     // =============================================================================
@@ -472,6 +485,71 @@ public function force_frontend_assets_on_gravity_forms() {
         return $issues;
     }
 }
+
+/**
+ * Global debug functions for asset loading tracking
+ */
+function debug_operaton_assets_loading() {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('=== OPERATON ASSETS DEBUG (EARLY) ===');
+        error_log('Is admin: ' . (is_admin() ? 'YES' : 'NO'));
+        error_log('Current page: ' . $_SERVER['REQUEST_URI']);
+        error_log('Has Gravity Forms: ' . (class_exists('GFForms') ? 'YES' : 'NO'));
+        
+        // Check if we have Gravity Forms on page
+        global $post;
+        if ($post) {
+            $has_gf_shortcode = has_shortcode($post->post_content, 'gravityform');
+            $has_gf_block = has_block('gravityforms/form', $post);
+            error_log('Has GF shortcode: ' . ($has_gf_shortcode ? 'YES' : 'NO'));
+            error_log('Has GF block: ' . ($has_gf_block ? 'YES' : 'NO'));
+            error_log('Post content preview: ' . substr($post->post_content, 0, 200));
+        }
+        
+        // Check what scripts are registered
+        global $wp_scripts;
+        $operaton_scripts = array();
+        if (isset($wp_scripts->registered)) {
+            foreach ($wp_scripts->registered as $handle => $script) {
+                if (strpos($handle, 'operaton') !== false) {
+                    $operaton_scripts[] = $handle . ' (registered)';
+                }
+            }
+        }
+        error_log('Operaton scripts found: ' . implode(', ', $operaton_scripts));
+        error_log('=====================================');
+    }
+}
+
+function debug_operaton_assets_loading_late() {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('=== OPERATON ASSETS DEBUG (LATE) ===');
+        
+        global $wp_scripts;
+        $operaton_scripts = array();
+        if (isset($wp_scripts->registered)) {
+            foreach ($wp_scripts->registered as $handle => $script) {
+                if (strpos($handle, 'operaton') !== false) {
+                    $status = wp_script_is($handle, 'enqueued') ? 'ENQUEUED' : 'registered only';
+                    $operaton_scripts[] = $handle . ' (' . $status . ')';
+                }
+            }
+        }
+        error_log('Final Operaton scripts: ' . implode(', ', $operaton_scripts));
+        
+        // Check if frontend script was localized
+        if (isset($wp_scripts->registered['operaton-dmn-frontend'])) {
+            $frontend_script = $wp_scripts->registered['operaton-dmn-frontend'];
+            error_log('Frontend script localized data: ' . print_r($frontend_script->extra, true));
+        }
+        
+        error_log('====================================');
+    }
+}
+
+// Hook the debug functions AFTER the class is defined
+add_action('wp_enqueue_scripts', 'debug_operaton_assets_loading', 1);
+add_action('wp_enqueue_scripts', 'debug_operaton_assets_loading_late', 999);
 
 // Add AJAX handler for clearing update cache
 add_action('wp_ajax_operaton_clear_update_cache', function() {

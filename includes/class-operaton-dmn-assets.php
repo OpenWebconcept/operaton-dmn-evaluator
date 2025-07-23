@@ -85,6 +85,30 @@ class Operaton_DMN_Assets {
         }
     }
 
+    public function debug_assets_loading() {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('=== ASSETS MANAGER DEBUG ===');
+        error_log('Is admin: ' . (is_admin() ? 'YES' : 'NO'));
+        error_log('Gravity Forms manager available: ' . (isset($this->gravity_forms_manager) ? 'YES' : 'NO'));
+        
+        if ($this->gravity_forms_manager) {
+            error_log('GF manager - is GF available: ' . ($this->gravity_forms_manager->is_gravity_forms_available() ? 'YES' : 'NO'));
+        }
+        
+        // Check if we're detecting forms correctly
+        $has_gf_on_page = $this->has_gravity_forms_on_page();
+        error_log('Has GF on page (our detection): ' . ($has_gf_on_page ? 'YES' : 'NO'));
+        
+        // Force check for DMN enabled forms
+        if ($this->gravity_forms_manager) {
+            $has_dmn_forms = $this->has_dmn_enabled_forms_on_page();
+            error_log('Has DMN enabled forms: ' . ($has_dmn_forms ? 'YES' : 'NO'));
+        }
+        
+        error_log('============================');
+    }
+}
+
     /**
      * Initialize WordPress hooks for asset management
      * Sets up action hooks for proper asset loading at the right times
@@ -211,8 +235,12 @@ class Operaton_DMN_Assets {
      * @since 1.0.0
      */
 public function maybe_enqueue_frontend_assets() {
+    // TEMPORARY DEBUG - Add this line at the very beginning
+    error_log('🔥 OPERATON DMN: maybe_enqueue_frontend_assets called! Admin: ' . (is_admin() ? 'YES' : 'NO'));
+    
     // Skip if admin
     if (is_admin()) {
+        error_log('🔥 OPERATON DMN: Skipping because is_admin() = true');
         return;
     }
     
@@ -221,14 +249,20 @@ public function maybe_enqueue_frontend_assets() {
     }
     
     // Check if we're on a page with Gravity Forms
-    if ($this->has_gravity_forms_on_page()) {
+    $has_gf = $this->has_gravity_forms_on_page();
+    error_log('🔥 OPERATON DMN: has_gravity_forms_on_page() = ' . ($has_gf ? 'TRUE' : 'FALSE'));
+    
+    if ($has_gf) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Assets: Gravity Forms detected, loading frontend assets');
         }
+        error_log('🔥 OPERATON DMN: About to call enqueue_frontend_assets()');
         $this->enqueue_frontend_assets();
+        error_log('🔥 OPERATON DMN: enqueue_frontend_assets() finished');
+    } else {
+        error_log('🔥 OPERATON DMN: No Gravity Forms detected, not loading assets');
     }
 }
-
     /**
      * Conditionally enqueue admin assets based on current admin page
      * Only loads admin assets on plugin-related admin pages
@@ -249,6 +283,13 @@ public function maybe_enqueue_frontend_assets() {
      * 
      * @since 1.0.0
      */
+
+/**
+ * FIXED enqueue_frontend_assets method for class-operaton-dmn-assets.php
+ * The issue is that wp_enqueue_script() might not immediately register the script
+ * We need to ensure registration happens before localization
+ */
+
 public function enqueue_frontend_assets() {
     // Prevent duplicate loading
     if (isset($this->loaded_assets['frontend'])) {
@@ -259,17 +300,65 @@ public function enqueue_frontend_assets() {
     }
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: Enqueuing frontend assets');
+        error_log('Operaton DMN Assets: ⭐ STARTING enqueue_frontend_assets');
+        error_log('Operaton DMN Assets: Current page URL: ' . $_SERVER['REQUEST_URI']);
+        error_log('Operaton DMN Assets: Is admin: ' . (is_admin() ? 'YES' : 'NO'));
+    }
+    
+    // CRITICAL FIX: Force registration first, then enqueue
+    if (!wp_script_is('operaton-dmn-frontend', 'registered')) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: 🔧 Script not registered, registering now');
+        }
+        
+        wp_register_script(
+            'operaton-dmn-frontend',
+            $this->plugin_url . 'assets/js/frontend.js',
+            array('jquery'),
+            $this->version,
+            true
+        );
     }
     
     // Enqueue frontend CSS
     wp_enqueue_style('operaton-dmn-frontend');
     
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: ✅ Frontend CSS enqueued');
+    }
+    
     // Enqueue frontend JavaScript
     wp_enqueue_script('operaton-dmn-frontend');
     
-    // CRITICAL: Localize frontend script with AJAX configuration
-    wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: ✅ Frontend JS enqueued');
+        
+        // Check if script was actually enqueued
+        $is_registered = wp_script_is('operaton-dmn-frontend', 'registered');
+        $is_enqueued = wp_script_is('operaton-dmn-frontend', 'enqueued');
+        error_log('Operaton DMN Assets: Script registered: ' . ($is_registered ? 'YES' : 'NO'));
+        error_log('Operaton DMN Assets: Script enqueued: ' . ($is_enqueued ? 'YES' : 'NO'));
+    }
+    
+    // CRITICAL: Verify script exists before localization
+    global $wp_scripts;
+    if (!isset($wp_scripts->registered['operaton-dmn-frontend'])) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: ❌ Script still not in registered array, forcing registration');
+        }
+        
+        // Force add to registered array
+        $wp_scripts->add(
+            'operaton-dmn-frontend',
+            $this->plugin_url . 'assets/js/frontend.js',
+            array('jquery'),
+            $this->version,
+            true
+        );
+    }
+    
+    // Build localization data
+    $localization_data = array(
         'url' => rest_url('operaton-dmn/v1/evaluate'),
         'nonce' => wp_create_nonce('wp_rest'),
         'debug' => defined('WP_DEBUG') && WP_DEBUG,
@@ -282,13 +371,53 @@ public function enqueue_frontend_assets() {
             'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
             'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
         )
-    ));
+    );
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: operaton_ajax localized with URL: ' . rest_url('operaton-dmn/v1/evaluate'));
+        error_log('Operaton DMN Assets: 🎯 About to localize operaton_ajax');
+        
+        // Final verification
+        if (isset($wp_scripts->registered['operaton-dmn-frontend'])) {
+            error_log('Operaton DMN Assets: ✅ Script found in registered array');
+        } else {
+            error_log('Operaton DMN Assets: ❌ Script STILL not found in registered array');
+        }
+    }
+    
+    // Attempt localization
+    $localize_result = wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: 🔍 wp_localize_script result: ' . ($localize_result ? 'SUCCESS' : 'FAILED'));
+        
+        if ($localize_result) {
+            error_log('Operaton DMN Assets: ✅ LOCALIZATION SUCCESS!');
+        } else {
+            error_log('Operaton DMN Assets: ❌ LOCALIZATION FAILED');
+            
+            // Emergency fallback - add to page manually
+            add_action('wp_head', function() use ($localization_data) {
+                echo '<script type="text/javascript">';
+                echo 'window.operaton_ajax = ' . wp_json_encode($localization_data) . ';';
+                echo 'console.log("🆘 Emergency operaton_ajax loaded via wp_head", window.operaton_ajax);';
+                echo '</script>';
+            }, 1);
+            
+            error_log('Operaton DMN Assets: 🆘 Emergency fallback activated');
+        }
+        
+        // Debug script status
+        if (isset($wp_scripts->registered['operaton-dmn-frontend'])) {
+            $script = $wp_scripts->registered['operaton-dmn-frontend'];
+            error_log('Operaton DMN Assets: Script extra after localization: ' . print_r($script->extra, true));
+        }
     }
     
     $this->loaded_assets['frontend'] = true;
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: ⭐ FINISHED enqueue_frontend_assets');
+    }
 }
 
     /**
