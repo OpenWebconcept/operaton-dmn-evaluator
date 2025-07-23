@@ -44,6 +44,14 @@ class Operaton_DMN_Assets {
     private $loaded_assets = array();
 
     /**
+     * Gravity Forms manager instance for form detection
+     * 
+     * @var Operaton_DMN_Gravity_Forms|null
+     * @since 1.0.0
+     */
+    private $gravity_forms_manager = null;
+
+    /**
      * Constructor for assets manager with plugin information
      * Initializes asset management system with base configuration
      * 
@@ -60,6 +68,21 @@ class Operaton_DMN_Assets {
         }
         
         $this->init_hooks();
+    }
+
+    /**
+     * Set Gravity Forms manager instance
+     * Allows assets manager to check for DMN-enabled forms
+     * 
+     * @param Operaton_DMN_Gravity_Forms $gravity_forms_manager Gravity Forms manager instance
+     * @since 1.0.0
+     */
+    public function set_gravity_forms_manager($gravity_forms_manager) {
+        $this->gravity_forms_manager = $gravity_forms_manager;
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Gravity Forms manager set successfully');
+        }
     }
 
     /**
@@ -319,14 +342,14 @@ public function enqueue_frontend_assets() {
         $this->loaded_assets['admin'] = true;
     }
 
-    /**
-     * Enqueue Gravity Forms-specific assets with form configuration
-     * Loads form-specific JavaScript and CSS for DMN evaluation functionality
-     * 
-     * @param array $form Gravity Forms form array
-     * @param object $config DMN configuration object
-     * @since 1.0.0
-     */
+/**
+ * Enqueue Gravity Forms-specific assets with form configuration
+ * Loads form-specific JavaScript and CSS for DMN evaluation functionality
+ * 
+ * @param array $form Gravity Forms form array
+ * @param object $config DMN configuration object
+ * @since 1.0.0
+ */
 public function enqueue_gravity_form_assets($form, $config) {
     if (defined('WP_DEBUG') && WP_DEBUG) {
         error_log('Operaton DMN Assets: Enqueuing Gravity Forms assets for form: ' . $form['id']);
@@ -335,8 +358,26 @@ public function enqueue_gravity_form_assets($form, $config) {
     // Ensure frontend assets are loaded first
     $this->enqueue_frontend_assets();
     
-    // Enqueue Gravity Forms integration script
-    wp_enqueue_script('operaton-dmn-gravity');
+    // Enqueue Gravity Forms integration script with proper dependency
+    wp_enqueue_script(
+        'operaton-dmn-gravity-integration',
+        $this->plugin_url . 'assets/js/gravity-forms.js',
+        array('jquery', 'operaton-dmn-frontend'), // ← Critical: Must depend on frontend
+        $this->version,
+        true  // ← Load in footer after dependencies
+    );
+    
+    // Localize AFTER enqueuing to ensure it's available
+    wp_localize_script('operaton-dmn-gravity-integration', 'operaton_gravity', array(
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('operaton_gravity_nonce'),
+        'debug' => defined('WP_DEBUG') && WP_DEBUG,
+        'strings' => array(
+            'validation_failed' => __('Please complete all required fields before evaluation.', 'operaton-dmn'),
+            'evaluation_in_progress' => __('Evaluation in progress...', 'operaton-dmn'),
+            'form_error' => __('Form validation failed. Please check your entries.', 'operaton-dmn')
+        )
+    ));
     
     // Process configuration for JavaScript
     $field_mappings = json_decode($config->field_mappings, true);
@@ -350,7 +391,7 @@ public function enqueue_gravity_form_assets($form, $config) {
     }
     
     // Localize form-specific configuration
-    wp_localize_script('operaton-dmn-gravity', 'operaton_config_' . $form['id'], array(
+    wp_localize_script('operaton-dmn-gravity-integration', 'operaton_config_' . $form['id'], array(
         'config_id' => $config->id,
         'button_text' => $config->button_text,
         'field_mappings' => $field_mappings,
@@ -467,49 +508,54 @@ public function enqueue_gravity_form_assets($form, $config) {
      * @return bool True if page has relevant Gravity Forms
      * @since 1.0.0
      */
-private function has_gravity_forms_on_page() {
-    // Check if Gravity Forms is active
-    if (!class_exists('GFForms')) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: Gravity Forms not active');
+    private function has_gravity_forms_on_page() {
+        // If Gravity Forms manager is available, use its detection
+        if ($this->gravity_forms_manager && $this->gravity_forms_manager->is_gravity_forms_available()) {
+            return $this->has_dmn_enabled_forms_on_page();
         }
-        return false;
-    }
-    
-    // Check for shortcodes in post content
-    global $post;
-    if ($post && has_shortcode($post->post_content, 'gravityform')) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: Found gravityform shortcode in post content');
+        
+        // Fallback to basic Gravity Forms detection
+        if (!class_exists('GFForms')) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: Gravity Forms not active');
+            }
+            return false;
         }
-        return true;
-    }
-    
-    // Check for Gravity Forms blocks (Gutenberg)
-    if ($post && has_block('gravityforms/form', $post)) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: Found Gravity Forms block in post');
+        
+        // Check for shortcodes in post content
+        global $post;
+        if ($post && has_shortcode($post->post_content, 'gravityform')) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: Found gravityform shortcode in post content');
+            }
+            return true;
         }
-        return true;
-    }
-    
-    // Check if we're on a Gravity Forms preview page
-    if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: On Gravity Forms preview page');
+        
+        // Check for Gravity Forms blocks (Gutenberg)
+        if ($post && has_block('gravityforms/form', $post)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: Found Gravity Forms block in post');
+            }
+            return true;
         }
-        return true;
+        
+        // Check if we're on a Gravity Forms preview page
+        if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: On Gravity Forms preview page');
+            }
+            return true;
+        }
+        
+        // Allow other plugins/themes to indicate GF presence
+        $has_gf = apply_filters('operaton_dmn_has_gravity_forms', false);
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Filter result for has_gravity_forms: ' . ($has_gf ? 'true' : 'false'));
+        }
+        
+        return $has_gf;
     }
-    
-    // Allow other plugins/themes to indicate GF presence
-    $has_gf = apply_filters('operaton_dmn_has_gravity_forms', false);
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: Filter result for has_gravity_forms: ' . ($has_gf ? 'true' : 'false'));
-    }
-    
-    return $has_gf;
-}
 
     /**
      * Get asset loading status for debugging and diagnostics
@@ -594,6 +640,131 @@ private function has_gravity_forms_on_page() {
                     error_log('Operaton DMN Assets: Unknown asset group: ' . $asset_group);
                 }
         }
+    }
+
+    /**
+     * Check if current page has DMN-enabled Gravity Forms
+     * Uses Gravity Forms manager to detect forms with DMN configurations
+     * 
+     * @return bool True if page has DMN-enabled forms
+     * @since 1.0.0
+     */
+    private function has_dmn_enabled_forms_on_page() {
+        global $post;
+        
+        // Check for shortcodes in post content
+        if ($post && has_shortcode($post->post_content, 'gravityform')) {
+            $form_ids = $this->extract_form_ids_from_shortcodes($post->post_content);
+            return $this->any_forms_have_dmn_config($form_ids);
+        }
+        
+        // Check for Gravity Forms blocks (Gutenberg)
+        if ($post && has_block('gravityforms/form', $post)) {
+            $form_ids = $this->extract_form_ids_from_blocks($post);
+            return $this->any_forms_have_dmn_config($form_ids);
+        }
+        
+        // Check if we're on a Gravity Forms preview page
+        if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
+            $form_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+            if ($form_id > 0) {
+                $config = $this->gravity_forms_manager->get_form_configuration($form_id);
+                return $config !== null;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Extract form IDs from gravityform shortcodes
+     * Parses shortcode attributes to find form IDs
+     * 
+     * @param string $content Post content to search
+     * @return array Array of form IDs found
+     * @since 1.0.0
+     */
+    private function extract_form_ids_from_shortcodes($content) {
+        $form_ids = array();
+        
+        // Pattern to match [gravityform id="X"] shortcodes
+        $pattern = '/\[gravityform[^\]]*id=["\'](\d+)["\'][^\]]*\]/';
+        
+        if (preg_match_all($pattern, $content, $matches)) {
+            $form_ids = array_map('intval', $matches[1]);
+        }
+        
+        return array_unique($form_ids);
+    }
+
+    /**
+     * Extract form IDs from Gravity Forms Gutenberg blocks
+     * Parses block content to find form IDs
+     * 
+     * @param WP_Post $post Post object to search
+     * @return array Array of form IDs found
+     * @since 1.0.0
+     */
+    private function extract_form_ids_from_blocks($post) {
+        $form_ids = array();
+        
+        if (function_exists('parse_blocks')) {
+            $blocks = parse_blocks($post->post_content);
+            $form_ids = $this->find_gravity_form_ids_in_blocks($blocks);
+        }
+        
+        return array_unique($form_ids);
+    }
+
+    /**
+     * Recursively find Gravity Forms block IDs
+     * Searches through nested blocks for gravityforms/form blocks
+     * 
+     * @param array $blocks Array of parsed blocks
+     * @return array Array of form IDs found
+     * @since 1.0.0
+     */
+    private function find_gravity_form_ids_in_blocks($blocks) {
+        $form_ids = array();
+        
+        foreach ($blocks as $block) {
+            if ($block['blockName'] === 'gravityforms/form') {
+                if (isset($block['attrs']['formId'])) {
+                    $form_ids[] = intval($block['attrs']['formId']);
+                }
+            }
+            
+            // Check inner blocks recursively
+            if (!empty($block['innerBlocks'])) {
+                $inner_ids = $this->find_gravity_form_ids_in_blocks($block['innerBlocks']);
+                $form_ids = array_merge($form_ids, $inner_ids);
+            }
+        }
+        
+        return $form_ids;
+    }
+
+    /**
+     * Check if any of the provided form IDs have DMN configurations
+     * Uses Gravity Forms manager to check for DMN configurations
+     * 
+     * @param array $form_ids Array of form IDs to check
+     * @return bool True if any form has DMN configuration
+     * @since 1.0.0
+     */
+    private function any_forms_have_dmn_config($form_ids) {
+        if (!$this->gravity_forms_manager) {
+            return false;
+        }
+        
+        foreach ($form_ids as $form_id) {
+            $config = $this->gravity_forms_manager->get_form_configuration($form_id);
+            if ($config !== null) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /**

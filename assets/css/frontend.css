@@ -526,3 +526,280 @@ body .gform_wrapper .gform_footer .gform_next_button input {
         color: black !important;
     }
 }
+
+/**
+ * Additional CSS for Gravity Forms Integration
+ * Add this to your existing frontend.css file
+ */
+
+/* =============================================================================
+   DMN EVALUATE BUTTON STYLES
+   ============================================================================= */
+
+.operaton-evaluate-btn {
+    background: linear-gradient(135deg, #0073aa 0%, #005a87 100%) !important;
+    border: none !important;
+    color: white !important;
+    padding: 12px 24px !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    margin: 15px 0 !important;
+    box-shadow: 0 2px 8px rgba(0, 115, 170, 0.3) !important;
+}
+
+.operaton-evaluate-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #005a87 0%, #004a73 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(0, 115, 170, 0.4) !important;
+}
+
+.operaton-evaluate-btn:active:not(:disabled) {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 6px rgba(0, 115, 170, 0.3) !important;
+}
+
+.operaton-evaluate-btn:disabled {
+    background: #cccccc !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* =============================================================================
+   MESSAGE STYLES
+   ============================================================================= */
+
+.operaton-message {
+    padding: 12px 16px;
+    margin: 15px 0;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 14px;
+    border-left: 4px solid;
+    animation: slideInDown 0.3s ease;
+}
+
+.operaton-message-success {
+    background-color: #d4edda;
+    color: #155724;
+    border-left-color: #28a745;
+}
+
+.operaton-message-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-left-color: #dc3545;
+}
+
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* =============================================================================
+   DECISION FLOW STYLES
+   ============================================================================= */
+
+.decision-flow-summary {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin: 20px 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.decision-flow-summary h3 {
+    background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
+    color: white;
+    margin: 0;
+    padding: 15px 20px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.decision-flow-summary .operaton-loading {
+    padding: 30px;
+    text-align: center;
+    color: #666;
+}
+
+.decision-flow-summary .operaton-loading p {
+    margin: 0;
+    font-size: 16px;
+}
+
+.decision-flow-summary .operaton-no-data,
+.decision-flow-summary .operaton-error {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+}
+
+.decision-flow-summary .operaton-error {
+    color: #dc3545;
+}
+
+/* =============================================================================
+   FORM FIELD ENHANCEMENTS
+   ============================================================================= */
+
+.operaton-dmn-field {
+    position: relative;
+}
+
+.operaton-dmn-field::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
+    border-radius: 0 4px 4px 0;
+    opacity: 0.3;
+}
+
+.operaton-dmn-field:focus-within::after {
+    opacity: 1;
+}
+
+/* =============================================================================
+   LOADING STATES
+   ============================================================================= */
+
+.operaton-loading {
+    position: relative;
+}
+
+.operaton-loading::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0073aa;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* =============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================= */
+
+@media (max-width: 768px) {
+    .operaton-evaluate-btn {
+        width: 100% !important;
+        font-size: 14px !important;
+        padding: 10px 20px !important;
+    }
+    
+    .operaton-message {
+        font-size: 13px;
+        padding: 10px 14px;
+    }
+    
+    .decision-flow-summary {
+        margin: 15px 0;
+    }
+    
+    .decision-flow-summary h3 {
+        font-size: 16px;
+        padding: 12px 15px;
+    }
+}
+
+/* =============================================================================
+   GRAVITY FORMS THEME COMPATIBILITY
+   ============================================================================= */
+
+/* Ensure button works with different GF themes */
+.gform_wrapper .operaton-evaluate-btn {
+    border: none !important;
+    outline: none !important;
+}
+
+/* Orbital theme compatibility */
+.gform_wrapper.gravity-theme .operaton-evaluate-btn {
+    border-radius: 3px !important;
+}
+
+/* Legacy theme compatibility */
+.gform_wrapper.gform_legacy_markup .operaton-evaluate-btn {
+    display: inline-block !important;
+}
+
+/* =============================================================================
+   ACCESSIBILITY IMPROVEMENTS
+   ============================================================================= */
+
+.operaton-evaluate-btn:focus {
+    outline: 2px solid #0073aa !important;
+    outline-offset: 2px !important;
+}
+
+.operaton-message {
+    role: alert;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .operaton-evaluate-btn {
+        border: 2px solid #000000 !important;
+    }
+    
+    .operaton-message-success {
+        border: 2px solid #000000;
+    }
+    
+    .operaton-message-error {
+        border: 2px solid #000000;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .operaton-evaluate-btn,
+    .operaton-message,
+    .operaton-loading::before {
+        animation: none !important;
+        transition: none !important;
+    }
+    
+    .operaton-evaluate-btn:hover:not(:disabled) {
+        transform: none !important;
+    }
+}
+
+/* =============================================================================
+   PRINT STYLES
+   ============================================================================= */
+
+@media print {
+    .operaton-evaluate-btn,
+    .decision-flow-summary .refresh-decision-flow-controlled {
+        display: none !important;
+    }
+    
+    .decision-flow-summary {
+        box-shadow: none !important;
+        border: 1px solid #000000 !important;
+    }
+}

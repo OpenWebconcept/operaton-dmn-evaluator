@@ -76,16 +76,12 @@ class Operaton_DMN_Admin {
         
         // Frontend hooks for form integration
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
-        
-        // Force frontend assets when Gravity Forms are present
-        add_action('wp_enqueue_scripts', array($this, 'force_frontend_assets_on_gravity_forms'), 20);
-        
+                
         // Plugin page enhancement
         $plugin_basename = plugin_basename(OPERATON_DMN_PLUGIN_PATH . 'operaton-dmn-plugin.php');
         add_filter("plugin_action_links_$plugin_basename", array($this, 'add_settings_link'));
         
-        // Gravity Forms integration hooks
-        add_action('init', array($this, 'init_gravity_forms_integration'));
+        // Note: Gravity Forms integration is handled by the dedicated Gravity Forms class
     }
 
     // =============================================================================
@@ -363,225 +359,7 @@ class Operaton_DMN_Admin {
             $this->assets->enqueue_frontend_assets();
         }
     }
-
-    /**
-     * Force frontend assets on pages with Gravity Forms
-     * Safety net to ensure operaton_ajax is always available
-     * 
-     * @since 1.0.0
-     */
-    public function force_frontend_assets_on_gravity_forms() {
-        if (!is_admin() && class_exists('GFForms')) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Admin: Forcing frontend assets due to Gravity Forms presence');
-            }
-            
-            // Force load frontend assets which includes operaton_ajax localization
-            $this->assets->enqueue_frontend_assets();
-        }
-    }
     
-    /**
-     * Ensures operaton_ajax is always available and loads form-specific configurations
-     * 
-     * @param array $form Gravity Forms form array
-     * @param bool $is_ajax Whether the form is being loaded via AJAX
-     * @since 1.0.0
-     */
-    public function enqueue_gravity_scripts($form, $is_ajax) {
-        $config = $this->core->get_config_by_form_id($form['id']);
-        if (!$config) {
-            return;
-        }
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Enqueuing Gravity Forms scripts for form ' . $form['id']);
-        }
-        
-        // STEP 1: Ensure jQuery is loaded
-        wp_enqueue_script('jquery');
-        
-        // STEP 2: Enqueue frontend script first
-        wp_enqueue_script(
-            'operaton-dmn-frontend',
-            OPERATON_DMN_PLUGIN_URL . 'assets/js/frontend.js',
-            array('jquery'),
-            OPERATON_DMN_VERSION,
-            true
-        );
-        
-        // STEP 3: Enqueue frontend CSS
-        wp_enqueue_style(
-            'operaton-dmn-frontend',
-            OPERATON_DMN_PLUGIN_URL . 'assets/css/frontend.css',
-            array(),
-            OPERATON_DMN_VERSION
-        );
-        
-        // STEP 4: CRITICAL - Localize operaton_ajax (this was missing!)
-        wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
-            'url' => rest_url('operaton-dmn/v1/evaluate'),
-            'nonce' => wp_create_nonce('wp_rest'),
-            'debug' => defined('WP_DEBUG') && WP_DEBUG,
-            'strings' => array(
-                'evaluating' => __('Evaluating...', 'operaton-dmn'),
-                'error' => __('Evaluation failed', 'operaton-dmn'),
-                'success' => __('Evaluation completed', 'operaton-dmn'),
-                'loading' => __('Loading...', 'operaton-dmn')
-            )
-        ));
-        
-        // STEP 5: Process form configuration for JavaScript
-        $field_mappings = json_decode($config->field_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $field_mappings = array();
-        }
-        
-        $result_mappings = json_decode($config->result_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $result_mappings = array();
-        }
-        
-        // STEP 6: Localize form-specific configuration
-        wp_localize_script('operaton-dmn-frontend', 'operaton_config_' . $form['id'], array(
-            'config_id' => $config->id,
-            'button_text' => $config->button_text,
-            'field_mappings' => $field_mappings,
-            'result_mappings' => $result_mappings,
-            'form_id' => $form['id'],
-            'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto',
-            'use_process' => isset($config->use_process) ? $config->use_process : false,
-            'show_decision_flow' => isset($config->show_decision_flow) ? $config->show_decision_flow : false,
-            'debug' => defined('WP_DEBUG') && WP_DEBUG
-        ));
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Successfully localized operaton_ajax and operaton_config_' . $form['id']);
-        }
-    }
-
-    // =============================================================================
-    // GRAVITY FORMS INTEGRATION METHODS
-    // =============================================================================
-
-    /**
-     * Initialize Gravity Forms integration hooks when GF is available
-     * Sets up form editor integration and button placement for DMN evaluation
-     * 
-     * @since 1.0.0
-     */
-    public function init_gravity_forms_integration() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Checking Gravity Forms integration');
-        }
-        
-        // Check if Gravity Forms is active before adding hooks
-        if (class_exists('GFForms')) {
-            add_action('gform_enqueue_scripts', array($this, 'enqueue_gravity_scripts'), 10, 2);
-            add_filter('gform_submit_button', array($this, 'add_evaluate_button'), 10, 2);
-            
-            // Add form editor integration
-            add_action('gform_editor_js', array($this, 'editor_script'));
-            add_action('gform_field_advanced_settings', array($this, 'field_advanced_settings'), 10, 2);
-        }
-    }
-
-    /**
-     * Add DMN evaluation button to Gravity Forms with dynamic placement and decision flow support
-     * Injects evaluation button and decision flow summary container into form submission flow
-     * 
-     * @param string $button Existing form submit button HTML
-     * @param array $form Gravity Forms form array
-     * @return string Modified button HTML with evaluation functionality
-     * @since 1.0.0
-     */
-    public function add_evaluate_button($button, $form) {
-        if (is_admin() || (defined('DOING_AJAX') && DOING_AJAX)) {
-            return $button;
-        }
-        
-        $config = $this->core->get_config_by_form_id($form['id']);
-        if (!$config) {
-            return $button;
-        }
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Adding evaluate button for form ' . $form['id']);
-        }
-        
-        // Get evaluation step from config
-        $evaluation_step = isset($config->evaluation_step) ? $config->evaluation_step : '2';
-        if ($evaluation_step === 'auto') {
-            $evaluation_step = '2';
-        }
-        
-        // Count total pages
-        $total_pages = $this->count_form_pages($form);
-        
-        // Check for decision flow summary
-        $show_decision_flow = isset($config->show_decision_flow) ? $config->show_decision_flow : false;
-        
-        // Create the evaluate button (always add it, let JavaScript control placement)
-        $evaluate_button = sprintf(
-            '<input type="button" id="operaton-evaluate-%1$d" value="%2$s" class="gform_button gform-theme-button operaton-evaluate-btn" data-form-id="%1$d" data-config-id="%3$d" style="display: none;">',
-            $form['id'],
-            esc_attr($config->button_text),
-            $config->id
-        );
-        
-        // Decision flow summary container (always add it)
-        $decision_flow_container = sprintf(
-            '<div id="decision-flow-summary-%d" class="decision-flow-summary" style="display: none;"></div>',
-            $form['id']
-        );
-
-        // JavaScript for dynamic button placement and decision flow
-        $script = $this->generate_button_control_script($form['id'], $evaluation_step, $show_decision_flow, $config);
-
-        // Return button + hidden elements + script
-        return $button . $evaluate_button . $decision_flow_container . $script;
-    }
-
-    /**
-     * Add compatibility script for Gravity Forms form editor integration
-     * Ensures proper field settings display in the GF form builder interface
-     * 
-     * @since 1.0.0
-     */
-    public function editor_script() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Adding Gravity Forms editor script');
-        }
-        
-        ?>
-        <script type='text/javascript'>
-        jQuery(document).ready(function($) {
-            // Add compatibility for form editor
-            if (typeof fieldSettings !== 'undefined') {
-                fieldSettings.operaton_dmn = '.label_setting, .description_setting, .admin_label_setting, .size_setting, .default_value_textarea_setting, .error_message_setting, .css_class_setting, .visibility_setting';
-            }
-        });
-        </script>
-        <?php
-    }
-
-    /**
-     * Placeholder for future field-specific advanced settings in Gravity Forms
-     * Reserved for potential field-level configuration options
-     * 
-     * @param int $position Setting position in the form editor
-     * @param int $form_id Gravity Forms form ID
-     * @since 1.0.0
-     */
-    public function field_advanced_settings($position, $form_id) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Field advanced settings called for form ' . $form_id);
-        }
-        
-        // Placeholder for future field-specific settings
-        // This could include field-level DMN mapping options
-    }
-
     // =============================================================================
     // ADMIN NOTICE AND STATUS METHODS
     // =============================================================================
@@ -676,224 +454,18 @@ class Operaton_DMN_Admin {
      * @return array Array of Gravity Forms with field details
      * @since 1.0.0
      */
-    private function get_gravity_forms() {
-        if (!class_exists('GFAPI')) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Admin: GFAPI class not available');
-            }
-            return array();
-        }
-        
-        try {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Admin: Retrieving Gravity Forms');
-            }
-            
-            $forms = GFAPI::get_forms();
-            // Add form fields information for better mapping
-            foreach ($forms as &$form) {
-                if (isset($form['fields'])) {
-                    $form['field_list'] = array();
-                    foreach ($form['fields'] as $field) {
-                        $form['field_list'][] = array(
-                            'id' => $field->id,
-                            'label' => $field->label,
-                            'type' => $field->type
-                        );
-                    }
-                }
-            }
-            return $forms;
-        } catch (Exception $e) {
-            error_log('Operaton DMN Admin: Error getting Gravity Forms: ' . $e->getMessage());
-            return array();
-        }
-    }
-
-    /**
-     * Count the number of pages in a Gravity Form
-     * Used for button placement logic
-     * 
-     * @param array $form Gravity Forms form array
-     * @return int Number of pages in the form
-     * @since 1.0.0
-     */
-    private function count_form_pages($form) {
-        $total_pages = 1;
-        
-        if (isset($form['fields']) && is_array($form['fields'])) {
-            foreach ($form['fields'] as $field) {
-                if (isset($field->type) && $field->type === 'page') {
-                    $total_pages++;
-                }
-            }
-        }
-        
-        return $total_pages;
-    }
-
-    /**
-     * Generate JavaScript for button control and decision flow
-     * Creates the dynamic button placement and decision flow loading script
-     * 
-     * @param int $form_id Gravity Forms form ID
-     * @param string $evaluation_step Target evaluation step
-     * @param bool $show_decision_flow Whether to show decision flow
-     * @param object $config Configuration object
-     * @return string JavaScript code for button control
-     * @since 1.0.0
-     */
-    private function generate_button_control_script($form_id, $evaluation_step, $show_decision_flow, $config) {
-        $use_process = isset($config->use_process) && $config->use_process;
-        
-        return '
-<script>
-jQuery(document).ready(function($) {
-    var formId = ' . $form_id . ';
-    var targetPage = ' . intval($evaluation_step) . ';
-    var showDecisionFlow = ' . ($show_decision_flow ? 'true' : 'false') . ';
-    var useProcess = ' . ($use_process ? 'true' : 'false') . ';
+private function get_gravity_forms() {
+    $gravity_forms_manager = $this->core->get_gravity_forms_instance();
     
-    console.log("All styling now handled by frontend.css via assets manager");
-    console.log("Target page for button:", targetPage);
-    console.log("Show decision flow:", showDecisionFlow, "Use process:", useProcess);
-    
-    function getCurrentPage() {
-        // Check URL parameter first
-        var urlParams = new URLSearchParams(window.location.search);
-        var gfPage = urlParams.get("gf_page");
-        if (gfPage) {
-            return parseInt(gfPage);
+    if (!$gravity_forms_manager || !$gravity_forms_manager->is_gravity_forms_available()) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Admin: Gravity Forms not available');
         }
-        
-        // Check Gravity Forms page field
-        var pageField = $("#gform_source_page_number_" + formId);
-        if (pageField.length && pageField.val()) {
-            return parseInt(pageField.val());
-        }
-        
-        // Check visible elements to determine page
-        var form = $("#gform_" + formId);
-        
-        // Page 1: Personal info fields
-        if (form.find("#input_" + formId + "_6:visible, #input_" + formId + "_5:visible").length > 0) {
-            return 1;
-        }
-        
-        // Page 2: Radio button table
-        if (form.find(".gf-table-row:visible").length > 0) {
-            return 2;
-        }
-        
-        // Page 3: Summary page
-        if (form.find("#field_" + formId + "_40:visible").length > 0) {
-            return 3;
-        }
-        
-        return 1; // Default to page 1
+        return array();
     }
     
-    function handleButtonAndSummary() {
-        var currentPage = getCurrentPage();
-        var evaluateBtn = $("#operaton-evaluate-" + formId);
-        var summaryContainer = $("#decision-flow-summary-" + formId);
-        
-        console.log("=== BUTTON CONTROL ===");
-        console.log("Current page:", currentPage, "Target page:", targetPage);
-        
-        // ALWAYS hide both first
-        evaluateBtn.hide();
-        summaryContainer.hide();
-        
-        if (currentPage === 2 && targetPage === 2) {
-            // SHOW button ONLY on page 2
-            console.log("✅ Showing evaluate button on page 2");
-            
-            var form = $("#gform_" + formId);
-            var targetContainer = form.find(".gform_body");
-            
-            evaluateBtn.detach().appendTo(targetContainer);
-            evaluateBtn.show();
-            
-        } else if (currentPage === 3) {
-            // Page 3 logic
-            console.log("📋 Page 3 detected");
-            
-            // ALWAYS hide button on page 3
-            evaluateBtn.hide();
-            evaluateBtn.remove(); // Remove completely to prevent showing
-            
-            // Only show decision flow if both conditions are met
-            if (showDecisionFlow && useProcess) {
-                console.log("✅ Showing decision flow (process mode enabled)");
-                summaryContainer.show();
-                loadDecisionFlowSummary();
-            } else {
-                console.log("⏹️ Decision flow disabled or not in process mode");
-                summaryContainer.hide();
-            }
-            
-        } else {
-            // Other pages - hide everything
-            console.log("⏹️ Other page - hiding everything");
-            evaluateBtn.hide();
-            summaryContainer.hide();
-        }
-    }
-    
-    function loadDecisionFlowSummary() {
-        var container = $("#decision-flow-summary-" + formId);
-        
-        if (container.hasClass("loading")) {
-            return;
-        }
-        
-        console.log("Loading decision flow summary...");
-        container.addClass("loading");
-        container.html("<p>⏳ Loading decision flow summary...</p>");
-        
-        $.ajax({
-            url: "' . home_url() . '/wp-json/operaton-dmn/v1/decision-flow/" + formId + "?cache_bust=" + Date.now(),
-            type: "GET",
-            cache: false,
-            success: function(response) {
-                console.log("Decision flow response:", response);
-                if (response.success && response.html) {
-                    container.html(response.html);
-                } else {
-                    container.html("<p><em>No decision flow data available.</em></p>");
-                }
-            },
-            error: function(xhr, status, error) {
-                console.log("Decision flow error:", error);
-                container.html("<p><em>Error loading decision flow summary.</em></p>");
-            },
-            complete: function() {
-                container.removeClass("loading");
-            }
-        });
-    }
-    
-    // Initialize after short delay
-    setTimeout(handleButtonAndSummary, 500);
-    
-    // Handle Gravity Forms page changes
-    $(document).on("gform_page_loaded", function(event, form_id, current_page) {
-        if (form_id == formId) {
-            console.log("GF page loaded:", current_page);
-            setTimeout(handleButtonAndSummary, 200);
-        }
-    });
-    
-    // Remove button on page 3 (safety check)
-    if (getCurrentPage() === 3) {
-        $("#operaton-evaluate-" + formId).remove();
-    }
-    
-    console.log("Button control initialized - all styling handled by frontend.css");
-});
-</script>';
-    }
+    return $gravity_forms_manager->get_available_forms();
+}
 
     /**
      * Load admin template with data
@@ -930,6 +502,12 @@ jQuery(document).ready(function($) {
         
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Admin: Performing health check');
+        }
+        
+        // Check if Gravity Forms is active
+        $gravity_forms_manager = $this->core->get_gravity_forms_instance();
+        if (!$gravity_forms_manager || !$gravity_forms_manager->is_gravity_forms_available()) {
+            $issues[] = __('Gravity Forms is not active.', 'operaton-dmn');
         }
         
         // Check if Gravity Forms is active

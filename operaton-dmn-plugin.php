@@ -97,6 +97,7 @@ class OperatonDMNEvaluator {
     private $admin;
     private $database;
     private $api;
+    private $gravity_forms;
 
     public static function get_instance() {
         if (null === self::$instance) {
@@ -156,6 +157,9 @@ private function __construct() {
 
     // 4. Load API manager fourth (depends on core and database)
     $this->load_api_manager();
+
+    // 5. Load Gravity Forms manager fifth (depends on all others)
+    $this->load_gravity_forms_manager();
 
     // Core WordPress hooks
     add_action('init', array($this, 'init'));
@@ -218,6 +222,23 @@ private function load_api_manager() {
     }
 }
 
+/**
+ * Load Gravity Forms integration
+ * 
+ * @since 1.0.0
+ */
+private function load_gravity_forms_manager() {
+    require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-gravity-forms.php';
+    $this->gravity_forms = new Operaton_DMN_Gravity_Forms($this, $this->assets, $this->database);
+    
+    // Set the Gravity Forms manager in the assets manager for form detection
+    $this->assets->set_gravity_forms_manager($this->gravity_forms);
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN: Gravity Forms manager loaded successfully');
+    }
+}
+
     /**
     * Get database instance for external access
     * Provides access to database manager for other components
@@ -227,6 +248,17 @@ private function load_api_manager() {
     */
     public function get_database_instance() {
         return $this->database;
+    }
+
+    /**
+    * Get Gravity Forms instance for external access
+    * Provides access to Gravity Forma integration manager for other components
+    * 
+    * @return Operaton_DMN_Gravity_Forms Database manager instance
+    * @since 1.0.0
+    */
+    public function get_gravity_forms_instance() {
+        return $this->gravity_forms;
     }
 
     /**
@@ -418,8 +450,8 @@ public function force_frontend_assets_on_gravity_forms() {
             error_log('Operaton DMN: Performing health check');
         }
         
-        // Check if Gravity Forms is active
-        if (!class_exists('GFForms')) {
+        // Check if Gravity Forms is active using the new manager
+        if (!$this->gravity_forms || !$this->gravity_forms->is_gravity_forms_available()) {
             $issues[] = __('Gravity Forms is not active.', 'operaton-dmn');
         }
         
