@@ -1,11 +1,14 @@
-// Enhanced frontend.js with process execution and decision flow support
+// FIXED frontend.js - Prevent duplicate initialization and improve jQuery handling
 console.log('Operaton DMN frontend script loading (enhanced with decision flow)...');
+
+// FIXED: Global flag to prevent duplicate initialization
+window.operatonDmnInitialized = window.operatonDmnInitialized || false;
 
 jQuery(document).ready(function($) {
     console.log('Enhanced Operaton DMN frontend script loaded');
 
     // CRITICAL FIX: Wait for operaton_ajax to be available
-    function waitForOperatonAjax(callback, maxAttempts = 50) {
+    function waitForOperatonAjax(callback, maxAttempts = 30) {
         var attempts = 0;
         
         function check() {
@@ -41,9 +44,13 @@ jQuery(document).ready(function($) {
         check();
     }
 
-    // CRITICAL FIX: Initialize only after operaton_ajax is available
+    // FIXED: Initialize only once after operaton_ajax is available
     waitForOperatonAjax(function() {
         console.log('Initializing Enhanced Operaton DMN...');
+        
+        // Set initialization flag
+        window.operatonDmnInitialized = true;
+        
         initOperatonDMN();
         
         // Bind events for existing forms
@@ -55,27 +62,46 @@ jQuery(document).ready(function($) {
         console.log('Enhanced Operaton DMN frontend script initialization complete');
     });
 
+    // FIXED: Debounced form initialization to prevent multiple calls
+    var formInitializationTimers = {};
+    
+    function debouncedFormInitialization(formId) {
+        if (formInitializationTimers[formId]) {
+            clearTimeout(formInitializationTimers[formId]);
+        }
+        
+        formInitializationTimers[formId] = setTimeout(function() {
+            initializeFormEvaluation(formId);
+        }, 200);
+    }
+
     // Initialize evaluation for forms
     var initOperatonDMN = function() {
         if (typeof gform !== 'undefined' && gform.initializeOnLoaded) {
             gform.addAction('gform_post_render', function(formId) {
                 console.log('Gravity Form rendered, initializing Enhanced Operaton DMN for form:', formId);
-                initializeFormEvaluation(formId);
+                debouncedFormInitialization(formId);
             });
         } else {
             setTimeout(function() {
                 $('form[id^="gform_"]').each(function() {
                     var formId = $(this).attr('id').replace('gform_', '');
-                    initializeFormEvaluation(formId);
+                    debouncedFormInitialization(formId);
                 });
             }, 500);
         }
     };
 
-    // Enhanced form initialization with decision flow support
+    // FIXED: Enhanced form initialization with duplicate prevention
     function initializeFormEvaluation(formId) {
         var configVar = 'operaton_config_' + formId;
         if (typeof window[configVar] !== 'undefined') {
+            // Check if already initialized for this form
+            if (window['operaton_form_' + formId + '_initialized']) {
+                console.log('Form', formId, 'already initialized, skipping');
+                return;
+            }
+            
             console.log('Enhanced configuration found for form:', formId);
             var config = window[configVar];
             
@@ -92,6 +118,9 @@ jQuery(document).ready(function($) {
             setTimeout(function() {
                 clearResultFieldWithMessage(formId, 'Form initialized');
             }, 200);
+            
+            // Mark as initialized
+            window['operaton_form_' + formId + '_initialized'] = true;
         }
     }
 
@@ -1177,4 +1206,16 @@ function debugResultFields(formId) {
     });
     
     console.log('Enhanced Operaton DMN frontend script initialization complete');
+
+    // FIXED: Better cleanup on page unload
+    $(window).on('beforeunload', function() {
+        window.operatonDmnInitialized = false;
+        // Clear form initialization flags
+        for (var key in window) {
+            if (key.startsWith('operaton_form_') && key.endsWith('_initialized')) {
+                delete window[key];
+            }
+        }
+    });
+
 });

@@ -144,28 +144,20 @@ class Operaton_DMN_Assets {
             $this->version
         );
         
-        // Register decision flow CSS
-        wp_register_style(
-            'operaton-dmn-decision-flow',
-            $this->plugin_url . 'assets/css/decision-flow.css',
-            array(),
-            $this->version
-        );
-        
-        // Register frontend JavaScript
+        // FIXED: Ensure jQuery is properly loaded first
         wp_register_script(
             'operaton-dmn-frontend',
             $this->plugin_url . 'assets/js/frontend.js',
-            array('jquery'),
+            array('jquery'), // Explicit jQuery dependency
             $this->version,
-            true
+            true // Load in footer
         );
         
-        // Register Gravity Forms integration
+        // FIXED: Better dependency chain for Gravity Forms integration
         wp_register_script(
-            'operaton-dmn-gravity',
+            'operaton-dmn-gravity-integration',
             $this->plugin_url . 'assets/js/gravity-forms.js',
-            array('jquery', 'operaton-dmn-frontend'),
+            array('jquery', 'operaton-dmn-frontend'), // Both dependencies
             $this->version,
             true
         );
@@ -289,135 +281,84 @@ public function maybe_enqueue_frontend_assets() {
  * The issue is that wp_enqueue_script() might not immediately register the script
  * We need to ensure registration happens before localization
  */
-public function enqueue_frontend_assets() {
-    // Prevent duplicate loading
-    if (isset($this->loaded_assets['frontend'])) {
+    public function enqueue_frontend_assets() {
+        // Prevent duplicate loading
+        if (isset($this->loaded_assets['frontend'])) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: Frontend assets already loaded, skipping');
+            }
+            return;
+        }
+        
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: Frontend assets already loaded, skipping');
-        }
-        return;
-    }
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: ⭐ STARTING enqueue_frontend_assets');
-        error_log('Operaton DMN Assets: Current page URL: ' . $_SERVER['REQUEST_URI']);
-        error_log('Operaton DMN Assets: Is admin: ' . (is_admin() ? 'YES' : 'NO'));
-    }
-    
-    // CRITICAL FIX: Force registration first, then enqueue
-    if (!wp_script_is('operaton-dmn-frontend', 'registered')) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: 🔧 Script not registered, registering now');
+            error_log('Operaton DMN Assets: ⭐ STARTING enqueue_frontend_assets');
         }
         
-        wp_register_script(
-            'operaton-dmn-frontend',
-            $this->plugin_url . 'assets/js/frontend.js',
-            array('jquery'),
-            $this->version,
-            true
-        );
-    }
-    
-    // Enqueue frontend CSS
-    wp_enqueue_style('operaton-dmn-frontend');
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: ✅ Frontend CSS enqueued');
-    }
-    
-    // Enqueue frontend JavaScript
-    wp_enqueue_script('operaton-dmn-frontend');
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: ✅ Frontend JS enqueued');
+        // FIXED: Ensure jQuery is enqueued first
+        wp_enqueue_script('jquery');
         
-        // Check if script was actually enqueued
-        $is_registered = wp_script_is('operaton-dmn-frontend', 'registered');
-        $is_enqueued = wp_script_is('operaton-dmn-frontend', 'enqueued');
-        error_log('Operaton DMN Assets: Script registered: ' . ($is_registered ? 'YES' : 'NO'));
-        error_log('Operaton DMN Assets: Script enqueued: ' . ($is_enqueued ? 'YES' : 'NO'));
-    }
-    
-    // CRITICAL: Verify script exists before localization
-    global $wp_scripts;
-    if (!isset($wp_scripts->registered['operaton-dmn-frontend'])) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: ❌ Script still not in registered array, forcing registration');
+        // FIXED: Force registration if not already registered
+        if (!wp_script_is('operaton-dmn-frontend', 'registered')) {
+            $this->register_frontend_assets();
         }
         
-        // Force add to registered array
-        $wp_scripts->add(
-            'operaton-dmn-frontend',
-            $this->plugin_url . 'assets/js/frontend.js',
-            array('jquery'),
-            $this->version,
-            true
-        );
-    }
-    
-    // Build localization data
-    $localization_data = array(
-        'url' => rest_url('operaton-dmn/v1/evaluate'),
-        'nonce' => wp_create_nonce('wp_rest'),
-        'debug' => defined('WP_DEBUG') && WP_DEBUG,
-        'strings' => array(
-            'evaluating' => __('Evaluating...', 'operaton-dmn'),
-            'error' => __('Evaluation failed', 'operaton-dmn'),
-            'success' => __('Evaluation completed', 'operaton-dmn'),
-            'loading' => __('Loading...', 'operaton-dmn'),
-            'no_config' => __('Configuration not found', 'operaton-dmn'),
-            'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
-            'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
-        )
-    );
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: 🎯 About to localize operaton_ajax');
+        // Enqueue CSS and JS
+        wp_enqueue_style('operaton-dmn-frontend');
+        wp_enqueue_script('operaton-dmn-frontend');
         
-        // Final verification
-        if (isset($wp_scripts->registered['operaton-dmn-frontend'])) {
-            error_log('Operaton DMN Assets: ✅ Script found in registered array');
-        } else {
-            error_log('Operaton DMN Assets: ❌ Script STILL not found in registered array');
-        }
-    }
-    
-    // Attempt localization
-    $localize_result = wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: 🔍 wp_localize_script result: ' . ($localize_result ? 'SUCCESS' : 'FAILED'));
-        
-        if ($localize_result) {
-            error_log('Operaton DMN Assets: ✅ LOCALIZATION SUCCESS!');
-        } else {
-            error_log('Operaton DMN Assets: ❌ LOCALIZATION FAILED');
+        // FIXED: Verify script is properly enqueued before localization
+        if (!wp_script_is('operaton-dmn-frontend', 'enqueued')) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: ❌ Script failed to enqueue, forcing...');
+            }
             
-            // Emergency fallback - add to page manually
+            // Force enqueue
+            global $wp_scripts;
+            if (!isset($wp_scripts->queue) || !in_array('operaton-dmn-frontend', $wp_scripts->queue)) {
+                $wp_scripts->queue[] = 'operaton-dmn-frontend';
+            }
+        }
+        
+        // Build localization data
+        $localization_data = array(
+            'url' => rest_url('operaton-dmn/v1/evaluate'),
+            'nonce' => wp_create_nonce('wp_rest'),
+            'debug' => defined('WP_DEBUG') && WP_DEBUG,
+            'strings' => array(
+                'evaluating' => __('Evaluating...', 'operaton-dmn'),
+                'error' => __('Evaluation failed', 'operaton-dmn'),
+                'success' => __('Evaluation completed', 'operaton-dmn'),
+                'loading' => __('Loading...', 'operaton-dmn'),
+                'no_config' => __('Configuration not found', 'operaton-dmn'),
+                'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
+                'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
+            )
+        );
+        
+        // FIXED: More robust localization with fallback
+        $localize_result = wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
+        
+        if (!$localize_result) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: ❌ wp_localize_script failed, using wp_head fallback');
+            }
+            
+            // Emergency fallback
             add_action('wp_head', function() use ($localization_data) {
                 echo '<script type="text/javascript">';
+                echo '/* Operaton DMN Emergency Fallback */';
                 echo 'window.operaton_ajax = ' . wp_json_encode($localization_data) . ';';
                 echo 'console.log("🆘 Emergency operaton_ajax loaded via wp_head", window.operaton_ajax);';
                 echo '</script>';
             }, 1);
-            
-            error_log('Operaton DMN Assets: 🆘 Emergency fallback activated');
         }
         
-        // Debug script status
-        if (isset($wp_scripts->registered['operaton-dmn-frontend'])) {
-            $script = $wp_scripts->registered['operaton-dmn-frontend'];
-            error_log('Operaton DMN Assets: Script extra after localization: ' . print_r($script->extra, true));
+        $this->loaded_assets['frontend'] = true;
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: ⭐ FINISHED enqueue_frontend_assets');
         }
     }
-    
-    $this->loaded_assets['frontend'] = true;
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: ⭐ FINISHED enqueue_frontend_assets');
-    }
-}
 
     /**
      * Enqueue admin assets for plugin configuration pages
@@ -478,69 +419,63 @@ public function enqueue_frontend_assets() {
  * @param object $config DMN configuration object
  * @since 1.0.0
  */
-public function enqueue_gravity_form_assets($form, $config) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: Enqueuing Gravity Forms assets for form: ' . $form['id']);
+    public function enqueue_gravity_form_assets($form, $config) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Enqueuing Gravity Forms assets for form: ' . $form['id']);
+        }
+        
+        // FIXED: Ensure frontend assets are loaded first
+        $this->enqueue_frontend_assets();
+        
+        // FIXED: Wait for frontend assets to be ready
+        add_action('wp_footer', function() use ($form, $config) {
+            $this->enqueue_gravity_integration_scripts($form, $config);
+        }, 5);
     }
-    
-    // Ensure frontend assets are loaded first
-    $this->enqueue_frontend_assets();
-    
-    // Enqueue Gravity Forms integration script with proper dependency
-    wp_enqueue_script(
-        'operaton-dmn-gravity-integration',
-        $this->plugin_url . 'assets/js/gravity-forms.js',
-        array('jquery', 'operaton-dmn-frontend'), // ← Critical: Must depend on frontend
-        $this->version,
-        true  // ← Load in footer after dependencies
-    );
-    
-    // Localize AFTER enqueuing to ensure it's available
-    wp_localize_script('operaton-dmn-gravity-integration', 'operaton_gravity', array(
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce' => wp_create_nonce('operaton_gravity_nonce'),
-        'debug' => defined('WP_DEBUG') && WP_DEBUG,
-        'strings' => array(
-            'validation_failed' => __('Please complete all required fields before evaluation.', 'operaton-dmn'),
-            'evaluation_in_progress' => __('Evaluation in progress...', 'operaton-dmn'),
-            'form_error' => __('Form validation failed. Please check your entries.', 'operaton-dmn')
-        )
-    ));
-    
-    // Process configuration for JavaScript
-    $field_mappings = json_decode($config->field_mappings, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        $field_mappings = array();
+
+    /**
+     * FIXED: Separate method for Gravity Forms integration scripts
+     */
+    private function enqueue_gravity_integration_scripts($form, $config) {
+        // Enqueue Gravity Forms integration script
+        wp_enqueue_script('operaton-dmn-gravity-integration');
+        
+        // Localize Gravity Forms specific data
+        wp_localize_script('operaton-dmn-gravity-integration', 'operaton_gravity', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('operaton_gravity_nonce'),
+            'debug' => defined('WP_DEBUG') && WP_DEBUG,
+            'strings' => array(
+                'validation_failed' => __('Please complete all required fields before evaluation.', 'operaton-dmn'),
+                'evaluation_in_progress' => __('Evaluation in progress...', 'operaton-dmn'),
+                'form_error' => __('Form validation failed. Please check your entries.', 'operaton-dmn')
+            )
+        ));
+        
+        // Process configuration for JavaScript
+        $field_mappings = json_decode($config->field_mappings, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $field_mappings = array();
+        }
+        
+        $result_mappings = json_decode($config->result_mappings, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $result_mappings = array();
+        }
+        
+        // Localize form-specific configuration
+        wp_localize_script('operaton-dmn-gravity-integration', 'operaton_config_' . $form['id'], array(
+            'config_id' => $config->id,
+            'button_text' => $config->button_text,
+            'field_mappings' => $field_mappings,
+            'result_mappings' => $result_mappings,
+            'form_id' => $form['id'],
+            'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto',
+            'use_process' => isset($config->use_process) ? $config->use_process : false,
+            'show_decision_flow' => isset($config->show_decision_flow) ? $config->show_decision_flow : false,
+            'debug' => defined('WP_DEBUG') && WP_DEBUG
+        ));
     }
-    
-    $result_mappings = json_decode($config->result_mappings, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        $result_mappings = array();
-    }
-    
-    // Localize form-specific configuration
-    wp_localize_script('operaton-dmn-gravity-integration', 'operaton_config_' . $form['id'], array(
-        'config_id' => $config->id,
-        'button_text' => $config->button_text,
-        'field_mappings' => $field_mappings,
-        'result_mappings' => $result_mappings,
-        'form_id' => $form['id'],
-        'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto',
-        'use_process' => isset($config->use_process) ? $config->use_process : false,
-        'show_decision_flow' => isset($config->show_decision_flow) ? $config->show_decision_flow : false,
-        'debug' => defined('WP_DEBUG') && WP_DEBUG
-    ));
-    
-    // Enqueue decision flow assets if needed
-    if (isset($config->show_decision_flow) && $config->show_decision_flow) {
-        $this->enqueue_decision_flow_assets();
-    }
-    
-    // Add any custom styles if configured
-    if (isset($config->custom_styles) && !empty($config->custom_styles)) {
-        $this->add_inline_styles($form['id'], json_decode($config->custom_styles, true));
-    }
-}
 
     /**
      * Enqueue decision flow CSS and JavaScript for process execution results
