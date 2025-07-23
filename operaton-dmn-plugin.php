@@ -91,49 +91,71 @@ if (is_admin()) {
  */
 class OperatonDMNEvaluator {
     
+    /**
+     * Single instance of the plugin
+     * 
+     * @var OperatonDMNEvaluator|null
+     * @since 1.0.0
+     */
     private static $instance = null;
 
+    /**
+     * Assets manager instance
+     * Handles CSS and JavaScript loading
+     * 
+     * @var Operaton_DMN_Assets
+     * @since 1.0.0
+     */
     private $assets;
+
+    /**
+     * Admin interface manager instance
+     * Handles WordPress admin interface
+     * 
+     * @var Operaton_DMN_Admin
+     * @since 1.0.0
+     */
     private $admin;
+
+    /**
+     * Database manager instance
+     * Handles all database operations
+     * 
+     * @var Operaton_DMN_Database
+     * @since 1.0.0
+     */
     private $database;
+
+    /**
+     * API manager instance
+     * Handles external API calls and REST endpoints
+     * 
+     * @var Operaton_DMN_API
+     * @since 1.0.0
+     */
     private $api;
+
+    /**
+     * Gravity Forms integration manager instance
+     * Handles all Gravity Forms integration
+     * 
+     * @var Operaton_DMN_Gravity_Forms
+     * @since 1.0.0
+     */
     private $gravity_forms;
 
+    /**
+     * Get singleton instance
+     * 
+     * @return OperatonDMNEvaluator
+     * @since 1.0.0
+     */
     public static function get_instance() {
         if (null === self::$instance) {
             self::$instance = new self();
         }
         return self::$instance;
     }
-
-/**
- * Get API manager instance for external access
- * Provides access to API functionality for other components
- * 
- * @return Operaton_DMN_API API manager instance
- * @since 1.0.0
- */
-public function get_api_instance() {
-    return $this->api;
-}
-
-/**
- * Backward compatibility: Delegate to API manager
- * 
- * @deprecated Use get_api_instance()->test_full_endpoint_configuration() instead
- */
-public function test_full_endpoint_configuration($base_endpoint, $decision_key) {
-    return $this->api->test_full_endpoint_configuration($base_endpoint, $decision_key);
-}
-
-/**
- * Backward compatibility: Delegate to API manager
- * 
- * @deprecated Use get_api_instance()->get_decision_flow_summary_html() instead
- */
-public function get_decision_flow_summary_html($form_id) {
-    return $this->api->get_decision_flow_summary_html($form_id);
-}
 
     // =============================================================================
     // CORE WORDPRESS METHODS (Init, Hooks)
@@ -145,154 +167,194 @@ public function get_decision_flow_summary_html($form_id) {
      * 
      * @since 1.0.0
      */
-private function __construct() {
-    // 1. Load assets manager first
-    $this->load_assets_manager();
-    
-    // 2. Load admin manager second (depends on assets)
-    $this->load_admin_manager();
+    private function __construct() {
+        // 1. Load assets manager first
+        $this->load_assets_manager();
+        
+        // 2. Load admin manager second (depends on assets)
+        $this->load_admin_manager();
 
-    // 3. Load database manager third
-    $this->load_database_manager();
+        // 3. Load database manager third
+        $this->load_database_manager();
 
-    // 4. Load API manager fourth (depends on core and database)
-    $this->load_api_manager();
+        // 4. Load API manager fourth (depends on core and database)
+        $this->load_api_manager();
 
-    // 5. Load Gravity Forms manager fifth (depends on all others)
-    $this->load_gravity_forms_manager();
+        // 5. Load Gravity Forms manager fifth (depends on all others)
+        $this->load_gravity_forms_manager();
 
-    // Core WordPress hooks
-    add_action('init', array($this, 'init'));
-    add_action('rest_api_init', array($this, 'register_rest_routes'));
- 
-    // Database and version checks (admin only)
-    if (is_admin()) {
-        add_action('admin_init', array($this->database, 'check_and_update_database'), 1);
-        add_action('admin_init', array($this, 'check_version'), 5);
-    }
-    
-    // Cleanup scheduled task
-    add_action('operaton_dmn_cleanup', array($this->database, 'cleanup_old_data'));
-    
-    // TEMPORARY: Clear decision flow cache
-    add_action('admin_init', function() {
-        if (isset($_GET['clear_operaton_cache'])) {
-            global $wpdb;
-            $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_operaton_%'");
-            wp_redirect(admin_url('admin.php?page=operaton-dmn&cache_cleared=1'));
-            exit;
+        // Core WordPress hooks
+        add_action('init', array($this, 'init'));
+        add_action('rest_api_init', array($this, 'register_rest_routes'));
+     
+        // Database and version checks (admin only)
+        if (is_admin()) {
+            add_action('admin_init', array($this->database, 'check_and_update_database'), 1);
+            add_action('admin_init', array($this, 'check_version'), 5);
         }
-    });
+        
+        // Cleanup scheduled task
+        add_action('operaton_dmn_cleanup', array($this->database, 'cleanup_old_data'));
+        
+        // TEMPORARY: Clear decision flow cache
+        add_action('admin_init', function() {
+            if (isset($_GET['clear_operaton_cache'])) {
+                global $wpdb;
+                $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_operaton_%'");
+                wp_redirect(admin_url('admin.php?page=operaton-dmn&cache_cleared=1'));
+                exit;
+            }
+        });
 
-    // FORCE LOAD FRONTEND ASSETS - This should fix operaton_ajax issue
-    add_action('wp_enqueue_scripts', array($this, 'force_frontend_assets_on_gravity_forms'), 20);
+        // FORCE LOAD FRONTEND ASSETS - This should fix operaton_ajax issue
+        add_action('wp_enqueue_scripts', array($this, 'force_frontend_assets_on_gravity_forms'), 20);
+        
+        // Emergency fallback for operaton_ajax
+        add_action('wp_head', array($this, 'emergency_operaton_ajax_fallback'), 1);
 
-    // Plugin lifecycle hooks
-    register_activation_hook(__FILE__, array($this, 'activate'));
-    register_deactivation_hook(__FILE__, array($this, 'deactivate'));
-}
+        // Plugin lifecycle hooks
+        register_activation_hook(__FILE__, array($this, 'activate'));
+        register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+    }
+
+    // =============================================================================
+    // MANAGER LOADING METHODS
+    // =============================================================================
 
     /**
-     * Ensure frontend assets are loaded when Gravity Forms renders
-     * This is a safety net to ensure operaton_ajax is always available
+     * Load assets manager for CSS/JavaScript handling
      * 
      * @since 1.0.0
      */
-public function force_frontend_assets_on_gravity_forms() {
-    error_log('🚀 OPERATON DMN: force_frontend_assets_on_gravity_forms called!');
-    error_log('🚀 OPERATON DMN: is_admin() = ' . (is_admin() ? 'TRUE' : 'FALSE'));
-    error_log('🚀 OPERATON DMN: GFForms class exists = ' . (class_exists('GFForms') ? 'TRUE' : 'FALSE'));
-    
-    if (!is_admin() && class_exists('GFForms')) {
-        error_log('🚀 OPERATON DMN: Conditions met, forcing frontend assets load');
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Forcing frontend assets load due to Gravity Forms presence');
-        }
-        
-        // Force load frontend assets which includes operaton_ajax localization
-        if (isset($this->assets)) {
-            error_log('🚀 OPERATON DMN: Assets manager available, calling enqueue_frontend_assets()');
-            $this->assets->enqueue_frontend_assets();
-            error_log('🚀 OPERATON DMN: enqueue_frontend_assets() completed');
-        } else {
-            error_log('🚀 OPERATON DMN: ❌ Assets manager NOT available!');
-        }
-    } else {
-        error_log('🚀 OPERATON DMN: Conditions not met, skipping force load');
-    }
-}
-    // NEW: Add this method
     private function load_assets_manager() {
         require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-assets.php';
         $this->assets = new Operaton_DMN_Assets(OPERATON_DMN_PLUGIN_URL, OPERATON_DMN_VERSION);
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: Assets manager loaded successfully');
+        }
     }
 
-    // NEW: Add this after loading the assets manager
+    /**
+     * Load admin manager for WordPress admin interface
+     * 
+     * @since 1.0.0
+     */
     private function load_admin_manager() {
         require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-admin.php';
         $this->admin = new Operaton_DMN_Admin($this, $this->assets);
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: Admin manager loaded successfully');
+        }
     }
 
-    // NEW: Add this method after load_admin_manager()
+    /**
+     * Load database manager for all database operations
+     * 
+     * @since 1.0.0
+     */
     private function load_database_manager() {
         require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-database.php';
         $this->database = new Operaton_DMN_Database(OPERATON_DMN_VERSION);
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: Database manager loaded successfully');
+        }
     }
-
-/**
- * Load API manager for external service integration
- * Handles DMN evaluation, process execution, and decision flow functionality
- * 
- * @since 1.0.0
- */
-private function load_api_manager() {
-    require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-api.php';
-    $this->api = new Operaton_DMN_API($this, $this->database);
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN: API manager loaded successfully');
-    }
-}
-
-/**
- * Load Gravity Forms integration
- * 
- * @since 1.0.0
- */
-private function load_gravity_forms_manager() {
-    require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-gravity-forms.php';
-    $this->gravity_forms = new Operaton_DMN_Gravity_Forms($this, $this->assets, $this->database);
-    
-    // Set the Gravity Forms manager in the assets manager for form detection
-    $this->assets->set_gravity_forms_manager($this->gravity_forms);
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN: Gravity Forms manager loaded successfully');
-    }
-}
 
     /**
-    * Get database instance for external access
-    * Provides access to database manager for other components
-    * 
-    * @return Operaton_DMN_Database Database manager instance
-    * @since 1.0.0
-    */
+     * Load API manager for external service integration
+     * Handles DMN evaluation, process execution, and decision flow functionality
+     * 
+     * @since 1.0.0
+     */
+    private function load_api_manager() {
+        require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-api.php';
+        $this->api = new Operaton_DMN_API($this, $this->database);
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: API manager loaded successfully');
+        }
+    }
+
+    /**
+     * Load Gravity Forms integration manager
+     * 
+     * @since 1.0.0
+     */
+    private function load_gravity_forms_manager() {
+        require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-gravity-forms.php';
+        $this->gravity_forms = new Operaton_DMN_Gravity_Forms($this, $this->assets, $this->database);
+        
+        // Set the Gravity Forms manager in the assets manager for form detection
+        $this->assets->set_gravity_forms_manager($this->gravity_forms);
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: Gravity Forms manager loaded successfully');
+        }
+    }
+
+    // =============================================================================
+    // MANAGER ACCESSOR METHODS
+    // =============================================================================
+
+    /**
+     * Get API manager instance for external access
+     * Provides access to API functionality for other components
+     * 
+     * @return Operaton_DMN_API API manager instance
+     * @since 1.0.0
+     */
+    public function get_api_instance() {
+        return $this->api;
+    }
+
+    /**
+     * Get database instance for external access
+     * Provides access to database manager for other components
+     * 
+     * @return Operaton_DMN_Database Database manager instance
+     * @since 1.0.0
+     */
     public function get_database_instance() {
         return $this->database;
     }
 
     /**
-    * Get Gravity Forms instance for external access
-    * Provides access to Gravity Forma integration manager for other components
-    * 
-    * @return Operaton_DMN_Gravity_Forms Database manager instance
-    * @since 1.0.0
-    */
+     * Get Gravity Forms instance for external access
+     * Provides access to Gravity Forms integration manager for other components
+     * 
+     * @return Operaton_DMN_Gravity_Forms Gravity Forms manager instance
+     * @since 1.0.0
+     */
     public function get_gravity_forms_instance() {
         return $this->gravity_forms;
     }
+
+    /**
+     * Get assets manager instance for external access
+     * 
+     * @return Operaton_DMN_Assets Assets manager instance
+     * @since 1.0.0
+     */
+    public function get_assets_instance() {
+        return $this->assets;
+    }
+
+    /**
+     * Get admin manager instance for external access
+     * 
+     * @return Operaton_DMN_Admin Admin manager instance
+     * @since 1.0.0
+     */
+    public function get_admin_instance() {
+        return $this->admin;
+    }
+
+    // =============================================================================
+    // CORE WORDPRESS INTEGRATION METHODS
+    // =============================================================================
 
     /**
      * Initialize plugin textdomain for internationalization support.
@@ -309,6 +371,56 @@ private function load_gravity_forms_manager() {
     }
 
     /**
+     * Register REST API routes for DMN evaluation and testing endpoints.
+     * Now delegates to API manager for route registration.
+     * 
+     * @since 1.0.0
+     */
+    public function register_rest_routes() {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: Delegating REST API registration to API manager');
+        }
+        
+        // API manager handles all REST route registration
+        if (isset($this->api)) {
+            // Routes are registered automatically via API manager hooks
+            return;
+        }
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: API manager not available for REST route registration');
+        }
+    }
+
+    /**
+     * Version check method that triggers automatic database migration on upgrades.
+     * Compares installed version with current version and runs migrations as needed.
+     * 
+     * @since 1.0.0
+     */
+    public function check_version() {
+        $installed_version = get_option('operaton_dmn_version', '1.0.0-beta.1');
+        
+        if (version_compare($installed_version, OPERATON_DMN_VERSION, '<')) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: Version upgrade detected from ' . $installed_version . ' to ' . OPERATON_DMN_VERSION);
+            }
+            
+            // Run database migration for any version upgrade
+            $this->database->check_and_update_database();
+            
+            // Update stored version
+            update_option('operaton_dmn_version', OPERATON_DMN_VERSION);
+            
+            error_log('Operaton DMN: Upgraded from ' . $installed_version . ' to ' . OPERATON_DMN_VERSION);
+        }
+    }
+
+    // =============================================================================
+    // PLUGIN LIFECYCLE METHODS
+    // =============================================================================
+
+    /**
      * Enhanced activation hook that creates database tables and sets default options.
      * Initializes plugin data structures and schedules cleanup tasks.
      * 
@@ -319,7 +431,7 @@ private function load_gravity_forms_manager() {
             error_log('Operaton DMN: Plugin activation started');
         }
         
-        // Create/update database tables - NOW USES DATABASE CLASS
+        // Create/update database tables
         $this->database->create_database_tables();
         
         // Set default options
@@ -348,60 +460,93 @@ private function load_gravity_forms_manager() {
         // Clear scheduled events
         wp_clear_scheduled_hook('operaton_dmn_cleanup');
         
-        // Clear any cached data - NOW USES DATABASE CLASS
+        // Clear any cached data
         $this->database->clear_configuration_cache();
         
         flush_rewrite_rules();
     }
 
-/**
- * Register REST API routes for DMN evaluation and testing endpoints.
- * Now delegates to API manager for route registration.
- * 
- * @since 1.0.0
- */
-public function register_rest_routes() {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN: Delegating REST API registration to API manager');
-    }
-    
-    // API manager handles all REST route registration
-    if (isset($this->api)) {
-        // Routes are registered automatically via API manager hooks
-        return;
-    }
-    
-    error_log('Operaton DMN: API manager not available for REST route registration');
-}
+    // =============================================================================
+    // ASSET LOADING AND FRONTEND METHODS
+    // =============================================================================
 
     /**
-     * Version check method that triggers automatic database migration on upgrades.
-     * Compares installed version with current version and runs migrations as needed.
+     * Ensure frontend assets are loaded when Gravity Forms renders
+     * This is a safety net to ensure operaton_ajax is always available
      * 
      * @since 1.0.0
      */
-    public function check_version() {
-        $installed_version = get_option('operaton_dmn_version', '1.0.0-beta.1');
+    public function force_frontend_assets_on_gravity_forms() {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('🚀 OPERATON DMN: force_frontend_assets_on_gravity_forms called!');
+            error_log('🚀 OPERATON DMN: is_admin() = ' . (is_admin() ? 'TRUE' : 'FALSE'));
+            error_log('🚀 OPERATON DMN: GFForms class exists = ' . (class_exists('GFForms') ? 'TRUE' : 'FALSE'));
+        }
         
-        if (version_compare($installed_version, OPERATON_DMN_VERSION, '<')) {
+        if (!is_admin() && class_exists('GFForms')) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Version upgrade detected from ' . $installed_version . ' to ' . OPERATON_DMN_VERSION);
+                error_log('🚀 OPERATON DMN: Conditions met, forcing frontend assets load');
+                error_log('Operaton DMN: Forcing frontend assets load due to Gravity Forms presence');
             }
             
-            // Run database migration for any version upgrade - NOW USES DATABASE CLASS
-            $this->database->check_and_update_database();
+            // Force load frontend assets which includes operaton_ajax localization
+            if (isset($this->assets)) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('🚀 OPERATON DMN: Assets manager available, calling enqueue_frontend_assets()');
+                }
+                $this->assets->enqueue_frontend_assets();
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('🚀 OPERATON DMN: enqueue_frontend_assets() completed');
+                }
+            } else {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('🚀 OPERATON DMN: ❌ Assets manager NOT available!');
+                }
+            }
+        } else {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('🚀 OPERATON DMN: Conditions not met, skipping force load');
+            }
+        }
+    }
+
+    /**
+     * Emergency fallback for operaton_ajax availability
+     * Ensures operaton_ajax is always available even if normal loading fails
+     * 
+     * @since 1.0.0
+     */
+    public function emergency_operaton_ajax_fallback() {
+        if (!is_admin() && !wp_script_is('operaton-dmn-frontend', 'done')) {
+            $localization_data = array(
+                'url' => rest_url('operaton-dmn/v1/evaluate'),
+                'nonce' => wp_create_nonce('wp_rest'),
+                'debug' => defined('WP_DEBUG') && WP_DEBUG,
+                'strings' => array(
+                    'evaluating' => __('Evaluating...', 'operaton-dmn'),
+                    'error' => __('Evaluation failed', 'operaton-dmn'),
+                    'success' => __('Evaluation completed', 'operaton-dmn'),
+                    'loading' => __('Loading...', 'operaton-dmn'),
+                    'no_config' => __('Configuration not found', 'operaton-dmn'),
+                    'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
+                    'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
+                )
+            );
             
-            // Update stored version
-            update_option('operaton_dmn_version', OPERATON_DMN_VERSION);
-            
-            error_log('Operaton DMN: Upgraded from ' . $installed_version . ' to ' . OPERATON_DMN_VERSION);
+            echo '<script type="text/javascript">';
+            echo '/* Operaton DMN Emergency Fallback */';
+            echo 'if (typeof window.operaton_ajax === "undefined") {';
+            echo 'window.operaton_ajax = ' . wp_json_encode($localization_data) . ';';
+            echo 'console.log("🆘 Emergency operaton_ajax loaded via wp_head", window.operaton_ajax);';
+            echo '}';
+            echo '</script>';
         }
     }
 
     // =============================================================================
     // UTILITY/HELPER METHODS
     // =============================================================================
-   
+
     /**
      * Enhanced configuration retrieval with caching for performance optimization.
      * Gets DMN configuration by form ID with optional caching to reduce database queries.
@@ -412,6 +557,13 @@ public function register_rest_routes() {
      * @since 1.0.0
      */
     public function get_config_by_form_id($form_id, $use_cache = true) {
+        if (!$this->database) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: Database manager not available for config retrieval');
+            }
+            return null;
+        }
+        
         return $this->database->get_config_by_form_id($form_id, $use_cache);
     }
 
@@ -469,22 +621,93 @@ public function register_rest_routes() {
         }
         
         // Check database table
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") !== $table_name) {
-            $issues[] = __('Database table is missing.', 'operaton-dmn');
+        if (!$this->database) {
+            $issues[] = __('Database manager not initialized.', 'operaton-dmn');
+        } else {
+            $health = $this->database->check_database_health();
+            if (!empty($health['issues'])) {
+                $issues = array_merge($issues, $health['issues']);
+            }
         }
         
         // Check if REST API is working
         $test_url = rest_url('operaton-dmn/v1/test');
-        $response = wp_remote_get($test_url);
+        $response = wp_remote_get($test_url, array('timeout' => 5));
         if (is_wp_error($response)) {
             $issues[] = __('REST API is not accessible.', 'operaton-dmn');
         }
         
+        // Check if assets are properly loaded
+        if (!$this->assets) {
+            $issues[] = __('Assets manager not initialized.', 'operaton-dmn');
+        }
+        
         return $issues;
     }
+
+    /**
+     * Get manager status for debugging
+     * Returns the status of all plugin managers
+     * 
+     * @return array Manager status information
+     * @since 1.0.0
+     */
+    public function get_managers_status() {
+        return array(
+            'assets' => isset($this->assets) ? 'loaded' : 'not loaded',
+            'admin' => isset($this->admin) ? 'loaded' : 'not loaded',
+            'database' => isset($this->database) ? 'loaded' : 'not loaded',
+            'api' => isset($this->api) ? 'loaded' : 'not loaded',
+            'gravity_forms' => isset($this->gravity_forms) ? 'loaded' : 'not loaded',
+            'gravity_forms_available' => isset($this->gravity_forms) ? $this->gravity_forms->is_gravity_forms_available() : false
+        );
+    }
+
+    // =============================================================================
+    // BACKWARD COMPATIBILITY METHODS
+    // =============================================================================
+
+    /**
+     * Backward compatibility: Delegate to API manager
+     * 
+     * @deprecated Use get_api_instance()->test_full_endpoint_configuration() instead
+     * @param string $base_endpoint Base endpoint URL
+     * @param string $decision_key Decision key to test
+     * @return array Test results
+     * @since 1.0.0
+     */
+    public function test_full_endpoint_configuration($base_endpoint, $decision_key) {
+        if (!$this->api) {
+            return array(
+                'success' => false,
+                'message' => __('API manager not available', 'operaton-dmn'),
+                'endpoint' => $base_endpoint
+            );
+        }
+        
+        return $this->api->test_full_endpoint_configuration($base_endpoint, $decision_key);
+    }
+
+    /**
+     * Backward compatibility: Delegate to API manager
+     * 
+     * @deprecated Use get_api_instance()->get_decision_flow_summary_html() instead
+     * @param int $form_id Form ID for decision flow
+     * @return string Decision flow HTML
+     * @since 1.0.0
+     */
+    public function get_decision_flow_summary_html($form_id) {
+        if (!$this->api) {
+            return '<div class="operaton-error"><p><em>API manager not available for decision flow.</em></p></div>';
+        }
+        
+        return $this->api->get_decision_flow_summary_html($form_id);
+    }
 }
+
+// =============================================================================
+// GLOBAL FUNCTIONS AND INITIALIZATION
+// =============================================================================
 
 /**
  * Global debug functions for asset loading tracking
@@ -574,6 +797,11 @@ OperatonDMNEvaluator::get_instance();
 // Create necessary directories and files
 register_activation_hook(__FILE__, 'operaton_dmn_create_files');
 
+/**
+ * Create necessary plugin files and directories on activation
+ * 
+ * @since 1.0.0
+ */
 function operaton_dmn_create_files() {
     $upload_dir = wp_upload_dir();
     $plugin_dir = $upload_dir['basedir'] . '/operaton-dmn/';
@@ -581,4 +809,67 @@ function operaton_dmn_create_files() {
     if (!file_exists($plugin_dir)) {
         wp_mkdir_p($plugin_dir);
     }
+}
+
+/**
+ * Global convenience function to get plugin instance
+ * 
+ * @return OperatonDMNEvaluator
+ * @since 1.0.0
+ */
+function operaton_dmn() {
+    return OperatonDMNEvaluator::get_instance();
+}
+
+/**
+ * Global convenience function to get a specific manager
+ * 
+ * @param string $manager Manager type (api, database, gravity_forms, assets, admin)
+ * @return mixed Manager instance or null
+ * @since 1.0.0
+ */
+function operaton_dmn_get_manager($manager) {
+    $instance = OperatonDMNEvaluator::get_instance();
+    
+    switch ($manager) {
+        case 'api':
+            return $instance->get_api_instance();
+        case 'database':
+            return $instance->get_database_instance();
+        case 'gravity_forms':
+            return $instance->get_gravity_forms_instance();
+        case 'assets':
+            return $instance->get_assets_instance();
+        case 'admin':
+            return $instance->get_admin_instance();
+        default:
+            return null;
+    }
+}
+
+/**
+ * Global debug function for plugin status
+ * 
+ * @since 1.0.0
+ */
+function operaton_dmn_debug_status() {
+    if (!defined('WP_DEBUG') || !WP_DEBUG) {
+        return;
+    }
+    
+    $instance = OperatonDMNEvaluator::get_instance();
+    $status = $instance->get_managers_status();
+    $health = $instance->health_check();
+    
+    error_log('=== OPERATON DMN PLUGIN STATUS ===');
+    error_log('Plugin Version: ' . OPERATON_DMN_VERSION);
+    error_log('Managers Status: ' . print_r($status, true));
+    
+    if (!empty($health)) {
+        error_log('Health Issues: ' . implode(', ', $health));
+    } else {
+        error_log('Health Status: All systems operational');
+    }
+    
+    error_log('==================================');
 }

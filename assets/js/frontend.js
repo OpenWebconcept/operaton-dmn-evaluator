@@ -3,7 +3,58 @@ console.log('Operaton DMN frontend script loading (enhanced with decision flow).
 
 jQuery(document).ready(function($) {
     console.log('Enhanced Operaton DMN frontend script loaded');
-    
+
+    // CRITICAL FIX: Wait for operaton_ajax to be available
+    function waitForOperatonAjax(callback, maxAttempts = 50) {
+        var attempts = 0;
+        
+        function check() {
+            attempts++;
+            
+            if (typeof window.operaton_ajax !== 'undefined') {
+                console.log('✅ operaton_ajax found after', attempts, 'attempts');
+                callback();
+            } else if (attempts < maxAttempts) {
+                console.log('⏳ Waiting for operaton_ajax... attempt', attempts);
+                setTimeout(check, 100);
+            } else {
+                console.error('❌ operaton_ajax not found after', maxAttempts, 'attempts');
+                // Emergency fallback
+                window.operaton_ajax = {
+                    url: '/wp-json/operaton-dmn/v1/evaluate',
+                    nonce: 'fallback',
+                    debug: true,
+                    strings: {
+                        evaluating: 'Evaluating...',
+                        error: 'Evaluation failed',
+                        success: 'Evaluation completed',
+                        loading: 'Loading...',
+                        no_config: 'Configuration not found',
+                        validation_failed: 'Please fill in all required fields',
+                        connection_error: 'Connection error. Please try again.'
+                    }
+                };
+                console.log('🆘 Using emergency fallback for operaton_ajax');
+                callback();
+            }
+        }
+        check();
+    }
+
+    // CRITICAL FIX: Initialize only after operaton_ajax is available
+    waitForOperatonAjax(function() {
+        console.log('Initializing Enhanced Operaton DMN...');
+        initOperatonDMN();
+        
+        // Bind events for existing forms
+        $('form[id^="gform_"]').each(function() {
+            var formId = $(this).attr('id').replace('gform_', '');
+            initializeFormEvaluation(formId);
+        });
+        
+        console.log('Enhanced Operaton DMN frontend script initialization complete');
+    });
+
     // Initialize evaluation for forms
     var initOperatonDMN = function() {
         if (typeof gform !== 'undefined' && gform.initializeOnLoaded) {
@@ -304,11 +355,20 @@ function debugResultFields(formId) {
             // Show loading state
             $button.val('Evaluating...').prop('disabled', true);
             
-            console.log('Making AJAX call to:', operaton_ajax.url);
-            
+        // CRITICAL FIX: Check if operaton_ajax is available before making call
+        if (typeof window.operaton_ajax === 'undefined') {
+            console.error('❌ operaton_ajax not available, cannot make AJAX call');
+            showError('System error: AJAX configuration not loaded. Please refresh the page.');
+            $button.val(originalText).prop('disabled', false);
+            return;
+        }
+        
+        console.log('Making AJAX call to:', window.operaton_ajax.url);
+
+
             // Make AJAX call to evaluate/execute process
             $.ajax({
-                url: operaton_ajax.url,
+            url: window.operaton_ajax.url, // Use window.operaton_ajax explicitly
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
@@ -395,26 +455,41 @@ function debugResultFields(formId) {
                         showError('No results received from evaluation.');
                     }
                 },
-                error: function(xhr, status, error) {
-                    console.error('AJAX Error:', error);
-                    var errorMessage = 'Error during evaluation. Please try again.';
-                    
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
+                console.error('XHR Status:', xhr.status);
+                console.error('XHR Response:', xhr.responseText);
+                
+                var errorMessage = 'Error during evaluation. Please try again.';
+                
+                // Better error handling
+                if (xhr.status === 0) {
+                    errorMessage = 'Connection error. Please check your internet connection and try again.';
+                } else if (xhr.status === 400) {
                     try {
                         var errorResponse = JSON.parse(xhr.responseText);
                         if (errorResponse.message) {
                             errorMessage = errorResponse.message;
                         }
                     } catch (e) {
-                        if (xhr.status === 0) {
-                            errorMessage = 'Connection error. Please check your internet connection.';
-                        } else if (xhr.status === 404) {
-                            errorMessage = 'Evaluation service not found.';
-                        } else if (xhr.status === 500) {
-                            errorMessage = 'Server error occurred during evaluation.';
-                        }
+                        errorMessage = 'Bad request. Please check your form data.';
                     }
-                    
-                    showError(errorMessage);
+                } else if (xhr.status === 404) {
+                    errorMessage = 'Evaluation service not found. Please contact support.';
+                } else if (xhr.status === 500) {
+                    errorMessage = 'Server error occurred during evaluation. Please try again.';
+                } else {
+                    try {
+                        var errorResponse = JSON.parse(xhr.responseText);
+                        if (errorResponse.message) {
+                            errorMessage = errorResponse.message;
+                        }
+                    } catch (e) {
+                        errorMessage = 'HTTP ' + xhr.status + ': ' + error;
+                    }
+                }
+                
+                showError(errorMessage);
                 },
                 complete: function() {
                     $button.val(originalText).prop('disabled', false);

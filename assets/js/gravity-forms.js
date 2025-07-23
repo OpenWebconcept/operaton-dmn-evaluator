@@ -10,8 +10,57 @@
 
 (function($) {
     'use strict';
-    
-    // Gravity Forms Integration for Operaton DMN
+
+    // CRITICAL FIX: Wait for required objects before initializing
+    function initializeWhenReady() {
+        function debugAvailableObjects() {
+            console.log('=== OPERATON DEBUG INFO ===');
+            console.log('typeof operaton_ajax:', typeof operaton_ajax);
+            console.log('typeof operaton_gravity:', typeof operaton_gravity);
+            console.log('typeof operaton_config_9:', typeof window.operaton_config_9);
+            console.log('window.operaton_ajax:', window.operaton_ajax);
+            console.log('Available window objects:', Object.keys(window).filter(key => key.includes('operaton')));
+            console.log('========================');
+        }
+        
+        debugAvailableObjects();
+        
+        // Check if required objects are available
+        if (typeof operaton_ajax === 'undefined') {
+            console.log('Operaton DMN: operaton_ajax still not available, waiting...');
+            setTimeout(initializeWhenReady, 500);
+            return;
+        }
+        
+        console.log('Operaton DMN: operaton_ajax found! Initializing Gravity Forms integration');
+        
+        if (typeof operaton_gravity === 'undefined') {
+            console.warn('Operaton DMN: operaton_gravity object not found - using defaults');
+            window.operaton_gravity = {
+                strings: {
+                    validation_failed: 'Please complete all required fields before evaluation.',
+                    evaluation_in_progress: 'Evaluation in progress...',
+                    form_error: 'Form validation failed. Please check your entries.'
+                }
+            };
+        }
+        
+        // Initialize the integration
+        OperatonGravityForms.init();
+        
+        // Make available globally for debugging
+        window.OperatonGravityForms = OperatonGravityForms;
+        
+        // Add debug command
+        if (operaton_ajax.debug) {
+            window.operatonDebug = function() {
+                console.log('Operaton DMN Debug Info:', OperatonGravityForms.getDebugInfo());
+            };
+            console.log('Debug mode enabled. Use operatonDebug() to get debug information.');
+        }
+    }
+
+    // CRITICAL FIX: Update the performEvaluation method in OperatonGravityForms
     var OperatonGravityForms = {
         
         /**
@@ -431,6 +480,7 @@
         /**
          * Perform DMN evaluation via AJAX
          * Sends form data to the evaluation endpoint
+         * CRITICAL FIX: Updated performEvaluation method with better error handling
          * 
          * @param {number} formId Form ID
          * @param {number} configId Configuration ID
@@ -449,16 +499,25 @@
                 formData: formData
             });
             
+            // CRITICAL FIX: Ensure operaton_ajax is available
+            if (typeof window.operaton_ajax === 'undefined') {
+                console.error('❌ operaton_ajax not available');
+                OperatonGravityForms.handleEvaluationError('System configuration error. Please refresh the page.');
+                $button.prop('disabled', false).val(originalText);
+                return;
+            }
+            
             $.ajax({
-                url: operaton_ajax.url,
+                url: window.operaton_ajax.url,
                 type: 'POST',
                 dataType: 'json',
-                data: {
+                data: JSON.stringify({
                     config_id: configId,
                     form_data: formData
-                },
+                }),
+                contentType: 'application/json',
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', operaton_ajax.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', window.operaton_ajax.nonce);
                 },
                 success: function(response) {
                     console.log('Evaluation response:', response);
@@ -471,7 +530,23 @@
                 },
                 error: function(xhr, status, error) {
                     console.error('Evaluation AJAX error:', error);
-                    OperatonGravityForms.handleEvaluationError('Connection error: ' + error);
+                    console.error('XHR status:', xhr.status);
+                    console.error('XHR response:', xhr.responseText);
+                    
+                    var errorMessage = 'Connection error: ' + error;
+                    
+                    // Better error message based on status
+                    if (xhr.status === 0) {
+                        errorMessage = 'Connection failed. Please check your internet connection.';
+                    } else if (xhr.status === 400) {
+                        errorMessage = 'Bad request. Please check your form data.';
+                    } else if (xhr.status === 404) {
+                        errorMessage = 'Evaluation service not found.';
+                    } else if (xhr.status === 500) {
+                        errorMessage = 'Server error occurred.';
+                    }
+                    
+                    OperatonGravityForms.handleEvaluationError(errorMessage);
                 },
                 complete: function() {
                     // Restore button state
@@ -479,7 +554,7 @@
                 }
             });
         },
-        
+                
         /**
          * Handle successful evaluation response
          * Updates form fields with evaluation results
@@ -729,63 +804,17 @@
     
 // Initialize when document is ready and operaton_ajax is available
 $(document).ready(function() {
-    function debugAvailableObjects() {
-        console.log('=== OPERATON DEBUG INFO ===');
-        console.log('typeof operaton_ajax:', typeof operaton_ajax);
-        console.log('typeof operaton_gravity:', typeof operaton_gravity);
-        console.log('typeof operaton_config_9:', typeof window.operaton_config_9);
-        console.log('window.operaton_ajax:', window.operaton_ajax);
-        console.log('Available window objects:', Object.keys(window).filter(key => key.includes('operaton')));
-        console.log('========================');
-    }
-    
-    function initializeWhenReady() {
-        debugAvailableObjects();
-        
-        // Check if required objects are available
-        if (typeof operaton_ajax === 'undefined') {
-            console.log('Operaton DMN: operaton_ajax still not available, waiting...');
-            setTimeout(initializeWhenReady, 500); // Increased wait time
-            return;
-        }
-        
-        console.log('Operaton DMN: operaton_ajax found! Initializing Gravity Forms integration');
-        
-        if (typeof operaton_gravity === 'undefined') {
-            console.warn('Operaton DMN: operaton_gravity object not found - using defaults');
-            window.operaton_gravity = {
-                strings: {
-                    validation_failed: 'Please complete all required fields before evaluation.',
-                    evaluation_in_progress: 'Evaluation in progress...',
-                    form_error: 'Form validation failed. Please check your entries.'
-                }
-            };
-        }
-        
-        // Initialize the integration
-        OperatonGravityForms.init();
-        
-        // Make available globally for debugging
-        window.OperatonGravityForms = OperatonGravityForms;
-        
-        // Add debug command
-        if (operaton_ajax.debug) {
-            window.operatonDebug = function() {
-                console.log('Operaton DMN Debug Info:', OperatonGravityForms.getDebugInfo());
-            };
-            console.log('Debug mode enabled. Use operatonDebug() to get debug information.');
-        }
-    }
-    
     // Start the initialization process with a small delay
     setTimeout(initializeWhenReady, 100);
-});
+    });
     
     // Handle window load for additional initialization
     $(window).on('load', function() {
         // Re-detect forms in case any were loaded dynamically
         setTimeout(function() {
-            OperatonGravityForms.detectForms();
+            if (typeof OperatonGravityForms !== 'undefined') {
+                OperatonGravityForms.detectForms();
+            }
         }, 1000);
     });
     

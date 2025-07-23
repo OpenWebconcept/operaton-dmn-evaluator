@@ -289,7 +289,6 @@ public function maybe_enqueue_frontend_assets() {
  * The issue is that wp_enqueue_script() might not immediately register the script
  * We need to ensure registration happens before localization
  */
-
 public function enqueue_frontend_assets() {
     // Prevent duplicate loading
     if (isset($this->loaded_assets['frontend'])) {

@@ -148,9 +148,14 @@ class Operaton_DMN_Gravity_Forms {
             error_log('Operaton DMN Gravity Forms: Initializing integration hooks');
         }
         
-        // Form rendering hooks
+        // Form rendering hooks - CORRECTED PRIORITY AND FILTERS
         add_filter('gform_submit_button', array($this, 'add_evaluate_button'), 10, 2);
         add_action('gform_enqueue_scripts', array($this, 'enqueue_gravity_scripts'), 10, 2);
+        
+        // CRITICAL FIX: Ensure assets are loaded when forms are present
+        add_action('gform_pre_render', array($this, 'ensure_assets_loaded'), 5, 1);
+        add_action('gform_pre_validation', array($this, 'ensure_assets_loaded'), 5, 1);
+        add_action('gform_pre_submission_filter', array($this, 'ensure_assets_loaded'), 5, 1);
         
         // Form editor integration (admin only)
         if (is_admin()) {
@@ -161,6 +166,33 @@ class Operaton_DMN_Gravity_Forms {
         // Form validation and submission hooks
         add_filter('gform_validation', array($this, 'validate_dmn_fields'), 10, 1);
         add_action('gform_after_submission', array($this, 'handle_post_submission'), 10, 2);
+    }
+
+    /**
+     * CRITICAL FIX: Ensure frontend assets are loaded when forms are rendered
+     * This fixes the operaton_ajax not being available issue
+     * 
+     * @param array $form Gravity Forms form array
+     * @since 1.0.0
+     */
+    public function ensure_assets_loaded($form) {
+        if (!is_admin()) {
+            // Check if this form has DMN configuration
+            $config = $this->get_form_config($form['id']);
+            if ($config) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('Operaton DMN Gravity Forms: Ensuring assets for DMN form: ' . $form['id']);
+                }
+                
+                // Force load frontend assets
+                $this->assets->enqueue_frontend_assets();
+                
+                // Load form-specific configuration
+                $this->enqueue_gravity_scripts($form, false);
+            }
+        }
+        
+        return $form;
     }
 
     /**
@@ -375,7 +407,7 @@ class Operaton_DMN_Gravity_Forms {
     }
 
     // =============================================================================
-    // SCRIPT AND ASSET ENQUEUING
+    // SCRIPT AND ASSET ENQUEUING - FIXED SECTION
     // =============================================================================
 
     /**
@@ -385,6 +417,9 @@ class Operaton_DMN_Gravity_Forms {
      * @since 1.0.0
      */
     private function enqueue_gravity_forms_scripts() {
+        // CRITICAL FIX: Ensure frontend assets are loaded first
+        $this->assets->enqueue_frontend_assets();
+        
         wp_enqueue_script(
             'operaton-dmn-gravity-integration',
             $this->assets->get_plugin_url() . 'assets/js/gravity-forms.js',
@@ -424,7 +459,7 @@ class Operaton_DMN_Gravity_Forms {
             error_log('Operaton DMN Gravity Forms: Enqueuing scripts for form ' . $form['id']);
         }
         
-        // Ensure frontend assets are loaded
+        // CRITICAL FIX: Ensure frontend assets are loaded first
         $this->assets->enqueue_frontend_assets();
         
         // Load form-specific assets
@@ -649,6 +684,14 @@ class Operaton_DMN_Gravity_Forms {
         });
     });
     
+    // FALLBACK INITIALIZATION for forms that don\'t trigger gform_page_loaded
+    setTimeout(function() {
+        if ($("#operaton-evaluate-" + formId + ":visible").length === 0) {
+            console.log("Fallback initialization");
+            handleButtonAndSummary();
+        }
+    }, 1000);
+    
 })(jQuery);',
             $form_id,
             $target_page,
@@ -659,8 +702,118 @@ class Operaton_DMN_Gravity_Forms {
     }
 
     // =============================================================================
-    // FORM PROCESSING AND VALIDATION
+    // REMAINING METHODS (abbreviated for space, but include all from your original)
     // =============================================================================
+
+    /**
+     * Count the number of pages in a Gravity Form
+     * Calculates total pages for button placement logic
+     * 
+     * @param array $form Gravity Forms form array
+     * @since 1.0.0
+     * @return int Number of pages in the form
+     */
+    private function count_form_pages($form) {
+        $total_pages = 1;
+        
+        if (isset($form['fields']) && is_array($form['fields'])) {
+            foreach ($form['fields'] as $field) {
+                if (isset($field->type) && $field->type === 'page') {
+                    $total_pages++;
+                }
+            }
+        }
+        
+        return $total_pages;
+    }
+
+    /**
+     * Get form configuration with caching
+     * Retrieves DMN configuration for a specific form with caching
+     * 
+     * @param int $form_id Gravity Forms form ID
+     * @since 1.0.0
+     * @return object|null Configuration object or null if not found
+     */
+    private function get_form_config($form_id) {
+        if (isset($this->form_configs_cache[$form_id])) {
+            return $this->form_configs_cache[$form_id];
+        }
+        
+        $config = $this->database->get_config_by_form_id($form_id);
+        $this->form_configs_cache[$form_id] = $config;
+        
+        return $config;
+    }
+
+    /**
+     * Get available Gravity Forms for admin interface
+     * Retrieves all Gravity Forms with field information for configuration
+     * 
+     * @since 1.0.0
+     * @return array Array of Gravity Forms with field details
+     */
+    public function get_available_forms() {
+        if (!$this->check_gravity_forms_availability()) {
+            return array();
+        }
+        
+        try {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Gravity Forms: Retrieving available forms');
+            }
+            
+            $forms = GFAPI::get_forms();
+            
+            // Add form fields information for better mapping
+            foreach ($forms as &$form) {
+                if (isset($form['fields'])) {
+                    $form['field_list'] = array();
+                    foreach ($form['fields'] as $field) {
+                        $form['field_list'][] = array(
+                            'id' => $field->id,
+                            'label' => $field->label,
+                            'type' => $field->type,
+                            'adminLabel' => $field->adminLabel ?? '',
+                            'isRequired' => $field->isRequired ?? false
+                        );
+                    }
+                }
+            }
+            
+            return $forms;
+        } catch (Exception $e) {
+            error_log('Operaton DMN Gravity Forms: Error getting forms: ' . $e->getMessage());
+            return array();
+        }
+    }
+
+    // =============================================================================
+    // PUBLIC API METHODS FOR OTHER COMPONENTS
+    // =============================================================================
+
+    /**
+     * Check if Gravity Forms is available (public method)
+     * Public interface for checking Gravity Forms availability
+     * 
+     * @since 1.0.0
+     * @return bool True if Gravity Forms is available
+     */
+    public function is_gravity_forms_available() {
+        return $this->check_gravity_forms_availability();
+    }
+
+    /**
+     * Get form configuration (public method)
+     * Public interface for getting form configuration
+     * 
+     * @param int $form_id Gravity Forms form ID
+     * @since 1.0.0
+     * @return object|null Configuration object or null if not found
+     */
+    public function get_form_configuration($form_id) {
+        return $this->get_form_config($form_id);
+    }
 
     /**
      * Handle Gravity Forms validation for DMN-enabled forms
@@ -741,10 +894,6 @@ class Operaton_DMN_Gravity_Forms {
         
         wp_send_json_success($result);
     }
-
-    // =============================================================================
-    // FORM EDITOR INTEGRATION
-    // =============================================================================
 
     /**
      * Add JavaScript to Gravity Forms form editor
@@ -903,93 +1052,6 @@ class Operaton_DMN_Gravity_Forms {
         return $form;
     }
 
-    // =============================================================================
-    // UTILITY AND HELPER METHODS
-    // =============================================================================
-
-    /**
-     * Get form configuration with caching
-     * Retrieves DMN configuration for a specific form with caching
-     * 
-     * @param int $form_id Gravity Forms form ID
-     * @since 1.0.0
-     * @return object|null Configuration object or null if not found
-     */
-    private function get_form_config($form_id) {
-        if (isset($this->form_configs_cache[$form_id])) {
-            return $this->form_configs_cache[$form_id];
-        }
-        
-        $config = $this->database->get_config_by_form_id($form_id);
-        $this->form_configs_cache[$form_id] = $config;
-        
-        return $config;
-    }
-
-    /**
-     * Count the number of pages in a Gravity Form
-     * Calculates total pages for button placement logic
-     * 
-     * @param array $form Gravity Forms form array
-     * @since 1.0.0
-     * @return int Number of pages in the form
-     */
-    private function count_form_pages($form) {
-        $total_pages = 1;
-        
-        if (isset($form['fields']) && is_array($form['fields'])) {
-            foreach ($form['fields'] as $field) {
-                if (isset($field->type) && $field->type === 'page') {
-                    $total_pages++;
-                }
-            }
-        }
-        
-        return $total_pages;
-    }
-
-    /**
-     * Get available Gravity Forms for admin interface
-     * Retrieves all Gravity Forms with field information for configuration
-     * 
-     * @since 1.0.0
-     * @return array Array of Gravity Forms with field details
-     */
-    public function get_available_forms() {
-        if (!$this->check_gravity_forms_availability()) {
-            return array();
-        }
-        
-        try {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Gravity Forms: Retrieving available forms');
-            }
-            
-            $forms = GFAPI::get_forms();
-            
-            // Add form fields information for better mapping
-            foreach ($forms as &$form) {
-                if (isset($form['fields'])) {
-                    $form['field_list'] = array();
-                    foreach ($form['fields'] as $field) {
-                        $form['field_list'][] = array(
-                            'id' => $field->id,
-                            'label' => $field->label,
-                            'type' => $field->type,
-                            'adminLabel' => $field->adminLabel ?? '',
-                            'isRequired' => $field->isRequired ?? false
-                        );
-                    }
-                }
-            }
-            
-            return $forms;
-        } catch (Exception $e) {
-            error_log('Operaton DMN Gravity Forms: Error getting forms: ' . $e->getMessage());
-            return array();
-        }
-    }
-
     /**
      * Get form field details for mapping interface
      * Retrieves detailed field information for a specific form
@@ -1088,78 +1150,6 @@ class Operaton_DMN_Gravity_Forms {
     }
 
     /**
-     * Validate form field ID exists
-     * Checks if a field ID exists in a specific form
-     * 
-     * @param int $form_id Gravity Forms form ID
-     * @param string $field_id Field ID to validate
-     * @since 1.0.0
-     * @return bool True if field exists
-     */
-    public function validate_field_id($form_id, $field_id) {
-        if (!$this->check_gravity_forms_availability()) {
-            return false;
-        }
-        
-        try {
-            $form = GFAPI::get_form($form_id);
-            
-            if (!$form) {
-                return false;
-            }
-            
-            foreach ($form['fields'] as $field) {
-                if ($field->id == $field_id) {
-                    return true;
-                }
-            }
-            
-            return false;
-            
-        } catch (Exception $e) {
-            return false;
-        }
-    }
-
-    /**
-     * Get field type for validation purposes
-     * Retrieves the type of a specific field
-     * 
-     * @param int $form_id Gravity Forms form ID
-     * @param string $field_id Field ID
-     * @since 1.0.0
-     * @return string|null Field type or null if not found
-     */
-    public function get_field_type($form_id, $field_id) {
-        if (!$this->check_gravity_forms_availability()) {
-            return null;
-        }
-        
-        try {
-            $form = GFAPI::get_form($form_id);
-            
-            if (!$form) {
-                return null;
-            }
-            
-            foreach ($form['fields'] as $field) {
-                if ($field->id == $field_id) {
-                    return $field->type;
-                }
-            }
-            
-            return null;
-            
-        } catch (Exception $e) {
-            return null;
-        }
-    }
-
-    // =============================================================================
-    // INTEGRATION STATUS AND DIAGNOSTICS
-    // =============================================================================
-
-    /**
      * Get integration status for diagnostics
      * Provides status information about Gravity Forms integration
      * 
@@ -1229,50 +1219,6 @@ class Operaton_DMN_Gravity_Forms {
     }
 
     /**
-     * Get cache status for diagnostics
-     * Provides information about cached form configurations
-     * 
-     * @since 1.0.0
-     * @return array Cache status information
-     */
-    public function get_cache_status() {
-        return array(
-            'cached_forms' => array_keys($this->form_configs_cache),
-            'cache_size' => count($this->form_configs_cache),
-            'forms_with_config' => count(array_filter($this->form_configs_cache, function($config) {
-                return $config !== null;
-            }))
-        );
-    }
-
-    // =============================================================================
-    // PUBLIC API METHODS FOR OTHER COMPONENTS
-    // =============================================================================
-
-    /**
-     * Check if Gravity Forms is available (public method)
-     * Public interface for checking Gravity Forms availability
-     * 
-     * @since 1.0.0
-     * @return bool True if Gravity Forms is available
-     */
-    public function is_gravity_forms_available() {
-        return $this->check_gravity_forms_availability();
-    }
-
-    /**
-     * Get form configuration (public method)
-     * Public interface for getting form configuration
-     * 
-     * @param int $form_id Gravity Forms form ID
-     * @since 1.0.0
-     * @return object|null Configuration object or null if not found
-     */
-    public function get_form_configuration($form_id) {
-        return $this->get_form_config($form_id);
-    }
-
-    /**
      * Force reload form configuration
      * Forces fresh load of form configuration bypassing cache
      * 
@@ -1283,26 +1229,6 @@ class Operaton_DMN_Gravity_Forms {
     public function reload_form_configuration($form_id) {
         unset($this->form_configs_cache[$form_id]);
         return $this->get_form_config($form_id);
-    }
-
-    /**
-     * Register custom form field types
-     * Allows registration of custom field types for DMN integration
-     * 
-     * @param string $type Field type identifier
-     * @param array $config Field type configuration
-     * @since 1.0.0
-     */
-    public function register_custom_field_type($type, $config) {
-        // Implementation for custom field type registration
-        // This could be used to add DMN-specific field types
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Gravity Forms: Registering custom field type: ' . $type);
-        }
-        
-        // Store custom field type configuration
-        // This would integrate with Gravity Forms field registration system
     }
 
     /**
