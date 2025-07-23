@@ -92,7 +92,6 @@ class Operaton_DMN_Admin {
         add_action('wp_ajax_nopriv_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
         add_action('wp_ajax_operaton_test_full_config', array($this, 'ajax_test_full_config'));
         add_action('wp_ajax_operaton_clear_update_cache', array($this, 'ajax_clear_update_cache'));
-        add_action('wp_ajax_operaton_manual_db_update', array($this, 'ajax_manual_database_update'));
     }
 
     // =============================================================================
@@ -201,7 +200,7 @@ class Operaton_DMN_Admin {
         }
         
         // Force database check when accessing admin pages
-        $this->core->check_and_update_database();
+        $this->core->get_database_instance()->check_and_update_database();
         
         // Check for database issues and show user-friendly message
         global $wpdb;
@@ -230,7 +229,7 @@ class Operaton_DMN_Admin {
         }
         
         // Get configurations for display
-        $configs = $this->core->get_all_configurations();
+        $configs = $this->core->get_database_instance()->get_all_configurations();
         
         // Include the admin list template
         $this->load_admin_template('list', compact('configs'));
@@ -248,7 +247,7 @@ class Operaton_DMN_Admin {
         }
         
         // Force database check
-        $this->core->check_and_update_database();
+        $this->core->get_database_instance()->check_and_update_database();
         
         // Check if migration was successful
         global $wpdb;
@@ -273,7 +272,7 @@ class Operaton_DMN_Admin {
         
         // Get data for form display
         $gravity_forms = $this->get_gravity_forms();
-        $config = isset($_GET['edit']) ? $this->core->get_configuration($_GET['edit']) : null;
+        $config = $this->core->get_database_instance()->get_configuration($_GET['edit']);
         
         // Include the admin form template
         $this->load_admin_template('form', compact('gravity_forms', 'config'));
@@ -767,33 +766,6 @@ class Operaton_DMN_Admin {
         wp_send_json_success(array('message' => __('Update cache cleared', 'operaton-dmn')));
     }
 
-    /**
-     * AJAX handler for manual database update triggered from admin interface
-     * Provides manual database migration option for administrators when automatic migration fails
-     * 
-     * @since 1.0.0
-     */
-    public function ajax_manual_database_update() {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Manual database update requested');
-        }
-        
-        // Verify nonce and permissions
-        if (!wp_verify_nonce($_GET['_wpnonce'], 'operaton_manual_db_update') || !current_user_can($this->capability)) {
-            wp_die(__('Security check failed', 'operaton-dmn'));
-        }
-        
-        // Perform database update
-        $this->core->check_and_update_database();
-        
-        // Redirect back with success message
-        wp_redirect(add_query_arg(array(
-            'page' => 'operaton-dmn',
-            'database_updated' => '1'
-        ), admin_url('admin.php')));
-        exit;
-    }
-
     // =============================================================================
     // HELPER AND UTILITY METHODS
     // =============================================================================
@@ -806,7 +778,7 @@ class Operaton_DMN_Admin {
      * @since 1.0.0
      */
     private function handle_config_deletion($config_id) {
-        $result = $this->core->delete_config($config_id);
+        $result = $this->core->get_database_instance()->delete_config($config_id);
         
         if ($result !== false) {
             echo '<div class="notice notice-success"><p>' . __('Configuration deleted successfully!', 'operaton-dmn') . '</p></div>';
@@ -823,7 +795,7 @@ class Operaton_DMN_Admin {
      * @since 1.0.0
      */
     private function handle_config_save($data) {
-        $result = $this->core->save_configuration($data);
+        $result = $this->core->get_database_instance()->save_configuration($data);
         
         if ($result) {
             echo '<div class="notice notice-success"><p>' . __('Configuration saved successfully!', 'operaton-dmn') . '</p></div>';
