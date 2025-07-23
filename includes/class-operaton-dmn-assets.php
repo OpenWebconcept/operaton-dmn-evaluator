@@ -123,6 +123,146 @@ class Operaton_DMN_Assets {
         // Conditional loading hooks
         add_action('wp_enqueue_scripts', array($this, 'maybe_enqueue_frontend_assets'), 10);
         add_action('admin_enqueue_scripts', array($this, 'maybe_enqueue_admin_assets'), 10);
+
+        // NEW: DOCTYPE compatibility check
+        add_action('wp_head', array($this, 'check_document_compatibility'), 1);
+    }
+
+    /**
+     * NEW: Check and handle document compatibility mode issues
+     * Detects Quirks Mode and provides warnings/fixes for jQuery compatibility
+     * 
+     * @since 1.0.0
+     */
+    public function check_document_compatibility() {
+        // Only run on frontend pages with potential Gravity Forms
+        if (is_admin()) {
+            return;
+        }
+        
+        // Check if we should run compatibility checks
+        if (!$this->should_run_compatibility_check()) {
+            return;
+        }
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Running document compatibility check');
+        }
+        
+        ?>
+        <script type="text/javascript">
+        /* Operaton DMN Document Compatibility Check */
+        (function() {
+            'use strict';
+            
+            // Check document compatibility mode
+            var isQuirksMode = document.compatMode === "BackCompat";
+            var hasDoctype = document.doctype !== null;
+            var doctypeName = document.doctype ? document.doctype.name : 'none';
+            
+            if (isQuirksMode) {
+                console.warn('Operaton DMN: Page running in Quirks Mode - jQuery compatibility issues possible');
+                console.warn('Operaton DMN: Doctype detected:', doctypeName);
+                
+                // Try to provide helpful information
+                if (!hasDoctype) {
+                    console.warn('Operaton DMN: No DOCTYPE declaration found. Add <!DOCTYPE html> to your theme header.');
+                } else if (doctypeName.toLowerCase() !== 'html') {
+                    console.warn('Operaton DMN: Non-HTML5 DOCTYPE detected. Consider using <!DOCTYPE html>');
+                }
+                
+                // Store compatibility info for other scripts
+                window.operatonCompatibilityInfo = {
+                    quirksMode: true,
+                    doctype: doctypeName,
+                    jqueryWarning: true
+                };
+            } else {
+                if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
+                    console.log('Operaton DMN: Document in Standards Mode ✓');
+                }
+                
+                window.operatonCompatibilityInfo = {
+                    quirksMode: false,
+                    doctype: doctypeName,
+                    jqueryWarning: false
+                };
+            }
+        })();
+        </script>
+        <?php
+        
+        // Add CSS fixes for Quirks Mode if needed
+        $this->add_quirks_mode_css_fixes();
+    }
+
+    /**
+     * NEW: Determine if compatibility check should run
+     * Only runs on pages that might have Gravity Forms with DMN
+     * 
+     * @return bool True if compatibility check should run
+     * @since 1.0.0
+     */
+    private function should_run_compatibility_check() {
+        // Always run if we detect Gravity Forms on the page
+        if ($this->has_gravity_forms_on_page()) {
+            return true;
+        }
+        
+        // Run on specific pages that might load forms dynamically
+        global $post;
+        if ($post) {
+            // Check for shortcodes
+            if (has_shortcode($post->post_content, 'gravityform')) {
+                return true;
+            }
+            
+            // Check for Gutenberg blocks
+            if (has_block('gravityforms/form', $post)) {
+                return true;
+            }
+        }
+        
+        // Run on Gravity Forms preview pages
+        if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * NEW: Add CSS fixes for Quirks Mode compatibility
+     * Provides basic styling fixes when in Quirks Mode
+     * 
+     * @since 1.0.0
+     */
+    private function add_quirks_mode_css_fixes() {
+        ?>
+        <style type="text/css">
+        /* Operaton DMN Quirks Mode Compatibility Fixes */
+        .operaton-quirks-mode-detected {
+            /* Ensure consistent box model */
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+        }
+        
+        /* Fix for Gravity Forms in Quirks Mode */
+        .gform_wrapper .operaton-evaluate-btn {
+            /* Ensure button displays correctly */
+            display: inline-block !important;
+            vertical-align: top;
+        }
+        
+        /* Decision flow tables in Quirks Mode */
+        .decision-table.excel-style {
+            /* More explicit table styling for Quirks Mode */
+            table-layout: fixed;
+            width: 100%;
+        }
+        </style>
+        <?php
     }
 
     /**
@@ -280,7 +420,9 @@ public function maybe_enqueue_frontend_assets() {
  * FIXED enqueue_frontend_assets method for class-operaton-dmn-assets.php
  * The issue is that wp_enqueue_script() might not immediately register the script
  * We need to ensure registration happens before localization
- */
+     * UPDATED: Enhanced frontend asset enqueuing with compatibility check
+     * Now includes compatibility mode handling
+     */
     public function enqueue_frontend_assets() {
         // Prevent duplicate loading
         if (isset($this->loaded_assets['frontend'])) {
@@ -294,32 +436,32 @@ public function maybe_enqueue_frontend_assets() {
             error_log('Operaton DMN Assets: ⭐ STARTING enqueue_frontend_assets');
         }
         
-        // FIXED: Ensure jQuery is enqueued first
+        // ENHANCED: Add compatibility check integration
+        add_action('wp_footer', array($this, 'add_compatibility_integration'), 5);
+        
+        // Ensure jQuery is loaded first
         wp_enqueue_script('jquery');
         
-        // FIXED: Force registration if not already registered
+        // Force registration if not already registered
         if (!wp_script_is('operaton-dmn-frontend', 'registered')) {
-            $this->register_frontend_assets();
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: 🔧 Script not registered, registering now');
+            }
+            
+            wp_register_script(
+                'operaton-dmn-frontend',
+                $this->plugin_url . 'assets/js/frontend.js',
+                array('jquery'),
+                $this->version,
+                true
+            );
         }
         
-        // Enqueue CSS and JS
+        // Enqueue frontend CSS and JS
         wp_enqueue_style('operaton-dmn-frontend');
         wp_enqueue_script('operaton-dmn-frontend');
         
-        // FIXED: Verify script is properly enqueued before localization
-        if (!wp_script_is('operaton-dmn-frontend', 'enqueued')) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Assets: ❌ Script failed to enqueue, forcing...');
-            }
-            
-            // Force enqueue
-            global $wp_scripts;
-            if (!isset($wp_scripts->queue) || !in_array('operaton-dmn-frontend', $wp_scripts->queue)) {
-                $wp_scripts->queue[] = 'operaton-dmn-frontend';
-            }
-        }
-        
-        // Build localization data
+        // Rest of your existing localization code...
         $localization_data = array(
             'url' => rest_url('operaton-dmn/v1/evaluate'),
             'nonce' => wp_create_nonce('wp_rest'),
@@ -335,22 +477,11 @@ public function maybe_enqueue_frontend_assets() {
             )
         );
         
-        // FIXED: More robust localization with fallback
+        // Enhanced localization with better error handling
         $localize_result = wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
         
-        if (!$localize_result) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Assets: ❌ wp_localize_script failed, using wp_head fallback');
-            }
-            
-            // Emergency fallback
-            add_action('wp_head', function() use ($localization_data) {
-                echo '<script type="text/javascript">';
-                echo '/* Operaton DMN Emergency Fallback */';
-                echo 'window.operaton_ajax = ' . wp_json_encode($localization_data) . ';';
-                echo 'console.log("🆘 Emergency operaton_ajax loaded via wp_head", window.operaton_ajax);';
-                echo '</script>';
-            }, 1);
+        if (!$localize_result && defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: ❌ wp_localize_script failed');
         }
         
         $this->loaded_assets['frontend'] = true;
@@ -358,6 +489,93 @@ public function maybe_enqueue_frontend_assets() {
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Assets: ⭐ FINISHED enqueue_frontend_assets');
         }
+    }
+
+    /**
+     * NEW: Add compatibility integration to footer
+     * Provides additional JavaScript compatibility handling
+     * 
+     * @since 1.0.0
+     */
+    public function add_compatibility_integration() {
+        // Only add once
+        static $added = false;
+        if ($added) {
+            return;
+        }
+        $added = true;
+        
+        ?>
+        <script type="text/javascript">
+        /* Operaton DMN Compatibility Integration */
+        (function($) {
+            'use strict';
+            
+            // Wait for compatibility info to be available
+            function waitForCompatibilityInfo(callback) {
+                var attempts = 0;
+                var maxAttempts = 10;
+                
+                function check() {
+                    if (window.operatonCompatibilityInfo) {
+                        callback(window.operatonCompatibilityInfo);
+                    } else if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(check, 100);
+                    } else {
+                        // Fallback
+                        callback({
+                            quirksMode: document.compatMode === "BackCompat",
+                            doctype: document.doctype ? document.doctype.name : 'none',
+                            jqueryWarning: false
+                        });
+                    }
+                }
+                check();
+            }
+            
+            // Initialize compatibility handling
+            $(document).ready(function() {
+                waitForCompatibilityInfo(function(compatInfo) {
+                    if (compatInfo.quirksMode) {
+                        // Add CSS class for Quirks Mode styling
+                        $('body').addClass('operaton-quirks-mode-detected');
+                        
+                        // Show user-friendly warning in debug mode
+                        if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
+                            console.warn('Operaton DMN: Your theme may be in Quirks Mode. Consider adding <!DOCTYPE html> to the theme header for better compatibility.');
+                        }
+                    }
+                    
+                    // Store compatibility info globally for other scripts
+                    if (window.operaton_ajax) {
+                        window.operaton_ajax.compatibility = compatInfo;
+                    }
+                });
+            });
+            
+        })(jQuery);
+        </script>
+        <?php
+    }
+
+    /**
+     * NEW: Get compatibility status for debugging
+     * Provides compatibility information for admin interface
+     * 
+     * @return array Compatibility status information
+     * @since 1.0.0
+     */
+    public function get_compatibility_status() {
+        return array(
+            'check_enabled' => true,
+            'hooks_registered' => array(
+                'wp_head' => has_action('wp_head', array($this, 'check_document_compatibility')),
+                'wp_footer' => has_action('wp_footer', array($this, 'add_compatibility_integration'))
+            ),
+            'quirks_mode_detection' => 'JavaScript-based',
+            'css_fixes_available' => true
+        );
     }
 
     /**

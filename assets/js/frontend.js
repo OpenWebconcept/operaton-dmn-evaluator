@@ -1,13 +1,85 @@
-// FIXED frontend.js - Prevent duplicate initialization and improve jQuery handling
+// Enhanced frontend.js with process execution and decision flow support
 console.log('Operaton DMN frontend script loading (enhanced with decision flow)...');
 
-// FIXED: Global flag to prevent duplicate initialization
+// Global flag to prevent duplicate initialization
 window.operatonDmnInitialized = window.operatonDmnInitialized || false;
 
 jQuery(document).ready(function($) {
+    'use strict';
+
+    // Prevent duplicate initialization
+    if (window.operatonDmnInitialized) {
+        console.log('Operaton DMN: Already initialized, skipping duplicate initialization');
+        return;
+    }
+
     console.log('Enhanced Operaton DMN frontend script loaded');
 
-    // CRITICAL FIX: Wait for operaton_ajax to be available
+    // FIXED: Define all functions FIRST before using them
+    
+    // Debounced form initialization to prevent multiple calls
+    var formInitializationTimers = {};
+    
+    function debouncedFormInitialization(formId) {
+        if (formInitializationTimers[formId]) {
+            clearTimeout(formInitializationTimers[formId]);
+        }
+        
+        formInitializationTimers[formId] = setTimeout(function() {
+            initializeFormEvaluation(formId);
+        }, 200);
+    }
+
+    // Initialize evaluation for forms
+    var initOperatonDMN = function() {
+        if (typeof gform !== 'undefined' && gform.initializeOnLoaded) {
+            gform.addAction('gform_post_render', function(formId) {
+                console.log('Gravity Form rendered, initializing Enhanced Operaton DMN for form:', formId);
+                debouncedFormInitialization(formId);
+            });
+        } else {
+            setTimeout(function() {
+                $('form[id^="gform_"]').each(function() {
+                    var formId = $(this).attr('id').replace('gform_', '');
+                    debouncedFormInitialization(formId);
+                });
+            }, 500);
+        }
+    };
+
+    // Enhanced form initialization with duplicate prevention
+    function initializeFormEvaluation(formId) {
+        var configVar = 'operaton_config_' + formId;
+        if (typeof window[configVar] !== 'undefined') {
+            // Check if already initialized for this form
+            if (window['operaton_form_' + formId + '_initialized']) {
+                console.log('Form', formId, 'already initialized, skipping');
+                return;
+            }
+            
+            console.log('Enhanced configuration found for form:', formId);
+            var config = window[configVar];
+            
+            bindEvaluationEvents(formId);
+            bindNavigationEvents(formId);
+            bindInputChangeListeners(formId);
+            
+            // Initialize decision flow summary if enabled
+            if (config.show_decision_flow) {
+                initializeDecisionFlowSummary(formId);
+            }
+            
+            // Clear any existing results when form initializes
+            setTimeout(function() {
+                clearResultFieldWithMessage(formId, 'Form initialized');
+            }, 200);
+            
+            // Mark as initialized
+            window['operaton_form_' + formId + '_initialized'] = true;
+        }
+    }
+
+    // Better waiting mechanism for operaton_ajax
     function waitForOperatonAjax(callback, maxAttempts = 30) {
         var attempts = 0;
         
@@ -44,87 +116,91 @@ jQuery(document).ready(function($) {
         check();
     }
 
-    // FIXED: Initialize only once after operaton_ajax is available
-    waitForOperatonAjax(function() {
-        console.log('Initializing Enhanced Operaton DMN...');
+    // Bind evaluation events
+    function bindEvaluationEvents(formId) {
+        var selector = '.operaton-evaluate-btn[data-form-id="' + formId + '"]';
+        console.log('Binding events for selector:', selector);
         
-        // Set initialization flag
-        window.operatonDmnInitialized = true;
-        
-        initOperatonDMN();
-        
-        // Bind events for existing forms
-        $('form[id^="gform_"]').each(function() {
-            var formId = $(this).attr('id').replace('gform_', '');
-            initializeFormEvaluation(formId);
+        $(document).off('click', selector);
+        $(document).on('click', selector, function(e) {
+            e.preventDefault();
+            console.log('Button clicked!', this);
+            handleEvaluateClick($(this));
         });
         
-        console.log('Enhanced Operaton DMN frontend script initialization complete');
-    });
+        console.log('Event handler bound for form:', formId);
+    }
 
-    // FIXED: Debounced form initialization to prevent multiple calls
-    var formInitializationTimers = {};
-    
-    function debouncedFormInitialization(formId) {
-        if (formInitializationTimers[formId]) {
-            clearTimeout(formInitializationTimers[formId]);
+    // Bind navigation events
+    function bindNavigationEvents(formId) {
+        var $form = $('#gform_' + formId);
+        
+        $form.off('click.operaton-nav');
+        $form.on('click.operaton-nav', '.gform_previous_button, input[value="Previous"], button:contains("Previous")', function() {
+            console.log('Previous button clicked for form:', formId);
+            clearResultFieldWithMessage(formId, 'Previous button clicked');
+        });
+        
+        if (typeof gform !== 'undefined') {
+            if (gform.removeAction) {
+                gform.removeAction('gform_page_loaded', 'operaton_clear_' + formId);
+            }
+            
+            gform.addAction('gform_page_loaded', function(loadedFormId, currentPage) {
+                if (loadedFormId == formId) {
+                    console.log('Form page loaded for form:', formId, 'page:', currentPage);
+                    setTimeout(function() {
+                        clearResultFieldWithMessage(formId, 'Page loaded: ' + currentPage);
+                    }, 300);
+                }
+            }, 10, 'operaton_clear_' + formId);
         }
         
-        formInitializationTimers[formId] = setTimeout(function() {
-            initializeFormEvaluation(formId);
-        }, 200);
+        if (typeof gform !== 'undefined') {
+            gform.addAction('gform_post_render', function(loadedFormId) {
+                if (loadedFormId == formId) {
+                    console.log('Form post render for form:', formId);
+                    setTimeout(function() {
+                        clearResultFieldWithMessage(formId, 'Form post render');
+                    }, 500);
+                }
+            }, 10, 'operaton_clear_render_' + formId);
+        }
     }
 
-    // Initialize evaluation for forms
-    var initOperatonDMN = function() {
-        if (typeof gform !== 'undefined' && gform.initializeOnLoaded) {
-            gform.addAction('gform_post_render', function(formId) {
-                console.log('Gravity Form rendered, initializing Enhanced Operaton DMN for form:', formId);
-                debouncedFormInitialization(formId);
-            });
-        } else {
-            setTimeout(function() {
-                $('form[id^="gform_"]').each(function() {
-                    var formId = $(this).attr('id').replace('gform_', '');
-                    debouncedFormInitialization(formId);
-                });
-            }, 500);
-        }
-    };
-
-    // FIXED: Enhanced form initialization with duplicate prevention
-    function initializeFormEvaluation(formId) {
+    // Bind input change listeners
+    function bindInputChangeListeners(formId) {
+        var $form = $('#gform_' + formId);
         var configVar = 'operaton_config_' + formId;
-        if (typeof window[configVar] !== 'undefined') {
-            // Check if already initialized for this form
-            if (window['operaton_form_' + formId + '_initialized']) {
-                console.log('Form', formId, 'already initialized, skipping');
-                return;
-            }
+        var config = window[configVar];
+        
+        if (!config || !config.field_mappings) return;
+        
+        console.log('Binding input change listeners for form:', formId);
+        
+        $.each(config.field_mappings, function(dmnVariable, mapping) {
+            var fieldId = mapping.field_id;
+            var selectors = [
+                '#input_' + formId + '_' + fieldId,
+                'input[name="input_' + formId + '_' + fieldId + '"]',
+                'select[name="input_' + formId + '_' + fieldId + '"]',
+                'input[name="input_' + fieldId + '"]'
+            ];
             
-            console.log('Enhanced configuration found for form:', formId);
-            var config = window[configVar];
-            
-            bindEvaluationEvents(formId);
-            bindNavigationEvents(formId);
-            bindInputChangeListeners(formId);
-            
-            // NEW: Initialize decision flow summary if enabled
-            if (config.show_decision_flow) {
-                initializeDecisionFlowSummary(formId);
-            }
-            
-            // Clear any existing results when form initializes
-            setTimeout(function() {
-                clearResultFieldWithMessage(formId, 'Form initialized');
-            }, 200);
-            
-            // Mark as initialized
-            window['operaton_form_' + formId + '_initialized'] = true;
-        }
+            $.each(selectors, function(index, selector) {
+                $form.off('change.operaton', selector);
+                $form.on('change.operaton', selector, function() {
+                    console.log('Input field changed:', selector, 'New value:', $(this).val());
+                    
+                    setTimeout(function() {
+                        clearResultFieldWithMessage(formId, 'Input changed - result cleared');
+                    }, 100);
+                });
+            });
+        });
     }
 
-    // NEW: Initialize decision flow summary functionality
+    // Initialize decision flow summary functionality
     function initializeDecisionFlowSummary(formId) {
         console.log('Initializing decision flow summary for form:', formId);
         
@@ -141,7 +217,7 @@ jQuery(document).ready(function($) {
         }
     }
 
-    // NEW: Load and display decision flow summary
+    // Load and display decision flow summary
     function loadDecisionFlowSummary(formId) {
         var $summaryContainer = $('#decision-flow-summary-' + formId);
         
@@ -208,7 +284,7 @@ jQuery(document).ready(function($) {
         });
     }
 
-    // NEW: Bind decision flow refresh functionality
+    // Bind decision flow refresh functionality
     function bindDecisionFlowRefresh(formId) {
         $(document).off('click.decision-flow', '.refresh-decision-flow[data-form-id="' + formId + '"]');
         $(document).on('click.decision-flow', '.refresh-decision-flow[data-form-id="' + formId + '"]', function(e) {
@@ -241,40 +317,40 @@ jQuery(document).ready(function($) {
         return totalPages;
     }
 
-function debugResultFields(formId) {
-    console.log('=== DEBUGGING RESULT FIELDS ===');
-    console.log('Form ID:', formId);
-    console.log('Looking for fields 35 and 36...');
-    
-    // Check all possible selectors
-    const selectors = [
-        '#input_' + formId + '_35',
-        '#input_' + formId + '_36',
-        'input[name="input_' + formId + '_35"]',
-        'input[name="input_' + formId + '_36"]',
-        '#field_' + formId + '_35',
-        '#field_' + formId + '_36'
-    ];
-    
-    selectors.forEach(selector => {
-        const elements = $(selector);
-        console.log('Selector:', selector, 'Found:', elements.length, 'Visible:', elements.filter(':visible').length);
-        if (elements.length > 0) {
-            elements.each(function() {
-                console.log('  Element:', this, 'Visible:', $(this).is(':visible'), 'Type:', this.type);
-            });
-        }
-    });
-    
-    // Check all visible inputs on current page
-    console.log('All visible inputs on current page:');
-    $('input:visible, textarea:visible, select:visible').each(function() {
-        const name = $(this).attr('name') || 'no-name';
-        const id = $(this).attr('id') || 'no-id';
-        console.log('  Input:', id, 'Name:', name, 'Type:', this.type);
-    });
-}
-
+    // Debug result fields
+    function debugResultFields(formId) {
+        console.log('=== DEBUGGING RESULT FIELDS ===');
+        console.log('Form ID:', formId);
+        console.log('Looking for fields 35 and 36...');
+        
+        // Check all possible selectors
+        var selectors = [
+            '#input_' + formId + '_35',
+            '#input_' + formId + '_36',
+            'input[name="input_' + formId + '_35"]',
+            'input[name="input_' + formId + '_36"]',
+            '#field_' + formId + '_35',
+            '#field_' + formId + '_36'
+        ];
+        
+        $.each(selectors, function(index, selector) {
+            var elements = $(selector);
+            console.log('Selector:', selector, 'Found:', elements.length, 'Visible:', elements.filter(':visible').length);
+            if (elements.length > 0) {
+                elements.each(function() {
+                    console.log('  Element:', this, 'Visible:', $(this).is(':visible'), 'Type:', this.type);
+                });
+            }
+        });
+        
+        // Check all visible inputs on current page
+        console.log('All visible inputs on current page:');
+        $('input:visible, textarea:visible, select:visible').each(function() {
+            var name = $(this).attr('name') || 'no-name';
+            var id = $(this).attr('id') || 'no-id';
+            console.log('  Input:', id, 'Name:', name, 'Type:', this.type);
+        });
+    }
 
     // Enhanced result processing for process execution
     function handleEvaluateClick($button) {
@@ -311,7 +387,7 @@ function debugResultFields(formId) {
                 return;
             }
             
-            // Collect form data (same as before)
+            // Collect form data
             var formData = {};
             var hasRequiredData = true;
             var missingFields = [];
@@ -384,20 +460,19 @@ function debugResultFields(formId) {
             // Show loading state
             $button.val('Evaluating...').prop('disabled', true);
             
-        // CRITICAL FIX: Check if operaton_ajax is available before making call
-        if (typeof window.operaton_ajax === 'undefined') {
-            console.error('❌ operaton_ajax not available, cannot make AJAX call');
-            showError('System error: AJAX configuration not loaded. Please refresh the page.');
-            $button.val(originalText).prop('disabled', false);
-            return;
-        }
-        
-        console.log('Making AJAX call to:', window.operaton_ajax.url);
-
+            // Check if operaton_ajax is available before making call
+            if (typeof window.operaton_ajax === 'undefined') {
+                console.error('❌ operaton_ajax not available, cannot make AJAX call');
+                showError('System error: AJAX configuration not loaded. Please refresh the page.');
+                $button.val(originalText).prop('disabled', false);
+                return;
+            }
+            
+            console.log('Making AJAX call to:', window.operaton_ajax.url);
 
             // Make AJAX call to evaluate/execute process
             $.ajax({
-            url: window.operaton_ajax.url, // Use window.operaton_ajax explicitly
+                url: window.operaton_ajax.url,
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
@@ -409,9 +484,8 @@ function debugResultFields(formId) {
                 },
                 success: function(response) {
                     console.log('AJAX success:', response);
-                    // Call this function right before trying to populate results
-                    // Add it to handleEvaluateClick function after the AJAX success
                     debugResultFields(formId);
+                    
                     if (response.success && response.results) {
                         console.log('Results received:', response.results);
                         
@@ -448,7 +522,7 @@ function debugResultFields(formId) {
                             }
                         });
                         
-                        // NEW: Store process instance ID if provided
+                        // Store process instance ID if provided
                         if (response.process_instance_id) {
                             storeProcessInstanceId(formId, response.process_instance_id);
                             console.log('Stored process instance ID:', response.process_instance_id);
@@ -484,41 +558,41 @@ function debugResultFields(formId) {
                         showError('No results received from evaluation.');
                     }
                 },
-            error: function(xhr, status, error) {
-                console.error('AJAX Error:', error);
-                console.error('XHR Status:', xhr.status);
-                console.error('XHR Response:', xhr.responseText);
-                
-                var errorMessage = 'Error during evaluation. Please try again.';
-                
-                // Better error handling
-                if (xhr.status === 0) {
-                    errorMessage = 'Connection error. Please check your internet connection and try again.';
-                } else if (xhr.status === 400) {
-                    try {
-                        var errorResponse = JSON.parse(xhr.responseText);
-                        if (errorResponse.message) {
-                            errorMessage = errorResponse.message;
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', error);
+                    console.error('XHR Status:', xhr.status);
+                    console.error('XHR Response:', xhr.responseText);
+                    
+                    var errorMessage = 'Error during evaluation. Please try again.';
+                    
+                    // Better error handling
+                    if (xhr.status === 0) {
+                        errorMessage = 'Connection error. Please check your internet connection and try again.';
+                    } else if (xhr.status === 400) {
+                        try {
+                            var errorResponse = JSON.parse(xhr.responseText);
+                            if (errorResponse.message) {
+                                errorMessage = errorResponse.message;
+                            }
+                        } catch (e) {
+                            errorMessage = 'Bad request. Please check your form data.';
                         }
-                    } catch (e) {
-                        errorMessage = 'Bad request. Please check your form data.';
-                    }
-                } else if (xhr.status === 404) {
-                    errorMessage = 'Evaluation service not found. Please contact support.';
-                } else if (xhr.status === 500) {
-                    errorMessage = 'Server error occurred during evaluation. Please try again.';
-                } else {
-                    try {
-                        var errorResponse = JSON.parse(xhr.responseText);
-                        if (errorResponse.message) {
-                            errorMessage = errorResponse.message;
+                    } else if (xhr.status === 404) {
+                        errorMessage = 'Evaluation service not found. Please contact support.';
+                    } else if (xhr.status === 500) {
+                        errorMessage = 'Server error occurred during evaluation. Please try again.';
+                    } else {
+                        try {
+                            var errorResponse = JSON.parse(xhr.responseText);
+                            if (errorResponse.message) {
+                                errorMessage = errorResponse.message;
+                            }
+                        } catch (e) {
+                            errorMessage = 'HTTP ' + xhr.status + ': ' + error;
                         }
-                    } catch (e) {
-                        errorMessage = 'HTTP ' + xhr.status + ': ' + error;
                     }
-                }
-                
-                showError(errorMessage);
+                    
+                    showError(errorMessage);
                 },
                 complete: function() {
                     $button.val(originalText).prop('disabled', false);
@@ -527,7 +601,7 @@ function debugResultFields(formId) {
         }
     }
 
-    // NEW: Store process instance ID for decision flow retrieval
+    // Store process instance ID for decision flow retrieval
     function storeProcessInstanceId(formId, processInstanceId) {
         sessionStorage.setItem('operaton_process_' + formId, processInstanceId);
         
@@ -537,7 +611,7 @@ function debugResultFields(formId) {
         console.log('Stored process instance ID for form', formId + ':', processInstanceId);
     }
 
-    // NEW: Get stored process instance ID
+    // Get stored process instance ID
     function getStoredProcessInstanceId(formId) {
         // Try global variable first
         if (window['operaton_process_' + formId]) {
@@ -592,31 +666,14 @@ function debugResultFields(formId) {
         sessionStorage.removeItem('operaton_dmn_data_' + formId);
         sessionStorage.removeItem('operaton_dmn_eval_data_' + formId);
         
-        // NEW: Clear process instance data
+        // Clear process instance data
         sessionStorage.removeItem('operaton_process_' + formId);
         delete window['operaton_process_' + formId];
         
         console.log('Cleared all stored results and process data for form:', formId);
     }
 
-    // All other existing functions remain the same...
-    // (bindEvaluationEvents, getCurrentPage, convertDateFormat, findFieldOnCurrentPage, 
-    //  findResultFieldOnCurrentPage, getGravityFieldValue, forceSyncRadioButtons, etc.)
-
-    function bindEvaluationEvents(formId) {
-        var selector = '.operaton-evaluate-btn[data-form-id="' + formId + '"]';
-        console.log('Binding events for selector:', selector);
-        
-        $(document).off('click', selector);
-        $(document).on('click', selector, function(e) {
-            e.preventDefault();
-            console.log('Button clicked!', this);
-            handleEvaluateClick($(this));
-        });
-        
-        console.log('Event handler bound for form:', formId);
-    }
-
+    // Get current page
     function getCurrentPage(formId) {
         var urlParams = new URLSearchParams(window.location.search);
         var pageParam = urlParams.get('gf_page');
@@ -633,74 +690,7 @@ function debugResultFields(formId) {
         return 1;
     }
 
-    function bindNavigationEvents(formId) {
-        var $form = $('#gform_' + formId);
-        
-        $form.off('click.operaton-nav');
-        $form.on('click.operaton-nav', '.gform_previous_button, input[value="Previous"], button:contains("Previous")', function() {
-            console.log('Previous button clicked for form:', formId);
-            clearResultFieldWithMessage(formId, 'Previous button clicked');
-        });
-        
-        if (typeof gform !== 'undefined') {
-            if (gform.removeAction) {
-                gform.removeAction('gform_page_loaded', 'operaton_clear_' + formId);
-            }
-            
-            gform.addAction('gform_page_loaded', function(loadedFormId, currentPage) {
-                if (loadedFormId == formId) {
-                    console.log('Form page loaded for form:', formId, 'page:', currentPage);
-                    setTimeout(function() {
-                        clearResultFieldWithMessage(formId, 'Page loaded: ' + currentPage);
-                    }, 300);
-                }
-            }, 10, 'operaton_clear_' + formId);
-        }
-        
-        if (typeof gform !== 'undefined') {
-            gform.addAction('gform_post_render', function(loadedFormId) {
-                if (loadedFormId == formId) {
-                    console.log('Form post render for form:', formId);
-                    setTimeout(function() {
-                        clearResultFieldWithMessage(formId, 'Form post render');
-                    }, 500);
-                }
-            }, 10, 'operaton_clear_render_' + formId);
-        }
-    }
-
-    function bindInputChangeListeners(formId) {
-        var $form = $('#gform_' + formId);
-        var configVar = 'operaton_config_' + formId;
-        var config = window[configVar];
-        
-        if (!config || !config.field_mappings) return;
-        
-        console.log('Binding input change listeners for form:', formId);
-        
-        $.each(config.field_mappings, function(dmnVariable, mapping) {
-            var fieldId = mapping.field_id;
-            var selectors = [
-                '#input_' + formId + '_' + fieldId,
-                'input[name="input_' + formId + '_' + fieldId + '"]',
-                'select[name="input_' + formId + '_' + fieldId + '"]',
-                'input[name="input_' + fieldId + '"]'
-            ];
-            
-            $.each(selectors, function(index, selector) {
-                $form.off('change.operaton', selector);
-                $form.on('change.operaton', selector, function() {
-                    console.log('Input field changed:', selector, 'New value:', $(this).val());
-                    
-                    setTimeout(function() {
-                        clearResultFieldWithMessage(formId, 'Input changed - result cleared');
-                    }, 100);
-                });
-            });
-        });
-    }
-
-    // Include all other existing helper functions...
+    // Convert date format
     function convertDateFormat(dateStr, fieldName) {
         if (!dateStr || dateStr === null) {
             return null;
@@ -750,6 +740,7 @@ function debugResultFields(formId) {
         return dateStr;
     }
 
+    // Find field on current page
     function findFieldOnCurrentPage(formId, fieldId) {
         console.log('Searching for field ID', fieldId, 'on current page of form:', formId);
         
@@ -774,6 +765,7 @@ function debugResultFields(formId) {
         return null;
     }
 
+    // Find result field on current page
     function findResultFieldOnCurrentPage(formId) {
         console.log('Searching for result field on current page of form:', formId);
         
@@ -844,6 +836,7 @@ function debugResultFields(formId) {
         return null;
     }
 
+    // Get Gravity field value
     function getGravityFieldValue(formId, fieldId) {
         console.log('Getting value for form:', formId, 'field:', fieldId);
         
@@ -896,6 +889,7 @@ function debugResultFields(formId) {
         return null;
     }
 
+    // Find custom radio value
     function findCustomRadioValue(formId, fieldId) {
         var $form = $('#gform_' + formId);
         
@@ -960,6 +954,7 @@ function debugResultFields(formId) {
         return null;
     }
 
+    // Generate possible radio names
     function generatePossibleRadioNames(fieldLabel, fieldId) {
         var possibilities = [];
         
@@ -982,6 +977,7 @@ function debugResultFields(formId) {
         return possibilities;
     }
 
+    // Force sync radio buttons
     function forceSyncRadioButtons(formId) {
         console.log('Forcing generic radio button synchronization for form:', formId);
         
@@ -1039,6 +1035,7 @@ function debugResultFields(formId) {
         });
     }
 
+    // Find field ID for radio name
     function findFieldIdForRadioName(formId, radioName) {
         var configVar = 'operaton_config_' + formId;
         if (typeof window[configVar] !== 'undefined') {
@@ -1052,6 +1049,7 @@ function debugResultFields(formId) {
         return null;
     }
 
+    // Get field value
     function getFieldValue($field) {
         if ($field.length === 0) return null;
         
@@ -1070,6 +1068,7 @@ function debugResultFields(formId) {
         return $field.val();
     }
 
+    // Validate field type
     function validateFieldType(value, expectedType) {
         switch (expectedType) {
             case 'Integer':
@@ -1084,6 +1083,7 @@ function debugResultFields(formId) {
         }
     }
 
+    // Validate form
     function validateForm(formId) {
         if (typeof gform !== 'undefined' && gform.validators && gform.validators[formId]) {
             var isValid = gform.validators[formId]();
@@ -1108,6 +1108,7 @@ function debugResultFields(formId) {
         return allValid;
     }
 
+    // Show success notification
     function showSuccessNotification(message) {
         console.log('Success:', message);
         
@@ -1140,6 +1141,7 @@ function debugResultFields(formId) {
         }, 6000);
     }
 
+    // Show error
     function showError(message) {
         console.error('Operaton DMN Error:', message);
         
@@ -1171,6 +1173,7 @@ function debugResultFields(formId) {
         }, 8000);
     }
 
+    // Highlight field
     function highlightField($field) {
         if ($field && $field.length > 0) {
             var originalBackground = $field.css('background-color');
@@ -1195,19 +1198,26 @@ function debugResultFields(formId) {
         }
     }
 
-    // Initialize the plugin
-    console.log('Initializing Enhanced Operaton DMN...');
-    initOperatonDMN();
-    
-    // Bind events for existing forms
-    $('form[id^="gform_"]').each(function() {
-        var formId = $(this).attr('id').replace('gform_', '');
-        initializeFormEvaluation(formId);
+    // FIXED: Proper initialization sequence
+    waitForOperatonAjax(function() {
+        console.log('Initializing Enhanced Operaton DMN...');
+        
+        // Set initialization flag
+        window.operatonDmnInitialized = true;
+        
+        // Initialize the main system
+        initOperatonDMN();
+        
+        // Bind events for existing forms
+        $('form[id^="gform_"]').each(function() {
+            var formId = $(this).attr('id').replace('gform_', '');
+            initializeFormEvaluation(formId);
+        });
+        
+        console.log('Enhanced Operaton DMN frontend script initialization complete');
     });
-    
-    console.log('Enhanced Operaton DMN frontend script initialization complete');
 
-    // FIXED: Better cleanup on page unload
+    // Cleanup on page unload
     $(window).on('beforeunload', function() {
         window.operatonDmnInitialized = false;
         // Clear form initialization flags
