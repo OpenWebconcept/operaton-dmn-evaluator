@@ -476,39 +476,78 @@ class OperatonDMNEvaluator {
      * 
      * @since 1.0.0
      */
-    public function force_frontend_assets_on_gravity_forms() {
+/**
+ * ENHANCED: Ensure frontend assets are loaded when Gravity Forms renders
+ * This fixes the operaton_ajax not being available issue
+ */
+public function force_frontend_assets_on_gravity_forms() {
+    // Skip in admin
+    if (is_admin()) {
+        return;
+    }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('🚀 OPERATON DMN: force_frontend_assets_on_gravity_forms called!');
+        error_log('🚀 OPERATON DMN: GFForms available = ' . (class_exists('GFForms') ? 'TRUE' : 'FALSE'));
+    }
+    
+    // Check multiple conditions for when to force load assets
+    $should_load = false;
+    
+    // Condition 1: Gravity Forms is available
+    if (class_exists('GFForms')) {
+        $should_load = true;
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('🚀 OPERATON DMN: force_frontend_assets_on_gravity_forms called!');
-            error_log('🚀 OPERATON DMN: is_admin() = ' . (is_admin() ? 'TRUE' : 'FALSE'));
-            error_log('🚀 OPERATON DMN: GFForms class exists = ' . (class_exists('GFForms') ? 'TRUE' : 'FALSE'));
+            error_log('🚀 OPERATON DMN: GFForms class exists - will load assets');
         }
-        
-        if (!is_admin() && class_exists('GFForms')) {
+    }
+    
+    // Condition 2: Current page has Gravity Forms content
+    global $post;
+    if ($post) {
+        if (has_shortcode($post->post_content, 'gravityform') || 
+            has_block('gravityforms/form', $post)) {
+            $should_load = true;
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('🚀 OPERATON DMN: Conditions met, forcing frontend assets load');
-                error_log('Operaton DMN: Forcing frontend assets load due to Gravity Forms presence');
-            }
-            
-            // Force load frontend assets which includes operaton_ajax localization
-            if (isset($this->assets)) {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('🚀 OPERATON DMN: Assets manager available, calling enqueue_frontend_assets()');
-                }
-                $this->assets->enqueue_frontend_assets();
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('🚀 OPERATON DMN: enqueue_frontend_assets() completed');
-                }
-            } else {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('🚀 OPERATON DMN: ❌ Assets manager NOT available!');
-                }
-            }
-        } else {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('🚀 OPERATON DMN: Conditions not met, skipping force load');
+                error_log('🚀 OPERATON DMN: GF shortcode/block detected - will load assets');
             }
         }
     }
+    
+    // Condition 3: GF preview page
+    if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
+        $should_load = true;
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('🚀 OPERATON DMN: GF preview page - will load assets');
+        }
+    }
+    
+    if ($should_load && isset($this->assets)) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('🚀 OPERATON DMN: Loading frontend assets...');
+        }
+        
+        // CRITICAL: Ensure assets are loaded with high priority
+        add_action('wp_enqueue_scripts', function() {
+            $this->assets->enqueue_frontend_assets();
+        }, 5); // High priority
+        
+        // ALSO: Load immediately if we're past wp_enqueue_scripts
+        if (did_action('wp_enqueue_scripts')) {
+            $this->assets->enqueue_frontend_assets();
+        }
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('🚀 OPERATON DMN: Frontend assets loading initiated');
+        }
+    } else {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('🚀 OPERATON DMN: Conditions not met for asset loading');
+            error_log('  - Should load: ' . ($should_load ? 'YES' : 'NO'));
+            error_log('  - Assets manager: ' . (isset($this->assets) ? 'AVAILABLE' : 'NOT AVAILABLE'));
+        }
+    }
+}
 
     /**
      * Emergency fallback for operaton_ajax availability
@@ -516,32 +555,67 @@ class OperatonDMNEvaluator {
      * 
      * @since 1.0.0
      */
-    public function emergency_operaton_ajax_fallback() {
-        if (!is_admin() && !wp_script_is('operaton-dmn-frontend', 'done')) {
-            $localization_data = array(
-                'url' => rest_url('operaton-dmn/v1/evaluate'),
-                'nonce' => wp_create_nonce('wp_rest'),
-                'debug' => defined('WP_DEBUG') && WP_DEBUG,
-                'strings' => array(
-                    'evaluating' => __('Evaluating...', 'operaton-dmn'),
-                    'error' => __('Evaluation failed', 'operaton-dmn'),
-                    'success' => __('Evaluation completed', 'operaton-dmn'),
-                    'loading' => __('Loading...', 'operaton-dmn'),
-                    'no_config' => __('Configuration not found', 'operaton-dmn'),
-                    'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
-                    'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
-                )
-            );
-            
-            echo '<script type="text/javascript">';
-            echo '/* Operaton DMN Emergency Fallback */';
-            echo 'if (typeof window.operaton_ajax === "undefined") {';
-            echo 'window.operaton_ajax = ' . wp_json_encode($localization_data) . ';';
-            echo 'console.log("🆘 Emergency operaton_ajax loaded via wp_head", window.operaton_ajax);';
-            echo '}';
-            echo '</script>';
-        }
+/**
+ * ENHANCED: Emergency fallback with better detection
+ */
+public function emergency_operaton_ajax_fallback() {
+    // Skip in admin
+    if (is_admin()) {
+        return;
     }
+    
+    // Only add fallback if we detect Gravity Forms on the page
+    global $post;
+    $has_gf = false;
+    
+    if ($post) {
+        $has_gf = has_shortcode($post->post_content, 'gravityform') || 
+                  has_block('gravityforms/form', $post);
+    }
+    
+    if (!$has_gf && !class_exists('GFForms')) {
+        return;
+    }
+    
+    ?>
+    <script type="text/javascript">
+    /* Operaton DMN Enhanced Emergency Fallback */
+    (function() {
+        'use strict';
+        
+        // Wait a bit to see if operaton_ajax loads normally
+        setTimeout(function() {
+            if (typeof window.operaton_ajax === 'undefined') {
+                console.log('🆘 Emergency: operaton_ajax not found, creating fallback');
+                
+                window.operaton_ajax = {
+                    url: '<?php echo rest_url('operaton-dmn/v1/evaluate'); ?>',
+                    nonce: '<?php echo wp_create_nonce('wp_rest'); ?>',
+                    debug: <?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>,
+                    strings: {
+                        evaluating: <?php echo json_encode(__('Evaluating...', 'operaton-dmn')); ?>,
+                        error: <?php echo json_encode(__('Evaluation failed', 'operaton-dmn')); ?>,
+                        success: <?php echo json_encode(__('Evaluation completed', 'operaton-dmn')); ?>,
+                        loading: <?php echo json_encode(__('Loading...', 'operaton-dmn')); ?>,
+                        no_config: <?php echo json_encode(__('Configuration not found', 'operaton-dmn')); ?>,
+                        validation_failed: <?php echo json_encode(__('Please fill in all required fields', 'operaton-dmn')); ?>,
+                        connection_error: <?php echo json_encode(__('Connection error. Please try again.', 'operaton-dmn')); ?>
+                    },
+                    emergency_mode: true
+                };
+                
+                console.log('🆘 Emergency operaton_ajax created:', window.operaton_ajax);
+                
+                // Trigger custom event to notify scripts
+                if (typeof jQuery !== 'undefined') {
+                    jQuery(document).trigger('operaton_ajax_emergency_loaded');
+                }
+            }
+        }, 1000);
+    })();
+    </script>
+    <?php
+}
 
     // =============================================================================
     // UTILITY/HELPER METHODS

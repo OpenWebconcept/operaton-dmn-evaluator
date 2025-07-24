@@ -134,67 +134,161 @@ class Operaton_DMN_Assets {
      * 
      * @since 1.0.0
      */
-    public function check_document_compatibility() {
-        // Only run on frontend pages with potential Gravity Forms
-        if (is_admin()) {
-            return;
-        }
-        
-        // Check if we should run compatibility checks
-        if (!$this->should_run_compatibility_check()) {
-            return;
-        }
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: Running document compatibility check');
-        }
-        
-        ?>
-        <script type="text/javascript">
-        /* Operaton DMN Document Compatibility Check */
-        (function() {
-            'use strict';
-            
-            // Check document compatibility mode
-            var isQuirksMode = document.compatMode === "BackCompat";
-            var hasDoctype = document.doctype !== null;
-            var doctypeName = document.doctype ? document.doctype.name : 'none';
-            
-            if (isQuirksMode) {
-                console.warn('Operaton DMN: Page running in Quirks Mode - jQuery compatibility issues possible');
-                console.warn('Operaton DMN: Doctype detected:', doctypeName);
-                
-                // Try to provide helpful information
-                if (!hasDoctype) {
-                    console.warn('Operaton DMN: No DOCTYPE declaration found. Add <!DOCTYPE html> to your theme header.');
-                } else if (doctypeName.toLowerCase() !== 'html') {
-                    console.warn('Operaton DMN: Non-HTML5 DOCTYPE detected. Consider using <!DOCTYPE html>');
-                }
-                
-                // Store compatibility info for other scripts
-                window.operatonCompatibilityInfo = {
-                    quirksMode: true,
-                    doctype: doctypeName,
-                    jqueryWarning: true
-                };
-            } else {
-                if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
-                    console.log('Operaton DMN: Document in Standards Mode ✓');
-                }
-                
-                window.operatonCompatibilityInfo = {
-                    quirksMode: false,
-                    doctype: doctypeName,
-                    jqueryWarning: false
-                };
-            }
-        })();
-        </script>
-        <?php
-        
-        // Add CSS fixes for Quirks Mode if needed
-        $this->add_quirks_mode_css_fixes();
+public function check_document_compatibility() {
+    // Only run on frontend pages with potential Gravity Forms
+    if (is_admin()) {
+        return;
     }
+    
+    // Check if we should run compatibility checks
+    if (!$this->should_run_compatibility_check()) {
+        return;
+    }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: Running document compatibility check');
+    }
+    
+    ?>
+    <script type="text/javascript">
+    /* Operaton DMN Document Compatibility Check */
+    (function() {
+        'use strict';
+        
+        // Check document compatibility mode
+        var isQuirksMode = document.compatMode === "BackCompat";
+        var hasDoctype = document.doctype !== null;
+        var doctypeName = document.doctype ? document.doctype.name : 'none';
+        
+        if (isQuirksMode) {
+            console.warn('Operaton DMN: Page running in Quirks Mode - jQuery compatibility issues possible');
+            console.warn('Operaton DMN: Doctype detected:', doctypeName);
+            
+            // Try to provide helpful information
+            if (!hasDoctype) {
+                console.warn('Operaton DMN: No DOCTYPE declaration found. Add <!DOCTYPE html> to your theme header.');
+                
+                // CRITICAL FIX: Try to force standards mode if possible
+                if (document.documentElement) {
+                    document.documentElement.setAttribute('data-operaton-quirks-detected', 'true');
+                }
+            }
+            
+            // Store compatibility info for other scripts
+            window.operatonCompatibilityInfo = {
+                quirksMode: true,
+                doctype: doctypeName,
+                jqueryWarning: true,
+                fixApplied: false
+            };
+            
+            // Add body class for CSS fixes
+            if (document.body) {
+                document.body.className += ' operaton-quirks-mode-detected';
+            } else {
+                // Wait for body to be available
+                document.addEventListener('DOMContentLoaded', function() {
+                    if (document.body) {
+                        document.body.className += ' operaton-quirks-mode-detected';
+                    }
+                });
+            }
+        } else {
+            if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
+                console.log('Operaton DMN: Document in Standards Mode ✓');
+            }
+            
+            window.operatonCompatibilityInfo = {
+                quirksMode: false,
+                doctype: doctypeName,
+                jqueryWarning: false,
+                fixApplied: false
+            };
+        }
+    })();
+    </script>
+    <?php
+    
+    // Add comprehensive CSS fixes for Quirks Mode
+    $this->add_enhanced_quirks_mode_css_fixes();
+}
+
+/**
+ * Enhanced CSS fixes for Quirks Mode compatibility
+ */
+private function add_enhanced_quirks_mode_css_fixes() {
+    ?>
+    <style type="text/css">
+    /* Operaton DMN Enhanced Quirks Mode Compatibility Fixes */
+    
+    /* Force box-sizing for all elements in quirks mode */
+    .operaton-quirks-mode-detected *,
+    .operaton-quirks-mode-detected *:before,
+    .operaton-quirks-mode-detected *:after {
+        -webkit-box-sizing: border-box !important;
+        -moz-box-sizing: border-box !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Fix Gravity Forms in Quirks Mode */
+    .operaton-quirks-mode-detected .gform_wrapper {
+        width: 100% !important;
+    }
+    
+    .operaton-quirks-mode-detected .gform_wrapper .operaton-evaluate-btn {
+        display: inline-block !important;
+        vertical-align: top !important;
+        margin: 10px 0 !important;
+        padding: 8px 16px !important;
+        line-height: 1.4 !important;
+    }
+    
+    /* Decision flow tables in Quirks Mode */
+    .operaton-quirks-mode-detected .decision-table.excel-style {
+        table-layout: fixed !important;
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+    
+    /* Fix jQuery UI conflicts in Quirks Mode */
+    .operaton-quirks-mode-detected .ui-widget {
+        font-family: inherit !important;
+    }
+    
+    /* Ensure proper form field sizing */
+    .operaton-quirks-mode-detected .gform_wrapper input[type="text"],
+    .operaton-quirks-mode-detected .gform_wrapper input[type="email"],
+    .operaton-quirks-mode-detected .gform_wrapper input[type="number"],
+    .operaton-quirks-mode-detected .gform_wrapper select,
+    .operaton-quirks-mode-detected .gform_wrapper textarea {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    
+    /* Quirks mode notification */
+    .operaton-quirks-mode-detected:before {
+        content: "⚠️ Quirks Mode Detected - Some features may not work optimally";
+        display: block;
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        color: #856404;
+        padding: 8px 12px;
+        margin: 0 0 15px 0;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        text-align: center;
+    }
+    
+    /* Hide the warning in production */
+    <?php if (!defined('WP_DEBUG') || !WP_DEBUG): ?>
+    .operaton-quirks-mode-detected:before {
+        display: none !important;
+    }
+    <?php endif; ?>
+    </style>
+    <?php
+}
 
     /**
      * NEW: Determine if compatibility check should run
@@ -423,73 +517,78 @@ public function maybe_enqueue_frontend_assets() {
      * UPDATED: Enhanced frontend asset enqueuing with compatibility check
      * Now includes compatibility mode handling
      */
-    public function enqueue_frontend_assets() {
-        // Prevent duplicate loading
-        if (isset($this->loaded_assets['frontend'])) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Assets: Frontend assets already loaded, skipping');
-            }
-            return;
-        }
-        
+public function enqueue_frontend_assets() {
+    // Prevent duplicate loading
+    if (isset($this->loaded_assets['frontend'])) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: ⭐ STARTING enqueue_frontend_assets');
+            error_log('Operaton DMN Assets: Frontend assets already loaded, skipping');
         }
-        
-        // ENHANCED: Add compatibility check integration
-        add_action('wp_footer', array($this, 'add_compatibility_integration'), 5);
-        
-        // Ensure jQuery is loaded first
-        wp_enqueue_script('jquery');
-        
-        // Force registration if not already registered
-        if (!wp_script_is('operaton-dmn-frontend', 'registered')) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Assets: 🔧 Script not registered, registering now');
-            }
-            
-            wp_register_script(
-                'operaton-dmn-frontend',
-                $this->plugin_url . 'assets/js/frontend.js',
-                array('jquery'),
-                $this->version,
-                true
-            );
-        }
-        
-        // Enqueue frontend CSS and JS
-        wp_enqueue_style('operaton-dmn-frontend');
-        wp_enqueue_script('operaton-dmn-frontend');
-        
-        // Rest of your existing localization code...
-        $localization_data = array(
-            'url' => rest_url('operaton-dmn/v1/evaluate'),
-            'nonce' => wp_create_nonce('wp_rest'),
-            'debug' => defined('WP_DEBUG') && WP_DEBUG,
-            'strings' => array(
-                'evaluating' => __('Evaluating...', 'operaton-dmn'),
-                'error' => __('Evaluation failed', 'operaton-dmn'),
-                'success' => __('Evaluation completed', 'operaton-dmn'),
-                'loading' => __('Loading...', 'operaton-dmn'),
-                'no_config' => __('Configuration not found', 'operaton-dmn'),
-                'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
-                'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
-            )
-        );
-        
-        // Enhanced localization with better error handling
-        $localize_result = wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
-        
-        if (!$localize_result && defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: ❌ wp_localize_script failed');
-        }
-        
-        $this->loaded_assets['frontend'] = true;
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: ⭐ FINISHED enqueue_frontend_assets');
-        }
+        return;
     }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: ⭐ STARTING enqueue_frontend_assets');
+    }
+    
+    // CRITICAL FIX: Ensure jQuery is loaded FIRST and wait for it
+    if (!wp_script_is('jquery', 'done') && !wp_script_is('jquery', 'enqueued')) {
+        wp_enqueue_script('jquery');
+    }
+    
+    // Force registration if not already registered
+    if (!wp_script_is('operaton-dmn-frontend', 'registered')) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: 🔧 Script not registered, registering now');
+        }
+        
+        wp_register_script(
+            'operaton-dmn-frontend',
+            $this->plugin_url . 'assets/js/frontend.js',
+            array('jquery'), // Explicit jQuery dependency
+            $this->version,
+            true // Load in footer AFTER jQuery
+        );
+    }
+    
+    // Enqueue CSS first
+    wp_enqueue_style('operaton-dmn-frontend');
+    
+    // Then enqueue JS with jQuery dependency
+    wp_enqueue_script('operaton-dmn-frontend');
+    
+    // CRITICAL: Add jQuery ready wrapper to the localization
+    $localization_data = array(
+        'url' => rest_url('operaton-dmn/v1/evaluate'),
+        'nonce' => wp_create_nonce('wp_rest'),
+        'debug' => defined('WP_DEBUG') && WP_DEBUG ? '1' : '0', // String for consistency
+        'strings' => array(
+            'evaluating' => __('Evaluating...', 'operaton-dmn'),
+            'error' => __('Evaluation failed', 'operaton-dmn'),
+            'success' => __('Evaluation completed', 'operaton-dmn'),
+            'loading' => __('Loading...', 'operaton-dmn'),
+            'no_config' => __('Configuration not found', 'operaton-dmn'),
+            'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
+            'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
+        ),
+        'compatibility' => array(
+            'quirks_mode_check' => true,
+            'jquery_version_required' => '3.0'
+        )
+    );
+    
+    // Enhanced localization with better error handling
+    $localize_result = wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
+    
+    if (!$localize_result && defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: ❌ wp_localize_script failed');
+    }
+    
+    $this->loaded_assets['frontend'] = true;
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Assets: ⭐ FINISHED enqueue_frontend_assets');
+    }
+}
 
     /**
      * NEW: Add compatibility integration to footer
