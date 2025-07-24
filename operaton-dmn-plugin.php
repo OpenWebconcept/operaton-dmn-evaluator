@@ -145,6 +145,15 @@ class OperatonDMNEvaluator {
     private $gravity_forms;
 
     /**
+     * Quirks Mode Fix manager instance
+     * Handles DOCTYPE and jQuery compatibility issues
+     * 
+     * @var Operaton_DMN_Quirks_Fix
+     * @since 1.0.0
+     */
+    private $quirks_fix;
+
+    /**
      * Get singleton instance
      * 
      * @return OperatonDMNEvaluator
@@ -168,6 +177,9 @@ class OperatonDMNEvaluator {
      * @since 1.0.0
      */
     private function __construct() {
+        // NEW: Load quirks fix manager FIRST (before assets)
+        $this->load_quirks_fix_manager();
+
         // 1. Load assets manager first
         $this->load_assets_manager();
         
@@ -220,6 +232,27 @@ class OperatonDMNEvaluator {
     // =============================================================================
     // MANAGER LOADING METHODS
     // =============================================================================
+
+    /**
+     * NEW METHOD: Load quirks fix manager
+     * Add this new method to your class
+     */
+    private function load_quirks_fix_manager() {
+        require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-quirks-fix.php';
+        $this->quirks_fix = new Operaton_DMN_Quirks_Fix();
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: Quirks fix manager loaded successfully');
+        }
+    }
+
+    /**
+     * NEW METHOD: Get quirks fix manager instance
+     * Add this accessor method
+     */
+    public function get_quirks_fix_instance() {
+        return $this->quirks_fix;
+    }
 
     /**
      * Load assets manager for CSS/JavaScript handling
@@ -710,6 +743,16 @@ public function emergency_operaton_ajax_fallback() {
         if (is_wp_error($response)) {
             $issues[] = __('REST API is not accessible.', 'operaton-dmn');
         }
+
+        // NEW: Check quirks fix status
+        if (!$this->quirks_fix) {
+            $issues[] = __('Quirks fix manager not initialized.', 'operaton-dmn');
+        } else {
+            $quirks_status = $this->quirks_fix->get_compatibility_status();
+            if (!$quirks_status['quirks_fix_active']) {
+                $issues[] = __('Quirks mode compatibility fixes not active.', 'operaton-dmn');
+            }
+        }
         
         // Check if assets are properly loaded
         if (!$this->assets) {
@@ -733,6 +776,7 @@ public function emergency_operaton_ajax_fallback() {
             'database' => isset($this->database) ? 'loaded' : 'not loaded',
             'api' => isset($this->api) ? 'loaded' : 'not loaded',
             'gravity_forms' => isset($this->gravity_forms) ? 'loaded' : 'not loaded',
+            'quirks_fix' => isset($this->quirks_fix) ? 'loaded' : 'not loaded', // NEW
             'gravity_forms_available' => isset($this->gravity_forms) ? $this->gravity_forms->is_gravity_forms_available() : false
         );
     }
@@ -896,6 +940,17 @@ function operaton_dmn() {
 }
 
 /**
+ * Global convenience function to get quirks fix manager
+ * 
+ * @return Operaton_DMN_Quirks_Fix
+ * @since 1.0.0
+ */
+function operaton_dmn_get_quirks_fix() {
+    $instance = OperatonDMNEvaluator::get_instance();
+    return $instance->get_quirks_fix_instance();
+}
+
+/**
  * Global convenience function to get a specific manager
  * 
  * @param string $manager Manager type (api, database, gravity_forms, assets, admin)
@@ -916,6 +971,8 @@ function operaton_dmn_get_manager($manager) {
             return $instance->get_assets_instance();
         case 'admin':
             return $instance->get_admin_instance();
+        case 'quirks_fix': // NEW
+            return $instance->get_quirks_fix_instance();
         default:
             return null;
     }

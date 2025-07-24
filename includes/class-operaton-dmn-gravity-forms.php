@@ -166,6 +166,8 @@ class Operaton_DMN_Gravity_Forms {
         // Form validation and submission hooks
         add_filter('gform_validation', array($this, 'validate_dmn_fields'), 10, 1);
         add_action('gform_after_submission', array($this, 'handle_post_submission'), 10, 2);
+    
+        $this->add_radio_sync_hooks();
     }
 
     /**
@@ -268,6 +270,430 @@ class Operaton_DMN_Gravity_Forms {
             $this->enqueue_gravity_forms_scripts();
         }
     }
+
+/**
+ * Add these methods to your class-operaton-dmn-gravity-forms.php file
+ * Radio Button Synchronization Integration
+ */
+
+/**
+ * Add this method to your Operaton_DMN_Gravity_Forms class
+ * 
+ * Detect forms that need radio button synchronization
+ */
+public function detect_radio_sync_forms() {
+    if (!$this->check_gravity_forms_availability()) {
+        return array();
+    }
+    
+    $forms_with_radio_sync = array();
+    
+    try {
+        $forms = GFAPI::get_forms();
+        
+        foreach ($forms as $form) {
+            if ($this->form_needs_radio_sync($form['id'])) {
+                $forms_with_radio_sync[] = $form['id'];
+            }
+        }
+        
+    } catch (Exception $e) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Gravity Forms: Error detecting radio sync forms: ' . $e->getMessage());
+        }
+    }
+    
+    return $forms_with_radio_sync;
+}
+
+/**
+ * Check if a specific form needs radio button synchronization
+ */
+public function form_needs_radio_sync($form_id) {
+    if (!$this->check_gravity_forms_availability()) {
+        return false;
+    }
+    
+    try {
+        $form = GFAPI::get_form($form_id);
+        
+        if (!$form || !isset($form['fields'])) {
+            return false;
+        }
+        
+        // Check for HTML fields with radio buttons that need sync
+        foreach ($form['fields'] as $field) {
+            if ($field->type === 'html' && isset($field->content)) {
+                $content = $field->content;
+                
+                // Look for radio buttons with specific naming patterns
+                if (strpos($content, 'type="radio"') !== false && 
+                    (strpos($content, 'aanvrager') !== false || 
+                     strpos($content, 'name="input_') !== false)) {
+                    return true;
+                }
+            }
+        }
+        
+    } catch (Exception $e) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Gravity Forms: Error checking form for radio sync: ' . $e->getMessage());
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Extract radio sync mappings from form configuration
+ */
+public function extract_radio_sync_mappings($form_id) {
+    $mappings = array();
+    
+    // Get DMN configuration for this form
+    $config = $this->get_form_config($form_id);
+    
+    if (!$config) {
+        return $this->get_default_radio_mappings($form_id);
+    }
+    
+    // Extract mappings from field_mappings JSON
+    $field_mappings = json_decode($config->field_mappings, true);
+    
+    if (json_last_error() === JSON_ERROR_NONE && is_array($field_mappings)) {
+        foreach ($field_mappings as $dmn_variable => $mapping) {
+            // Check if this looks like a radio sync variable
+            if (strpos($dmn_variable, 'aanvrager') === 0 && isset($mapping['field_id'])) {
+                $mappings[$dmn_variable] = 'input_' . $form_id . '_' . $mapping['field_id'];
+            }
+        }
+    }
+    
+    return $mappings;
+}
+
+/**
+ * Get default radio sync mappings for known forms
+ */
+private function get_default_radio_mappings($form_id) {
+    $default_mappings = array();
+    
+    // Form 8 specific mappings
+    if ($form_id == 8) {
+        $default_mappings = array(
+            'aanvragerDitKalenderjaarAlAangevraagd' => 'input_8_25',
+            'aanvragerAanmerkingStudieFinanciering' => 'input_8_26',
+            'aanvragerUitkeringBaanbrekers' => 'input_8_27',
+            'aanvragerVoedselbankpasDenBosch' => 'input_8_28',
+            'aanvragerKwijtscheldingGemeentelijkeBelastingen' => 'input_8_29',
+            'aanvragerSchuldhulptrajectKredietbankNederland' => 'input_8_30',
+            'aanvragerHeeftKind4Tm17' => 'input_8_31'
+        );
+    }
+    
+    return apply_filters('operaton_dmn_default_radio_mappings', $default_mappings, $form_id);
+}
+
+/**
+ * Initialize radio sync for a specific form
+ */
+public function initialize_radio_sync($form_id) {
+    if (!$this->form_needs_radio_sync($form_id)) {
+        return;
+    }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN Gravity Forms: Initializing radio sync for form: ' . $form_id);
+    }
+    
+    // Enqueue radio sync assets
+    $this->assets->enqueue_radio_sync_assets($form_id);
+    
+    // Add form-specific initialization
+    add_action('wp_footer', function() use ($form_id) {
+        $this->add_radio_sync_initialization($form_id);
+    }, 15);
+}
+
+/**
+ * Add radio sync initialization script to footer
+ */
+private function add_radio_sync_initialization($form_id) {
+    $mappings = $this->extract_radio_sync_mappings($form_id);
+    
+    if (empty($mappings)) {
+        return;
+    }
+    
+    ?>
+    <script type="text/javascript">
+    /* Operaton DMN Radio Sync Initialization for Form <?php echo esc_js($form_id); ?> */
+    (function($) {
+        'use strict';
+        
+        if (typeof window.OperatonRadioSync !== 'undefined') {
+            // Update field mappings for this specific form
+            window.OperatonRadioSync.fieldMappings = <?php echo wp_json_encode($mappings); ?>;
+            
+            // Force re-initialization with new mappings
+            $(document).ready(function() {
+                setTimeout(function() {
+                    if (window.OperatonRadioSync.forceSyncAll) {
+                        window.OperatonRadioSync.forceSyncAll();
+                        
+                        console.log('✅ Radio sync initialized for form <?php echo esc_js($form_id); ?> with mappings:', window.OperatonRadioSync.fieldMappings);
+                    }
+                }, 1000);
+            });
+        } else {
+            console.warn('⚠️ OperatonRadioSync not available for form <?php echo esc_js($form_id); ?>');
+        }
+        
+    })(jQuery);
+    </script>
+    <?php
+}
+
+/**
+ * Add hook integration for radio sync
+ * Add this to your existing init_gravity_forms_integration method
+ */
+public function add_radio_sync_hooks() {
+    if (!$this->check_gravity_forms_availability()) {
+        return;
+    }
+    
+    // Hook into form rendering to initialize radio sync
+    add_action('gform_pre_render', array($this, 'maybe_initialize_radio_sync'), 5, 1);
+    add_action('gform_pre_validation', array($this, 'maybe_initialize_radio_sync'), 5, 1);
+    add_action('gform_pre_submission_filter', array($this, 'maybe_initialize_radio_sync'), 5, 1);
+    
+    // Add admin hooks for form editing
+    if (is_admin()) {
+        add_action('gform_editor_js', array($this, 'add_radio_sync_editor_support'));
+    }
+}
+
+/**
+ * Maybe initialize radio sync for a form
+ */
+public function maybe_initialize_radio_sync($form) {
+    if (!is_array($form) || !isset($form['id'])) {
+        return $form;
+    }
+    
+    $form_id = $form['id'];
+    
+    if ($this->form_needs_radio_sync($form_id)) {
+        $this->initialize_radio_sync($form_id);
+    }
+    
+    return $form;
+}
+
+/**
+ * Add radio sync support to form editor
+ */
+public function add_radio_sync_editor_support() {
+    ?>
+    <script type="text/javascript">
+    /* Operaton DMN Radio Sync Editor Support */
+    if (typeof fieldSettings !== 'undefined') {
+        // Add radio sync setting to HTML fields
+        fieldSettings.html += ', .operaton_radio_sync_setting';
+    }
+    
+    // Add editor enhancement for radio sync detection
+    jQuery(document).ready(function($) {
+        // Detect HTML fields with radio buttons
+        $('.gfield_html textarea').on('input', function() {
+            var content = $(this).val();
+            var $field = $(this).closest('.gfield');
+            
+            if (content.indexOf('type="radio"') !== -1 && 
+                content.indexOf('aanvrager') !== -1) {
+                
+                if (!$field.find('.operaton-radio-sync-notice').length) {
+                    $field.append(
+                        '<div class="operaton-radio-sync-notice" style="background: #e8f4f8; padding: 8px; margin-top: 5px; border-radius: 4px; font-size: 12px;">' +
+                        '🔄 <strong>Operaton DMN:</strong> Radio button synchronization will be automatically enabled for this field.' +
+                        '</div>'
+                    );
+                }
+            } else {
+                $field.find('.operaton-radio-sync-notice').remove();
+            }
+        });
+    });
+    </script>
+    <?php
+}
+
+/**
+ * Get radio sync status for debugging
+ */
+public function get_radio_sync_status() {
+    $status = array(
+        'available_forms' => array(),
+        'enabled_forms' => array(),
+        'mappings' => array(),
+        'assets_loaded' => array()
+    );
+    
+    try {
+        $forms = GFAPI::get_forms();
+        
+        foreach ($forms as $form) {
+            $form_id = $form['id'];
+            $status['available_forms'][] = $form_id;
+            
+            if ($this->form_needs_radio_sync($form_id)) {
+                $status['enabled_forms'][] = $form_id;
+                $status['mappings'][$form_id] = $this->extract_radio_sync_mappings($form_id);
+            }
+        }
+        
+    } catch (Exception $e) {
+        $status['error'] = $e->getMessage();
+    }
+    
+    return $status;
+}
+
+/**
+ * Clean HTML content for forms (remove large script blocks)
+ * This can be used to automatically clean up forms with large sync scripts
+ */
+public function clean_form_html_blocks($form_id) {
+    if (!$this->check_gravity_forms_availability()) {
+        return false;
+    }
+    
+    try {
+        $form = GFAPI::get_form($form_id);
+        
+        if (!$form || !isset($form['fields'])) {
+            return false;
+        }
+        
+        $modified = false;
+        
+        foreach ($form['fields'] as &$field) {
+            if ($field->type === 'html' && isset($field->content)) {
+                $original_content = $field->content;
+                
+                // Check if this HTML field contains a large radio sync script
+                if (strpos($original_content, 'fieldMapping') !== false && 
+                    strpos($original_content, 'syncRadioToHidden') !== false &&
+                    strlen($original_content) > 5000) {
+                    
+                    // Replace with cleaned version
+                    $field->content = $this->get_cleaned_html_content();
+                    $modified = true;
+                    
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        error_log('Operaton DMN: Cleaned large HTML block in form ' . $form_id . ', field ' . $field->id);
+                    }
+                }
+            }
+        }
+        
+        if ($modified) {
+            $result = GFAPI::update_form($form);
+            
+            if (is_wp_error($result)) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('Operaton DMN: Error updating form: ' . $result->get_error_message());
+                }
+                return false;
+            }
+            
+            return true;
+        }
+        
+    } catch (Exception $e) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: Error cleaning form HTML: ' . $e->getMessage());
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Get cleaned HTML content to replace large script blocks
+ */
+private function get_cleaned_html_content() {
+    return '<!-- Operaton DMN: Radio sync handled by plugin -->
+<style>
+/* Form styling preserved */
+.gform_wrapper {
+    background-color: white !important;
+    padding: 30px !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    margin: 20px 0 !important;
+}
+
+/* Table styling */
+.gf-table-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 20px;
+    align-items: center;
+    padding: 15px;
+    background-color: #f2f2f2;
+    border-bottom: 2px solid #ddd;
+    font-weight: bold;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.gf-table-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 20px;
+    align-items: center;
+    padding: 15px 15px 5px 15px;
+    border-bottom: 1px solid #eee;
+    min-height: 60px;
+}
+
+.gf-table-row:hover {
+    background-color: #f8f9fa;
+}
+
+.gf-table-row input[type="radio"] {
+    margin-right: 5px;
+    transform: scale(1.2);
+}
+
+.gf-table-row h3.field-label {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    color: #333 !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+}
+
+.gf-table-row label {
+    cursor: pointer;
+    font-weight: normal !important;
+    font-size: 14px !important;
+}
+</style>
+
+<script type="text/javascript">
+// Minimal form initialization - radio sync handled by plugin
+document.addEventListener("DOMContentLoaded", function() {
+    var form = document.querySelector("#gform_8");
+    if (form) {
+        form.setAttribute("data-operaton-radio-sync", "true");
+        console.log("✅ Form marked for Operaton DMN radio synchronization");
+    }
+});
+</script>';
+}
 
     /**
      * Check if current page has Gravity Forms with DMN configurations

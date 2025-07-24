@@ -1,8 +1,7 @@
 /**
- * Enhanced Operaton DMN Frontend Script
+ * Enhanced Operaton DMN Frontend Script - FIXED VERSION
  * 
- * Complete rewrite with proper duplicate prevention, error handling,
- * and jQuery compatibility fixes.
+ * Fixed jQuery loading issues and improved initialization timing
  * 
  * @package OperatonDMN
  * @since 1.0.0
@@ -15,23 +14,102 @@ window.operatonInitialized = window.operatonInitialized || {
     forms: new Set(),
     scripts: new Set(),
     globalInit: false,
-    timers: {}
+    timers: {},
+    jQueryReady: false
 };
 
-// Ensure jQuery is available before proceeding
+// CRITICAL FIX: Enhanced jQuery detection and loading
 (function() {
     'use strict';
     
-    function initializeWithJQuery() {
-        // Check if jQuery is available
-        if (typeof jQuery === 'undefined') {
-            console.error('❌ jQuery not available for Operaton DMN');
+    // Check if we're in a problematic environment
+    var isQuirksMode = document.compatMode === "BackCompat";
+    var hasDoctype = document.doctype !== null;
+    
+    if (isQuirksMode) {
+        console.warn('⚠️ Operaton DMN: Quirks Mode detected - applying compatibility fixes');
+        
+        // Add compatibility class to document
+        if (document.documentElement) {
+            document.documentElement.setAttribute('data-operaton-quirks', 'true');
+        }
+    }
+    
+    // Enhanced jQuery detection with better timing
+    function waitForjQueryAndInitialize() {
+        var attempts = 0;
+        var maxAttempts = 100; // Increased from 50
+        
+        function checkJQuery() {
+            attempts++;
+            
+            // Check multiple jQuery references
+            var jQueryAvailable = (
+                (typeof window.jQuery !== 'undefined') ||
+                (typeof window.$ !== 'undefined') ||
+                (typeof jQuery !== 'undefined')
+            );
+            
+            if (jQueryAvailable) {
+                // Use the most reliable jQuery reference
+                var $ = window.jQuery || window.$ || jQuery;
+                
+                console.log('✅ Operaton DMN: jQuery found after', attempts, 'attempts, version:', $.fn.jquery);
+                
+                // Mark jQuery as ready
+                window.operatonInitialized.jQueryReady = true;
+                
+                // Initialize with jQuery
+                initializeWithjQuery($);
+                
+            } else if (attempts < maxAttempts) {
+                if (attempts % 20 === 0) {
+                    console.log('⏳ Operaton DMN: Still waiting for jQuery... attempt', attempts);
+                }
+                setTimeout(checkJQuery, 50); // Reduced timeout for faster detection
+            } else {
+                console.error('❌ Operaton DMN: jQuery not found after', maxAttempts, 'attempts');
+                console.error('❌ Document ready state:', document.readyState);
+                console.error('❌ Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('jquery')));
+                
+                // Try emergency fallback
+                handleJQueryFailure();
+            }
+        }
+        
+        checkJQuery();
+    }
+    
+    // Emergency fallback when jQuery fails to load
+    function handleJQueryFailure() {
+        console.warn('🆘 Operaton DMN: Attempting emergency jQuery fallback');
+        
+        // Try to find jQuery in the page
+        var scripts = document.getElementsByTagName('script');
+        var jqueryFound = false;
+        
+        for (var i = 0; i < scripts.length; i++) {
+            var src = scripts[i].src;
+            if (src && src.includes('jquery')) {
+                console.log('🔍 Found jQuery script:', src);
+                jqueryFound = true;
+            }
+        }
+        
+        if (!jqueryFound) {
+            console.error('🚨 No jQuery scripts found in page - plugin will not work');
             return;
         }
         
-        var $ = jQuery;
-        
-        // Prevent duplicate global initialization
+        // Try again after a longer delay
+        setTimeout(function() {
+            console.log('🔄 Emergency retry for jQuery...');
+            waitForjQueryAndInitialize();
+        }, 2000);
+    }
+    
+    function initializeWithjQuery($) {
+        // Prevent duplicate initialization
         if (window.operatonInitialized.globalInit) {
             console.log('Operaton DMN: Already globally initialized, skipping duplicate');
             return;
@@ -94,23 +172,6 @@ window.operatonInitialized = window.operatonInitialized || {
         }
         
         /**
-         * Debounced form initialization to prevent rapid duplicate calls
-         */
-        function debouncedFormInitialization(formId) {
-            formId = parseInt(formId);
-            
-            // Clear any existing timer for this form
-            if (window.operatonInitialized.timers[formId]) {
-                clearTimeout(window.operatonInitialized.timers[formId]);
-            }
-            
-            window.operatonInitialized.timers[formId] = setTimeout(function() {
-                initializeFormEvaluation(formId);
-                delete window.operatonInitialized.timers[formId];
-            }, 300);
-        }
-        
-        /**
          * Better waiting mechanism for operaton_ajax with timeout
          */
         function waitForOperatonAjax(callback, maxAttempts = 50) {
@@ -164,7 +225,7 @@ window.operatonInitialized = window.operatonInitialized || {
         }
         
         /**
-         * Initialize evaluation system with improved detection
+         * Initialize evaluation system
          */
         function initOperatonDMN() {
             console.log('Starting Operaton DMN initialization...');
@@ -199,6 +260,23 @@ window.operatonInitialized = window.operatonInitialized || {
                     }
                 });
             }, 500);
+        }
+        
+        /**
+         * Debounced form initialization to prevent rapid duplicate calls
+         */
+        function debouncedFormInitialization(formId) {
+            formId = parseInt(formId);
+            
+            // Clear any existing timer for this form
+            if (window.operatonInitialized.timers[formId]) {
+                clearTimeout(window.operatonInitialized.timers[formId]);
+            }
+            
+            window.operatonInitialized.timers[formId] = setTimeout(function() {
+                initializeFormEvaluation(formId);
+                delete window.operatonInitialized.timers[formId];
+            }, 300);
         }
         
         // =============================================================================
@@ -631,7 +709,7 @@ window.operatonInitialized = window.operatonInitialized || {
         }
         
         // =============================================================================
-        // UTILITY FUNCTIONS
+        // UTILITY FUNCTIONS (keeping all existing utility functions)
         // =============================================================================
         
         /**
@@ -960,7 +1038,7 @@ window.operatonInitialized = window.operatonInitialized || {
                     });
                     
                     if (targetDmnVariable) {
-                        var $radioChecked = $('input[name="' + targetDmnVariable + '"]:checked');
+                        var $radioChecked = $('input[type="radio"][name="' + targetDmnVariable + '"]:checked');
                         if ($radioChecked.length > 0) {
                             var value = $radioChecked.val();
                             
@@ -1267,54 +1345,61 @@ window.operatonInitialized = window.operatonInitialized || {
     }
     
     // =============================================================================
-    // JQUERY LOADING AND INITIALIZATION
+    // DOCUMENT READY AND INITIALIZATION LOGIC
     // =============================================================================
     
-    // Check if jQuery is available immediately
+    // Multiple initialization strategies to handle different loading scenarios
+    
+    // Strategy 1: Check if jQuery is immediately available
     if (typeof jQuery !== 'undefined') {
+        console.log('✅ Operaton DMN: jQuery available immediately');
         jQuery(document).ready(function() {
-            initializeWithJQuery();
+            initializeWithjQuery(jQuery);
         });
     } else {
-        // Wait for jQuery to load
-        var jQueryCheckAttempts = 0;
-        var maxJQueryAttempts = 50;
+        console.log('⏳ Operaton DMN: jQuery not immediately available, waiting...');
         
-        function waitForJQuery() {
-            jQueryCheckAttempts++;
-            
-            if (typeof jQuery !== 'undefined') {
-                console.log('✅ jQuery found after', jQueryCheckAttempts, 'attempts');
-                jQuery(document).ready(function() {
-                    initializeWithJQuery();
-                });
-            } else if (jQueryCheckAttempts < maxJQueryAttempts) {
-                if (jQueryCheckAttempts % 10 === 0) {
-                    console.log('⏳ Waiting for jQuery... attempt', jQueryCheckAttempts);
-                }
-                setTimeout(waitForJQuery, 100);
-            } else {
-                console.error('❌ jQuery not found after', maxJQueryAttempts, 'attempts');
-                console.error('❌ Operaton DMN cannot initialize without jQuery');
-            }
-        }
-        
-        // Start checking for jQuery
-        waitForJQuery();
+        // Strategy 2: Wait for jQuery with enhanced detection
+        waitForjQueryAndInitialize();
     }
     
-    // Additional safety check - initialize when window loads
+    // Strategy 3: Initialize on window load as fallback
     if (typeof window.addEventListener !== 'undefined') {
         window.addEventListener('load', function() {
             setTimeout(function() {
-                if (!window.operatonInitialized.globalInit && typeof jQuery !== 'undefined') {
+                if (!window.operatonInitialized.globalInit) {
                     console.log('🔄 Window load: Attempting late initialization...');
-                    jQuery(function() {
-                        initializeWithJQuery();
-                    });
+                    
+                    if (typeof jQuery !== 'undefined') {
+                        jQuery(function() {
+                            initializeWithjQuery(jQuery);
+                        });
+                    } else {
+                        console.warn('⚠️ Window load: jQuery still not available');
+                        waitForjQueryAndInitialize();
+                    }
                 }
             }, 1000);
         });
     }
+    
+    // Strategy 4: Periodic check as final fallback
+    var globalCheckAttempts = 0;
+    var globalCheckInterval = setInterval(function() {
+        globalCheckAttempts++;
+        
+        if (window.operatonInitialized.globalInit) {
+            clearInterval(globalCheckInterval);
+        } else if (globalCheckAttempts > 30) { // Stop after 30 seconds
+            clearInterval(globalCheckInterval);
+            console.error('❌ Operaton DMN: Failed to initialize after 30 seconds');
+        } else if (typeof jQuery !== 'undefined' && !window.operatonInitialized.jQueryReady) {
+            console.log('🔄 Periodic check: Found jQuery, attempting initialization');
+            clearInterval(globalCheckInterval);
+            jQuery(document).ready(function() {
+                initializeWithjQuery(jQuery);
+            });
+        }
+    }, 1000);
 
 })();

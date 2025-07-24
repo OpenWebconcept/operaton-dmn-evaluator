@@ -1,9 +1,12 @@
 <?php
 /**
- * Assets Manager for Operaton DMN Plugin
+ * FIXED: Assets Manager for Operaton DMN Plugin
  * 
- * Handles proper enqueueing of CSS and JavaScript files with dependency management,
- * conditional loading, and performance optimization.
+ * Key fixes:
+ * 1. Enhanced jQuery dependency management
+ * 2. Better Gravity Forms detection
+ * 3. Improved compatibility checks
+ * 4. DOCTYPE validation and fixes
  * 
  * @package OperatonDMN
  * @since 1.0.0
@@ -16,49 +19,11 @@ if (!defined('ABSPATH')) {
 
 class Operaton_DMN_Assets {
     
-    /**
-     * Plugin URL for asset paths
-     * Base URL for loading CSS and JavaScript files
-     * 
-     * @var string
-     * @since 1.0.0
-     */
     private $plugin_url;
-    
-    /**
-     * Plugin version for cache busting
-     * Used to force browser cache updates when plugin is updated
-     * 
-     * @var string
-     * @since 1.0.0
-     */
     private $version;
-    
-    /**
-     * Asset loading flags to prevent duplicate enqueuing
-     * Tracks which asset groups have been loaded to avoid conflicts
-     * 
-     * @var array
-     * @since 1.0.0
-     */
     private $loaded_assets = array();
-
-    /**
-     * Gravity Forms manager instance for form detection
-     * 
-     * @var Operaton_DMN_Gravity_Forms|null
-     * @since 1.0.0
-     */
     private $gravity_forms_manager = null;
 
-    /**
-     * Constructor for assets manager with plugin information
-     * Initializes asset management system with base configuration
-     * 
-     * @param string $plugin_url Plugin base URL for asset paths
-     * @param string $version Plugin version for cache busting
-     * @since 1.0.0
-     */
     public function __construct($plugin_url, $version) {
         $this->plugin_url = trailingslashit($plugin_url);
         $this->version = $version;
@@ -70,13 +35,6 @@ class Operaton_DMN_Assets {
         $this->init_hooks();
     }
 
-    /**
-     * Set Gravity Forms manager instance
-     * Allows assets manager to check for DMN-enabled forms
-     * 
-     * @param Operaton_DMN_Gravity_Forms $gravity_forms_manager Gravity Forms manager instance
-     * @since 1.0.0
-     */
     public function set_gravity_forms_manager($gravity_forms_manager) {
         $this->gravity_forms_manager = $gravity_forms_manager;
         
@@ -85,225 +43,319 @@ class Operaton_DMN_Assets {
         }
     }
 
-    public function debug_assets_loading() {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('=== ASSETS MANAGER DEBUG ===');
-        error_log('Is admin: ' . (is_admin() ? 'YES' : 'NO'));
-        error_log('Gravity Forms manager available: ' . (isset($this->gravity_forms_manager) ? 'YES' : 'NO'));
-        
-        if ($this->gravity_forms_manager) {
-            error_log('GF manager - is GF available: ' . ($this->gravity_forms_manager->is_gravity_forms_available() ? 'YES' : 'NO'));
-        }
-        
-        // Check if we're detecting forms correctly
-        $has_gf_on_page = $this->has_gravity_forms_on_page();
-        error_log('Has GF on page (our detection): ' . ($has_gf_on_page ? 'YES' : 'NO'));
-        
-        // Force check for DMN enabled forms
-        if ($this->gravity_forms_manager) {
-            $has_dmn_forms = $this->has_dmn_enabled_forms_on_page();
-            error_log('Has DMN enabled forms: ' . ($has_dmn_forms ? 'YES' : 'NO'));
-        }
-        
-        error_log('============================');
-    }
-}
-
     /**
-     * Initialize WordPress hooks for asset management
-     * Sets up action hooks for proper asset loading at the right times
-     * 
-     * @since 1.0.0
+     * FIXED: Enhanced initialization hooks with better timing
      */
     private function init_hooks() {
-        // Register all assets early
+        // Register all assets very early
         add_action('wp_enqueue_scripts', array($this, 'register_frontend_assets'), 5);
         add_action('admin_enqueue_scripts', array($this, 'register_admin_assets'), 5);
         
-        // Conditional loading hooks
+        // FIXED: Better conditional loading with multiple detection methods
         add_action('wp_enqueue_scripts', array($this, 'maybe_enqueue_frontend_assets'), 10);
         add_action('admin_enqueue_scripts', array($this, 'maybe_enqueue_admin_assets'), 10);
 
-        // NEW: DOCTYPE compatibility check
+        // FIXED: Enhanced DOCTYPE and compatibility checking
         add_action('wp_head', array($this, 'check_document_compatibility'), 1);
+        add_action('wp_head', array($this, 'add_jquery_compatibility_fix'), 2);
+        
+        // FIXED: Force load assets for known GF pages
+        add_action('template_redirect', array($this, 'detect_gravity_forms_early'), 1);
     }
 
     /**
-     * NEW: Check and handle document compatibility mode issues
-     * Detects Quirks Mode and provides warnings/fixes for jQuery compatibility
-     * 
-     * @since 1.0.0
+     * NEW: Early detection of Gravity Forms pages
      */
-public function check_document_compatibility() {
-    // Only run on frontend pages with potential Gravity Forms
-    if (is_admin()) {
-        return;
-    }
-    
-    // Check if we should run compatibility checks
-    if (!$this->should_run_compatibility_check()) {
-        return;
-    }
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: Running document compatibility check');
-    }
-    
-    ?>
-    <script type="text/javascript">
-    /* Operaton DMN Document Compatibility Check */
-    (function() {
-        'use strict';
+    public function detect_gravity_forms_early() {
+        if (is_admin()) {
+            return;
+        }
         
-        // Check document compatibility mode
-        var isQuirksMode = document.compatMode === "BackCompat";
-        var hasDoctype = document.doctype !== null;
-        var doctypeName = document.doctype ? document.doctype.name : 'none';
+        // Check for GF preview pages
+        if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
+            add_action('wp_enqueue_scripts', array($this, 'force_enqueue_frontend_assets'), 8);
+            return;
+        }
         
-        if (isQuirksMode) {
-            console.warn('Operaton DMN: Page running in Quirks Mode - jQuery compatibility issues possible');
-            console.warn('Operaton DMN: Doctype detected:', doctypeName);
+        // Check post content early
+        global $post;
+        if ($post) {
+            $has_gf = has_shortcode($post->post_content, 'gravityform') || 
+                     has_block('gravityforms/form', $post);
             
-            // Try to provide helpful information
-            if (!hasDoctype) {
-                console.warn('Operaton DMN: No DOCTYPE declaration found. Add <!DOCTYPE html> to your theme header.');
+            if ($has_gf) {
+                add_action('wp_enqueue_scripts', array($this, 'force_enqueue_frontend_assets'), 8);
+            }
+        }
+    }
+
+    /**
+     * FIXED: Enhanced jQuery compatibility checking
+     */
+    public function add_jquery_compatibility_fix() {
+        if (is_admin()) {
+            return;
+        }
+        
+        ?>
+        <script type="text/javascript">
+        /* Operaton DMN: Enhanced jQuery Compatibility Fix */
+        (function() {
+            'use strict';
+            
+            // Store original console methods
+            var originalLog = console.log;
+            var originalError = console.error;
+            var originalWarn = console.warn;
+            
+            // Enhanced jQuery detection
+            function checkjQueryCompatibility() {
+                var compatibilityInfo = {
+                    jqueryAvailable: typeof jQuery !== 'undefined',
+                    jqueryVersion: typeof jQuery !== 'undefined' ? jQuery.fn.jquery : 'none',
+                    quirksMode: document.compatMode === "BackCompat",
+                    doctype: document.doctype ? document.doctype.name : 'missing',
+                    issues: []
+                };
                 
-                // CRITICAL FIX: Try to force standards mode if possible
-                if (document.documentElement) {
-                    document.documentElement.setAttribute('data-operaton-quirks-detected', 'true');
+                // Check for common issues
+                if (!compatibilityInfo.jqueryAvailable) {
+                    compatibilityInfo.issues.push('jQuery not loaded');
                 }
+                
+                if (compatibilityInfo.quirksMode) {
+                    compatibilityInfo.issues.push('Quirks Mode detected');
+                }
+                
+                if (compatibilityInfo.doctype === 'missing') {
+                    compatibilityInfo.issues.push('DOCTYPE missing');
+                }
+                
+                // Store globally for other scripts
+                window.operatonCompatibilityInfo = compatibilityInfo;
+                
+                if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
+                    console.log('Operaton DMN Compatibility Check:', compatibilityInfo);
+                }
+                
+                return compatibilityInfo;
             }
             
-            // Store compatibility info for other scripts
-            window.operatonCompatibilityInfo = {
-                quirksMode: true,
-                doctype: doctypeName,
-                jqueryWarning: true,
-                fixApplied: false
-            };
+            // Run compatibility check immediately
+            var compatInfo = checkjQueryCompatibility();
             
-            // Add body class for CSS fixes
-            if (document.body) {
-                document.body.className += ' operaton-quirks-mode-detected';
-            } else {
-                // Wait for body to be available
-                document.addEventListener('DOMContentLoaded', function() {
+            // If jQuery is not available, set up detection
+            if (!compatInfo.jqueryAvailable) {
+                var jqueryWaitAttempts = 0;
+                var maxWaitAttempts = 50;
+                
+                function waitForjQuery() {
+                    jqueryWaitAttempts++;
+                    
+                    if (typeof jQuery !== 'undefined') {
+                        console.log('✅ Operaton DMN: jQuery loaded after', jqueryWaitAttempts, 'attempts');
+                        
+                        // Update compatibility info
+                        window.operatonCompatibilityInfo.jqueryAvailable = true;
+                        window.operatonCompatibilityInfo.jqueryVersion = jQuery.fn.jquery;
+                        
+                        // Trigger custom event
+                        if (typeof jQuery !== 'undefined') {
+                            jQuery(document).trigger('operaton_jquery_ready');
+                        }
+                        
+                    } else if (jqueryWaitAttempts < maxWaitAttempts) {
+                        setTimeout(waitForjQuery, 100);
+                    } else {
+                        console.error('❌ Operaton DMN: jQuery not found after', maxWaitAttempts, 'attempts');
+                        
+                        // Create emergency notification
+                        if (document.body) {
+                            var notice = document.createElement('div');
+                            notice.style.cssText = 'position:fixed;top:10px;right:10px;background:#f44336;color:white;padding:10px;z-index:99999;border-radius:4px;font-size:12px;';
+                            notice.innerHTML = '⚠️ Operaton DMN: jQuery loading failed';
+                            document.body.appendChild(notice);
+                            
+                            setTimeout(function() {
+                                if (notice.parentNode) {
+                                    notice.parentNode.removeChild(notice);
+                                }
+                            }, 5000);
+                        }
+                    }
+                }
+                
+                waitForjQuery();
+            }
+            
+        })();
+        </script>
+        <?php
+    }
+
+    /**
+     * FIXED: Enhanced document compatibility checking
+     */
+    public function check_document_compatibility() {
+        if (is_admin()) {
+            return;
+        }
+        
+        // Only run on pages that might have Gravity Forms
+        if (!$this->should_run_compatibility_check()) {
+            return;
+        }
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Running document compatibility check');
+        }
+        
+        ?>
+        <script type="text/javascript">
+        /* Operaton DMN Document Compatibility Check */
+        (function() {
+            'use strict';
+            
+            // Check document compatibility mode
+            var isQuirksMode = document.compatMode === "BackCompat";
+            var hasDoctype = document.doctype !== null;
+            var doctypeName = document.doctype ? document.doctype.name : 'none';
+            
+            if (isQuirksMode || !hasDoctype) {
+                console.warn('⚠️ Operaton DMN: Document compatibility issues detected');
+                console.warn('- Quirks Mode:', isQuirksMode);
+                console.warn('- DOCTYPE present:', hasDoctype);
+                console.warn('- DOCTYPE name:', doctypeName);
+                
+                // Try to provide helpful information
+                if (!hasDoctype) {
+                    console.warn('💡 Add <!DOCTYPE html> to your theme header.php file');
+                }
+                
+                // Store compatibility info for other scripts
+                window.operatonCompatibilityInfo = window.operatonCompatibilityInfo || {};
+                window.operatonCompatibilityInfo.quirksMode = isQuirksMode;
+                window.operatonCompatibilityInfo.doctype = doctypeName;
+                window.operatonCompatibilityInfo.hasDoctype = hasDoctype;
+                
+                // Add body class for CSS fixes
+                function addCompatibilityClass() {
                     if (document.body) {
                         document.body.className += ' operaton-quirks-mode-detected';
+                        document.body.setAttribute('data-operaton-quirks', 'true');
                     }
-                });
+                }
+                
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', addCompatibilityClass);
+                } else {
+                    addCompatibilityClass();
+                }
+                
+            } else {
+                if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
+                    console.log('✅ Operaton DMN: Document in Standards Mode');
+                }
+                
+                window.operatonCompatibilityInfo = window.operatonCompatibilityInfo || {};
+                window.operatonCompatibilityInfo.quirksMode = false;
+                window.operatonCompatibilityInfo.doctype = doctypeName;
+                window.operatonCompatibilityInfo.hasDoctype = hasDoctype;
             }
-        } else {
-            if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
-                console.log('Operaton DMN: Document in Standards Mode ✓');
-            }
-            
-            window.operatonCompatibilityInfo = {
-                quirksMode: false,
-                doctype: doctypeName,
-                jqueryWarning: false,
-                fixApplied: false
-            };
-        }
-    })();
-    </script>
-    <?php
-    
-    // Add comprehensive CSS fixes for Quirks Mode
-    $this->add_enhanced_quirks_mode_css_fixes();
-}
-
-/**
- * Enhanced CSS fixes for Quirks Mode compatibility
- */
-private function add_enhanced_quirks_mode_css_fixes() {
-    ?>
-    <style type="text/css">
-    /* Operaton DMN Enhanced Quirks Mode Compatibility Fixes */
-    
-    /* Force box-sizing for all elements in quirks mode */
-    .operaton-quirks-mode-detected *,
-    .operaton-quirks-mode-detected *:before,
-    .operaton-quirks-mode-detected *:after {
-        -webkit-box-sizing: border-box !important;
-        -moz-box-sizing: border-box !important;
-        box-sizing: border-box !important;
+        })();
+        </script>
+        
+        <?php
+        // Add comprehensive CSS fixes for Quirks Mode
+        $this->add_enhanced_quirks_mode_css_fixes();
     }
-    
-    /* Fix Gravity Forms in Quirks Mode */
-    .operaton-quirks-mode-detected .gform_wrapper {
-        width: 100% !important;
-    }
-    
-    .operaton-quirks-mode-detected .gform_wrapper .operaton-evaluate-btn {
-        display: inline-block !important;
-        vertical-align: top !important;
-        margin: 10px 0 !important;
-        padding: 8px 16px !important;
-        line-height: 1.4 !important;
-    }
-    
-    /* Decision flow tables in Quirks Mode */
-    .operaton-quirks-mode-detected .decision-table.excel-style {
-        table-layout: fixed !important;
-        width: 100% !important;
-        border-collapse: collapse !important;
-    }
-    
-    /* Fix jQuery UI conflicts in Quirks Mode */
-    .operaton-quirks-mode-detected .ui-widget {
-        font-family: inherit !important;
-    }
-    
-    /* Ensure proper form field sizing */
-    .operaton-quirks-mode-detected .gform_wrapper input[type="text"],
-    .operaton-quirks-mode-detected .gform_wrapper input[type="email"],
-    .operaton-quirks-mode-detected .gform_wrapper input[type="number"],
-    .operaton-quirks-mode-detected .gform_wrapper select,
-    .operaton-quirks-mode-detected .gform_wrapper textarea {
-        width: 100% !important;
-        max-width: 100% !important;
-    }
-    
-    /* Quirks mode notification */
-    .operaton-quirks-mode-detected:before {
-        content: "⚠️ Quirks Mode Detected - Some features may not work optimally";
-        display: block;
-        background: #fff3cd;
-        border: 1px solid #ffeaa7;
-        color: #856404;
-        padding: 8px 12px;
-        margin: 0 0 15px 0;
-        border-radius: 4px;
-        font-size: 12px;
-        font-weight: bold;
-        text-align: center;
-    }
-    
-    /* Hide the warning in production */
-    <?php if (!defined('WP_DEBUG') || !WP_DEBUG): ?>
-    .operaton-quirks-mode-detected:before {
-        display: none !important;
-    }
-    <?php endif; ?>
-    </style>
-    <?php
-}
 
     /**
-     * NEW: Determine if compatibility check should run
-     * Only runs on pages that might have Gravity Forms with DMN
-     * 
-     * @return bool True if compatibility check should run
-     * @since 1.0.0
+     * Enhanced CSS fixes for Quirks Mode compatibility
+     */
+    private function add_enhanced_quirks_mode_css_fixes() {
+        ?>
+        <style type="text/css">
+        /* Operaton DMN Enhanced Quirks Mode Compatibility Fixes */
+        
+        /* Force box-sizing for all elements in quirks mode */
+        .operaton-quirks-mode-detected *,
+        .operaton-quirks-mode-detected *:before,
+        .operaton-quirks-mode-detected *:after {
+            -webkit-box-sizing: border-box !important;
+            -moz-box-sizing: border-box !important;
+            box-sizing: border-box !important;
+        }
+        
+        /* Fix Gravity Forms in Quirks Mode */
+        .operaton-quirks-mode-detected .gform_wrapper {
+            width: 100% !important;
+        }
+        
+        .operaton-quirks-mode-detected .gform_wrapper .operaton-evaluate-btn {
+            display: inline-block !important;
+            vertical-align: top !important;
+            margin: 10px 0 !important;
+            padding: 8px 16px !important;
+            line-height: 1.4 !important;
+        }
+        
+        /* Decision flow tables in Quirks Mode */
+        .operaton-quirks-mode-detected .decision-table.excel-style {
+            table-layout: fixed !important;
+            width: 100% !important;
+            border-collapse: collapse !important;
+        }
+        
+        /* Fix jQuery UI conflicts in Quirks Mode */
+        .operaton-quirks-mode-detected .ui-widget {
+            font-family: inherit !important;
+        }
+        
+        /* Ensure proper form field sizing */
+        .operaton-quirks-mode-detected .gform_wrapper input[type="text"],
+        .operaton-quirks-mode-detected .gform_wrapper input[type="email"],
+        .operaton-quirks-mode-detected .gform_wrapper input[type="number"],
+        .operaton-quirks-mode-detected .gform_wrapper select,
+        .operaton-quirks-mode-detected .gform_wrapper textarea {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        /* Hide quirks mode warning in production */
+        <?php if (!defined('WP_DEBUG') || !WP_DEBUG): ?>
+        .operaton-quirks-mode-detected::before {
+            display: none !important;
+        }
+        <?php else: ?>
+        /* Quirks mode notification for debug */
+        .operaton-quirks-mode-detected::before {
+            content: "⚠️ Quirks Mode Detected - Some features may not work optimally";
+            display: block;
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 8px 12px;
+            margin: 0 0 15px 0;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+        }
+        <?php endif; ?>
+        </style>
+        <?php
+    }
+
+    /**
+     * FIXED: Determine if compatibility check should run
      */
     private function should_run_compatibility_check() {
-        // Always run if we detect Gravity Forms on the page
-        if ($this->has_gravity_forms_on_page()) {
+        // Always run if we detect Gravity Forms
+        if (class_exists('GFForms')) {
             return true;
         }
         
-        // Run on specific pages that might load forms dynamically
         global $post;
         if ($post) {
             // Check for shortcodes
@@ -326,44 +378,7 @@ private function add_enhanced_quirks_mode_css_fixes() {
     }
 
     /**
-     * NEW: Add CSS fixes for Quirks Mode compatibility
-     * Provides basic styling fixes when in Quirks Mode
-     * 
-     * @since 1.0.0
-     */
-    private function add_quirks_mode_css_fixes() {
-        ?>
-        <style type="text/css">
-        /* Operaton DMN Quirks Mode Compatibility Fixes */
-        .operaton-quirks-mode-detected {
-            /* Ensure consistent box model */
-            -webkit-box-sizing: border-box;
-            -moz-box-sizing: border-box;
-            box-sizing: border-box;
-        }
-        
-        /* Fix for Gravity Forms in Quirks Mode */
-        .gform_wrapper .operaton-evaluate-btn {
-            /* Ensure button displays correctly */
-            display: inline-block !important;
-            vertical-align: top;
-        }
-        
-        /* Decision flow tables in Quirks Mode */
-        .decision-table.excel-style {
-            /* More explicit table styling for Quirks Mode */
-            table-layout: fixed;
-            width: 100%;
-        }
-        </style>
-        <?php
-    }
-
-    /**
-     * Register all frontend assets without enqueuing them
-     * Pre-registers assets for conditional loading based on page context
-     * 
-     * @since 1.0.0
+     * FIXED: Register frontend assets with proper dependencies
      */
     public function register_frontend_assets() {
         if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -379,12 +394,16 @@ private function add_enhanced_quirks_mode_css_fixes() {
         );
         
         // FIXED: Ensure jQuery is properly loaded first
+        if (!wp_script_is('jquery', 'registered')) {
+            wp_register_script('jquery');
+        }
+        
         wp_register_script(
             'operaton-dmn-frontend',
             $this->plugin_url . 'assets/js/frontend.js',
             array('jquery'), // Explicit jQuery dependency
             $this->version,
-            true // Load in footer
+            true // Load in footer AFTER jQuery
         );
         
         // FIXED: Better dependency chain for Gravity Forms integration
@@ -404,20 +423,191 @@ private function add_enhanced_quirks_mode_css_fixes() {
             $this->version,
             true
         );
+
+        // Register radio sync assets
+        $this->register_radio_sync_assets();
     }
 
     /**
-     * Register all admin assets without enqueuing them
-     * Pre-registers admin assets for conditional loading on plugin pages
-     * 
-     * @since 1.0.0
+     * Register radio sync assets
+     */
+    public function register_radio_sync_assets() {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Registering radio sync assets');
+        }
+        
+        wp_register_script(
+            'operaton-dmn-radio-sync',
+            $this->plugin_url . 'assets/js/radio-sync.js',
+            array('jquery'),
+            $this->version,
+            true
+        );
+        
+        wp_register_style(
+            'operaton-dmn-radio-sync',
+            $this->plugin_url . 'assets/css/radio-sync.css',
+            array(),
+            $this->version
+        );
+    }
+
+    /**
+     * FIXED: Enhanced frontend asset detection and loading
+     */
+    public function maybe_enqueue_frontend_assets() {
+        if (is_admin()) {
+            return;
+        }
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('🔥 OPERATON DMN: maybe_enqueue_frontend_assets called!');
+        }
+        
+        // Multiple detection methods
+        $should_load = false;
+        $detection_reason = '';
+        
+        // Method 1: Class exists check
+        if (class_exists('GFForms')) {
+            $should_load = true;
+            $detection_reason = 'GFForms class exists';
+        }
+        
+        // Method 2: Post content check
+        if (!$should_load) {
+            global $post;
+            if ($post) {
+                if (has_shortcode($post->post_content, 'gravityform')) {
+                    $should_load = true;
+                    $detection_reason = 'gravityform shortcode found';
+                } elseif (has_block('gravityforms/form', $post)) {
+                    $should_load = true;
+                    $detection_reason = 'gravityforms block found';
+                }
+            }
+        }
+        
+        // Method 3: Preview page check
+        if (!$should_load && isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
+            $should_load = true;
+            $detection_reason = 'GF preview page';
+        }
+        
+        // Method 4: DMN-enabled forms check
+        if (!$should_load && $this->has_dmn_enabled_forms_on_page()) {
+            $should_load = true;
+            $detection_reason = 'DMN-enabled forms detected';
+        }
+        
+        if ($should_load) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('🔥 OPERATON DMN: Loading assets - Reason: ' . $detection_reason);
+            }
+            
+            $this->enqueue_frontend_assets();
+        } else {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('🔥 OPERATON DMN: No Gravity Forms detected, not loading assets');
+            }
+        }
+    }
+
+    /**
+     * FIXED: Force enqueue frontend assets
+     */
+    public function force_enqueue_frontend_assets() {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('🔥 OPERATON DMN: force_enqueue_frontend_assets called!');
+        }
+        
+        $this->enqueue_frontend_assets();
+    }
+
+    /**
+     * FIXED: Enhanced frontend asset enqueuing with compatibility check
+     */
+    public function enqueue_frontend_assets() {
+        // Prevent duplicate loading
+        if (isset($this->loaded_assets['frontend'])) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: Frontend assets already loaded, skipping');
+            }
+            return;
+        }
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: ⭐ STARTING enqueue_frontend_assets');
+        }
+        
+        // CRITICAL FIX: Ensure jQuery is loaded FIRST
+        if (!wp_script_is('jquery', 'done') && !wp_script_is('jquery', 'enqueued')) {
+            wp_enqueue_script('jquery');
+        }
+        
+        // Force registration if not already registered
+        if (!wp_script_is('operaton-dmn-frontend', 'registered')) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: 🔧 Script not registered, registering now');
+            }
+            
+            wp_register_script(
+                'operaton-dmn-frontend',
+                $this->plugin_url . 'assets/js/frontend.js',
+                array('jquery'), // Explicit jQuery dependency
+                $this->version,
+                true // Load in footer AFTER jQuery
+            );
+        }
+        
+        // Enqueue CSS first
+        wp_enqueue_style('operaton-dmn-frontend');
+        
+        // Then enqueue JS with jQuery dependency
+        wp_enqueue_script('operaton-dmn-frontend');
+        
+        // CRITICAL: Enhanced localization data
+        $localization_data = array(
+            'url' => rest_url('operaton-dmn/v1/evaluate'),
+            'nonce' => wp_create_nonce('wp_rest'),
+            'debug' => defined('WP_DEBUG') && WP_DEBUG ? '1' : '0',
+            'strings' => array(
+                'evaluating' => __('Evaluating...', 'operaton-dmn'),
+                'error' => __('Evaluation failed', 'operaton-dmn'),
+                'success' => __('Evaluation completed', 'operaton-dmn'),
+                'loading' => __('Loading...', 'operaton-dmn'),
+                'no_config' => __('Configuration not found', 'operaton-dmn'),
+                'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
+                'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
+            ),
+            'compatibility' => array(
+                'quirks_mode_check' => true,
+                'jquery_version_required' => '3.0'
+            )
+        );
+        
+        // Enhanced localization with error handling
+        $localize_result = wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
+        
+        if (!$localize_result && defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: ❌ wp_localize_script failed');
+        }
+        
+        $this->loaded_assets['frontend'] = true;
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: ⭐ FINISHED enqueue_frontend_assets');
+        }
+    }
+
+    /**
+     * Register admin assets
      */
     public function register_admin_assets() {
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Assets: Registering admin assets');
         }
         
-        // Register admin CSS
         wp_register_style(
             'operaton-dmn-admin',
             $this->plugin_url . 'assets/css/admin.css',
@@ -425,7 +615,6 @@ private function add_enhanced_quirks_mode_css_fixes() {
             $this->version
         );
         
-        // Register debug CSS (only in debug mode)
         if (defined('WP_DEBUG') && WP_DEBUG) {
             wp_register_style(
                 'operaton-dmn-debug',
@@ -435,7 +624,6 @@ private function add_enhanced_quirks_mode_css_fixes() {
             );
         }
         
-        // Register admin JavaScript
         wp_register_script(
             'operaton-dmn-admin',
             $this->plugin_url . 'assets/js/admin.js',
@@ -444,7 +632,6 @@ private function add_enhanced_quirks_mode_css_fixes() {
             true
         );
         
-        // Register API testing JavaScript
         wp_register_script(
             'operaton-dmn-api-test',
             $this->plugin_url . 'assets/js/api-test.js',
@@ -455,237 +642,18 @@ private function add_enhanced_quirks_mode_css_fixes() {
     }
 
     /**
-     * Conditionally enqueue frontend assets based on page context
-     * Only loads frontend assets when they're actually needed
-     * 
-     * @since 1.0.0
-     */
-public function maybe_enqueue_frontend_assets() {
-    // TEMPORARY DEBUG - Add this line at the very beginning
-    error_log('🔥 OPERATON DMN: maybe_enqueue_frontend_assets called! Admin: ' . (is_admin() ? 'YES' : 'NO'));
-    
-    // Skip if admin
-    if (is_admin()) {
-        error_log('🔥 OPERATON DMN: Skipping because is_admin() = true');
-        return;
-    }
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: Checking if frontend assets should be loaded');
-    }
-    
-    // Check if we're on a page with Gravity Forms
-    $has_gf = $this->has_gravity_forms_on_page();
-    error_log('🔥 OPERATON DMN: has_gravity_forms_on_page() = ' . ($has_gf ? 'TRUE' : 'FALSE'));
-    
-    if ($has_gf) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: Gravity Forms detected, loading frontend assets');
-        }
-        error_log('🔥 OPERATON DMN: About to call enqueue_frontend_assets()');
-        $this->enqueue_frontend_assets();
-        error_log('🔥 OPERATON DMN: enqueue_frontend_assets() finished');
-    } else {
-        error_log('🔥 OPERATON DMN: No Gravity Forms detected, not loading assets');
-    }
-}
-    /**
-     * Conditionally enqueue admin assets based on current admin page
-     * Only loads admin assets on plugin-related admin pages
-     * 
-     * @param string $hook Current admin page hook
-     * @since 1.0.0
+     * Maybe enqueue admin assets
      */
     public function maybe_enqueue_admin_assets($hook) {
-        // Only load on our plugin pages
         if (strpos($hook, 'operaton-dmn') !== false) {
             $this->enqueue_admin_assets($hook);
         }
     }
 
     /**
-     * Enqueue frontend assets for public form pages
-     * Loads CSS and JavaScript needed for DMN evaluation functionality
-     * 
-     * @since 1.0.0
-     */
-
-/**
- * FIXED enqueue_frontend_assets method for class-operaton-dmn-assets.php
- * The issue is that wp_enqueue_script() might not immediately register the script
- * We need to ensure registration happens before localization
-     * UPDATED: Enhanced frontend asset enqueuing with compatibility check
-     * Now includes compatibility mode handling
-     */
-public function enqueue_frontend_assets() {
-    // Prevent duplicate loading
-    if (isset($this->loaded_assets['frontend'])) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: Frontend assets already loaded, skipping');
-        }
-        return;
-    }
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: ⭐ STARTING enqueue_frontend_assets');
-    }
-    
-    // CRITICAL FIX: Ensure jQuery is loaded FIRST and wait for it
-    if (!wp_script_is('jquery', 'done') && !wp_script_is('jquery', 'enqueued')) {
-        wp_enqueue_script('jquery');
-    }
-    
-    // Force registration if not already registered
-    if (!wp_script_is('operaton-dmn-frontend', 'registered')) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: 🔧 Script not registered, registering now');
-        }
-        
-        wp_register_script(
-            'operaton-dmn-frontend',
-            $this->plugin_url . 'assets/js/frontend.js',
-            array('jquery'), // Explicit jQuery dependency
-            $this->version,
-            true // Load in footer AFTER jQuery
-        );
-    }
-    
-    // Enqueue CSS first
-    wp_enqueue_style('operaton-dmn-frontend');
-    
-    // Then enqueue JS with jQuery dependency
-    wp_enqueue_script('operaton-dmn-frontend');
-    
-    // CRITICAL: Add jQuery ready wrapper to the localization
-    $localization_data = array(
-        'url' => rest_url('operaton-dmn/v1/evaluate'),
-        'nonce' => wp_create_nonce('wp_rest'),
-        'debug' => defined('WP_DEBUG') && WP_DEBUG ? '1' : '0', // String for consistency
-        'strings' => array(
-            'evaluating' => __('Evaluating...', 'operaton-dmn'),
-            'error' => __('Evaluation failed', 'operaton-dmn'),
-            'success' => __('Evaluation completed', 'operaton-dmn'),
-            'loading' => __('Loading...', 'operaton-dmn'),
-            'no_config' => __('Configuration not found', 'operaton-dmn'),
-            'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
-            'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
-        ),
-        'compatibility' => array(
-            'quirks_mode_check' => true,
-            'jquery_version_required' => '3.0'
-        )
-    );
-    
-    // Enhanced localization with better error handling
-    $localize_result = wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
-    
-    if (!$localize_result && defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: ❌ wp_localize_script failed');
-    }
-    
-    $this->loaded_assets['frontend'] = true;
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN Assets: ⭐ FINISHED enqueue_frontend_assets');
-    }
-}
-
-    /**
-     * NEW: Add compatibility integration to footer
-     * Provides additional JavaScript compatibility handling
-     * 
-     * @since 1.0.0
-     */
-    public function add_compatibility_integration() {
-        // Only add once
-        static $added = false;
-        if ($added) {
-            return;
-        }
-        $added = true;
-        
-        ?>
-        <script type="text/javascript">
-        /* Operaton DMN Compatibility Integration */
-        (function($) {
-            'use strict';
-            
-            // Wait for compatibility info to be available
-            function waitForCompatibilityInfo(callback) {
-                var attempts = 0;
-                var maxAttempts = 10;
-                
-                function check() {
-                    if (window.operatonCompatibilityInfo) {
-                        callback(window.operatonCompatibilityInfo);
-                    } else if (attempts < maxAttempts) {
-                        attempts++;
-                        setTimeout(check, 100);
-                    } else {
-                        // Fallback
-                        callback({
-                            quirksMode: document.compatMode === "BackCompat",
-                            doctype: document.doctype ? document.doctype.name : 'none',
-                            jqueryWarning: false
-                        });
-                    }
-                }
-                check();
-            }
-            
-            // Initialize compatibility handling
-            $(document).ready(function() {
-                waitForCompatibilityInfo(function(compatInfo) {
-                    if (compatInfo.quirksMode) {
-                        // Add CSS class for Quirks Mode styling
-                        $('body').addClass('operaton-quirks-mode-detected');
-                        
-                        // Show user-friendly warning in debug mode
-                        if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
-                            console.warn('Operaton DMN: Your theme may be in Quirks Mode. Consider adding <!DOCTYPE html> to the theme header for better compatibility.');
-                        }
-                    }
-                    
-                    // Store compatibility info globally for other scripts
-                    if (window.operaton_ajax) {
-                        window.operaton_ajax.compatibility = compatInfo;
-                    }
-                });
-            });
-            
-        })(jQuery);
-        </script>
-        <?php
-    }
-
-    /**
-     * NEW: Get compatibility status for debugging
-     * Provides compatibility information for admin interface
-     * 
-     * @return array Compatibility status information
-     * @since 1.0.0
-     */
-    public function get_compatibility_status() {
-        return array(
-            'check_enabled' => true,
-            'hooks_registered' => array(
-                'wp_head' => has_action('wp_head', array($this, 'check_document_compatibility')),
-                'wp_footer' => has_action('wp_footer', array($this, 'add_compatibility_integration'))
-            ),
-            'quirks_mode_detection' => 'JavaScript-based',
-            'css_fixes_available' => true
-        );
-    }
-
-    /**
-     * Enqueue admin assets for plugin configuration pages
-     * Loads CSS and JavaScript needed for admin interface functionality
-     * 
-     * @param string $hook Current admin page hook
-     * @since 1.0.0
+     * Enqueue admin assets
      */
     public function enqueue_admin_assets($hook) {
-        // Prevent duplicate loading
         if (isset($this->loaded_assets['admin'])) {
             return;
         }
@@ -694,23 +662,18 @@ public function enqueue_frontend_assets() {
             error_log('Operaton DMN Assets: Enqueuing admin assets for: ' . $hook);
         }
         
-        // Enqueue admin CSS
         wp_enqueue_style('operaton-dmn-admin');
         
-        // Enqueue debug CSS if in debug mode
         if (defined('WP_DEBUG') && WP_DEBUG && strpos($hook, 'debug') !== false) {
             wp_enqueue_style('operaton-dmn-debug');
         }
         
-        // Enqueue admin JavaScript
         wp_enqueue_script('operaton-dmn-admin');
         
-        // Enqueue API testing on config pages
         if (strpos($hook, 'operaton-dmn-add') !== false || isset($_GET['edit'])) {
             wp_enqueue_script('operaton-dmn-api-test');
         }
         
-        // Localize admin script
         wp_localize_script('operaton-dmn-admin', 'operaton_admin', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('operaton_admin_nonce'),
@@ -728,30 +691,240 @@ public function enqueue_frontend_assets() {
         $this->loaded_assets['admin'] = true;
     }
 
-/**
- * Enqueue Gravity Forms-specific assets with form configuration
- * Loads form-specific JavaScript and CSS for DMN evaluation functionality
- * 
- * @param array $form Gravity Forms form array
- * @param object $config DMN configuration object
- * @since 1.0.0
- */
+    /**
+     * Enqueue radio sync assets for specific form
+     */
+    public function enqueue_radio_sync_assets($form_id = null) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Enqueuing radio sync assets for form: ' . $form_id);
+        }
+        
+        // Check if this form needs radio synchronization
+        if ($form_id && $this->form_needs_radio_sync($form_id)) {
+            wp_enqueue_script('operaton-dmn-radio-sync');
+            wp_enqueue_style('operaton-dmn-radio-sync');
+            
+            // Localize script with form-specific data
+            wp_localize_script('operaton-dmn-radio-sync', 'operaton_radio_sync', array(
+                'form_id' => $form_id,
+                'debug' => defined('WP_DEBUG') && WP_DEBUG,
+                'field_mappings' => $this->get_radio_sync_mappings($form_id),
+                'strings' => array(
+                    'sync_complete' => __('Radio buttons synchronized', 'operaton-dmn'),
+                    'sync_error' => __('Radio synchronization error', 'operaton-dmn'),
+                    'initializing' => __('Initializing radio sync...', 'operaton-dmn')
+                )
+            ));
+            
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: Radio sync assets enqueued for form ' . $form_id);
+            }
+        }
+    }
+
+    /**
+     * Check if a form needs radio synchronization
+     */
+    private function form_needs_radio_sync($form_id) {
+        // Form 8 specifically needs radio sync
+        if ($form_id == 8) {
+            return true;
+        }
+        
+        // Check if form has HTML fields with radio buttons
+        if ($this->gravity_forms_manager && $this->gravity_forms_manager->is_gravity_forms_available()) {
+            try {
+                if (class_exists('GFAPI')) {
+                    $form = GFAPI::get_form($form_id);
+                    if ($form && isset($form['fields'])) {
+                        foreach ($form['fields'] as $field) {
+                            if ($field->type === 'html' && 
+                                strpos($field->content, 'type="radio"') !== false &&
+                                strpos($field->content, 'aanvrager') !== false) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('Operaton DMN Assets: Error checking form for radio sync: ' . $e->getMessage());
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Get radio sync field mappings for a specific form
+     */
+    private function get_radio_sync_mappings($form_id) {
+        // Default mappings for form 8
+        $default_mappings = array(
+            'aanvragerDitKalenderjaarAlAangevraagd' => 'input_8_25',
+            'aanvragerAanmerkingStudieFinanciering' => 'input_8_26',
+            'aanvragerUitkeringBaanbrekers' => 'input_8_27',
+            'aanvragerVoedselbankpasDenBosch' => 'input_8_28',
+            'aanvragerKwijtscheldingGemeentelijkeBelastingen' => 'input_8_29',
+            'aanvragerSchuldhulptrajectKredietbankNederland' => 'input_8_30',
+            'aanvragerHeeftKind4Tm17' => 'input_8_31'
+        );
+        
+        if ($form_id == 8) {
+            return $default_mappings;
+        }
+        
+        // For other forms, could extract mappings dynamically
+        // or store them in the database configuration
+        return array();
+    }
+
+    /**
+     * Check if current page has Gravity Forms
+     */
+    private function has_gravity_forms_on_page() {
+        if ($this->gravity_forms_manager && $this->gravity_forms_manager->is_gravity_forms_available()) {
+            return $this->has_dmn_enabled_forms_on_page();
+        }
+        
+        if (!class_exists('GFForms')) {
+            return false;
+        }
+        
+        global $post;
+        if ($post && has_shortcode($post->post_content, 'gravityform')) {
+            return true;
+        }
+        
+        if ($post && has_block('gravityforms/form', $post)) {
+            return true;
+        }
+        
+        if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
+            return true;
+        }
+        
+        return apply_filters('operaton_dmn_has_gravity_forms', false);
+    }
+
+    /**
+     * Check if current page has DMN-enabled Gravity Forms
+     */
+    private function has_dmn_enabled_forms_on_page() {
+        global $post;
+        
+        if ($post && has_shortcode($post->post_content, 'gravityform')) {
+            $form_ids = $this->extract_form_ids_from_shortcodes($post->post_content);
+            return $this->any_forms_have_dmn_config($form_ids);
+        }
+        
+        if ($post && has_block('gravityforms/form', $post)) {
+            $form_ids = $this->extract_form_ids_from_blocks($post);
+            return $this->any_forms_have_dmn_config($form_ids);
+        }
+        
+        if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
+            $form_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+            if ($form_id > 0) {
+                $config = $this->gravity_forms_manager->get_form_configuration($form_id);
+                return $config !== null;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Extract form IDs from gravityform shortcodes
+     */
+    private function extract_form_ids_from_shortcodes($content) {
+        $form_ids = array();
+        $pattern = '/\[gravityform[^\]]*id=["\'](\d+)["\'][^\]]*\]/';
+        
+        if (preg_match_all($pattern, $content, $matches)) {
+            $form_ids = array_map('intval', $matches[1]);
+        }
+        
+        return array_unique($form_ids);
+    }
+
+    /**
+     * Extract form IDs from Gravity Forms Gutenberg blocks
+     */
+    private function extract_form_ids_from_blocks($post) {
+        $form_ids = array();
+        
+        if (function_exists('parse_blocks')) {
+            $blocks = parse_blocks($post->post_content);
+            $form_ids = $this->find_gravity_form_ids_in_blocks($blocks);
+        }
+        
+        return array_unique($form_ids);
+    }
+
+    /**
+     * Recursively find Gravity Forms block IDs
+     */
+    private function find_gravity_form_ids_in_blocks($blocks) {
+        $form_ids = array();
+        
+        foreach ($blocks as $block) {
+            if ($block['blockName'] === 'gravityforms/form') {
+                if (isset($block['attrs']['formId'])) {
+                    $form_ids[] = intval($block['attrs']['formId']);
+                }
+            }
+            
+            if (!empty($block['innerBlocks'])) {
+                $inner_ids = $this->find_gravity_form_ids_in_blocks($block['innerBlocks']);
+                $form_ids = array_merge($form_ids, $inner_ids);
+            }
+        }
+        
+        return $form_ids;
+    }
+
+    /**
+     * Check if any forms have DMN configurations
+     */
+    private function any_forms_have_dmn_config($form_ids) {
+        if (!$this->gravity_forms_manager) {
+            return false;
+        }
+        
+        foreach ($form_ids as $form_id) {
+            $config = $this->gravity_forms_manager->get_form_configuration($form_id);
+            if ($config !== null) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Enqueue Gravity Forms-specific assets with form configuration
+     */
     public function enqueue_gravity_form_assets($form, $config) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Assets: Enqueuing Gravity Forms assets for form: ' . $form['id']);
         }
         
-        // FIXED: Ensure frontend assets are loaded first
+        // Ensure frontend assets are loaded first
         $this->enqueue_frontend_assets();
         
-        // FIXED: Wait for frontend assets to be ready
+        // Enqueue radio sync if needed
+        $this->enqueue_radio_sync_assets($form['id']);
+
+        // Add form-specific scripts with proper timing
         add_action('wp_footer', function() use ($form, $config) {
             $this->enqueue_gravity_integration_scripts($form, $config);
         }, 5);
     }
 
     /**
-     * FIXED: Separate method for Gravity Forms integration scripts
+     * Separate method for Gravity Forms integration scripts
      */
     private function enqueue_gravity_integration_scripts($form, $config) {
         // Enqueue Gravity Forms integration script
@@ -795,10 +968,7 @@ public function enqueue_frontend_assets() {
     }
 
     /**
-     * Enqueue decision flow CSS and JavaScript for process execution results
-     * Loads Excel-style table CSS and interactive JavaScript for decision flow display
-     * 
-     * @since 1.0.0
+     * Enqueue decision flow CSS and JavaScript
      */
     public function enqueue_decision_flow_assets() {
         // Prevent duplicate loading
@@ -832,12 +1002,7 @@ public function enqueue_frontend_assets() {
     }
 
     /**
-     * Add inline CSS for dynamic styling based on configuration
-     * Generates custom CSS properties and form-specific styles
-     * 
-     * @param int $form_id Gravity Forms form ID (optional)
-     * @param array $styles Custom styles to apply
-     * @since 1.0.0
+     * Add inline CSS for dynamic styling
      */
     public function add_inline_styles($form_id = null, $styles = array()) {
         $css = '';
@@ -882,67 +1047,7 @@ public function enqueue_frontend_assets() {
     }
 
     /**
-     * Check if current page has Gravity Forms that might need our assets
-     * Determines whether frontend assets should be loaded based on page content
-     * 
-     * @return bool True if page has relevant Gravity Forms
-     * @since 1.0.0
-     */
-    private function has_gravity_forms_on_page() {
-        // If Gravity Forms manager is available, use its detection
-        if ($this->gravity_forms_manager && $this->gravity_forms_manager->is_gravity_forms_available()) {
-            return $this->has_dmn_enabled_forms_on_page();
-        }
-        
-        // Fallback to basic Gravity Forms detection
-        if (!class_exists('GFForms')) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Assets: Gravity Forms not active');
-            }
-            return false;
-        }
-        
-        // Check for shortcodes in post content
-        global $post;
-        if ($post && has_shortcode($post->post_content, 'gravityform')) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Assets: Found gravityform shortcode in post content');
-            }
-            return true;
-        }
-        
-        // Check for Gravity Forms blocks (Gutenberg)
-        if ($post && has_block('gravityforms/form', $post)) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Assets: Found Gravity Forms block in post');
-            }
-            return true;
-        }
-        
-        // Check if we're on a Gravity Forms preview page
-        if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Assets: On Gravity Forms preview page');
-            }
-            return true;
-        }
-        
-        // Allow other plugins/themes to indicate GF presence
-        $has_gf = apply_filters('operaton_dmn_has_gravity_forms', false);
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: Filter result for has_gravity_forms: ' . ($has_gf ? 'true' : 'false'));
-        }
-        
-        return $has_gf;
-    }
-
-    /**
-     * Get asset loading status for debugging and diagnostics
-     * Returns information about which assets are currently loaded
-     * 
-     * @return array Asset loading status information
-     * @since 1.0.0
+     * Get asset loading status for debugging
      */
     public function get_assets_status() {
         global $wp_scripts, $wp_styles;
@@ -950,17 +1055,16 @@ public function enqueue_frontend_assets() {
         $status = array(
             'loaded_assets' => $this->loaded_assets,
             'scripts' => array(),
-            'styles' => array(),
-            'registered' => array()
+            'styles' => array()
         );
         
-        // Check our scripts
         $our_scripts = array(
             'operaton-dmn-admin',
             'operaton-dmn-frontend', 
-            'operaton-dmn-gravity',
+            'operaton-dmn-gravity-integration',
             'operaton-dmn-decision-flow',
-            'operaton-dmn-api-test'
+            'operaton-dmn-api-test',
+            'operaton-dmn-radio-sync'
         );
         
         foreach ($our_scripts as $script) {
@@ -971,12 +1075,12 @@ public function enqueue_frontend_assets() {
             );
         }
         
-        // Check our styles
         $our_styles = array(
             'operaton-dmn-admin',
             'operaton-dmn-frontend',
             'operaton-dmn-decision-flow',
-            'operaton-dmn-debug'
+            'operaton-dmn-debug',
+            'operaton-dmn-radio-sync'
         );
         
         foreach ($our_styles as $style) {
@@ -992,10 +1096,6 @@ public function enqueue_frontend_assets() {
 
     /**
      * Force enqueue specific assets for manual loading
-     * Allows other components to force load specific asset groups when needed
-     * 
-     * @param string $asset_group Asset group to force load (admin, frontend, decision_flow)
-     * @since 1.0.0
      */
     public function force_enqueue($asset_group) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -1015,6 +1115,12 @@ public function enqueue_frontend_assets() {
                 $this->enqueue_decision_flow_assets();
                 break;
                 
+            case 'radio_sync':
+                $this->register_radio_sync_assets();
+                wp_enqueue_script('operaton-dmn-radio-sync');
+                wp_enqueue_style('operaton-dmn-radio-sync');
+                break;
+                
             default:
                 if (defined('WP_DEBUG') && WP_DEBUG) {
                     error_log('Operaton DMN Assets: Unknown asset group: ' . $asset_group);
@@ -1023,135 +1129,23 @@ public function enqueue_frontend_assets() {
     }
 
     /**
-     * Check if current page has DMN-enabled Gravity Forms
-     * Uses Gravity Forms manager to detect forms with DMN configurations
-     * 
-     * @return bool True if page has DMN-enabled forms
-     * @since 1.0.0
+     * Get compatibility status for debugging
      */
-    private function has_dmn_enabled_forms_on_page() {
-        global $post;
-        
-        // Check for shortcodes in post content
-        if ($post && has_shortcode($post->post_content, 'gravityform')) {
-            $form_ids = $this->extract_form_ids_from_shortcodes($post->post_content);
-            return $this->any_forms_have_dmn_config($form_ids);
-        }
-        
-        // Check for Gravity Forms blocks (Gutenberg)
-        if ($post && has_block('gravityforms/form', $post)) {
-            $form_ids = $this->extract_form_ids_from_blocks($post);
-            return $this->any_forms_have_dmn_config($form_ids);
-        }
-        
-        // Check if we're on a Gravity Forms preview page
-        if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview') {
-            $form_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-            if ($form_id > 0) {
-                $config = $this->gravity_forms_manager->get_form_configuration($form_id);
-                return $config !== null;
-            }
-        }
-        
-        return false;
+    public function get_compatibility_status() {
+        return array(
+            'check_enabled' => true,
+            'hooks_registered' => array(
+                'wp_head' => has_action('wp_head', array($this, 'check_document_compatibility')),
+                'template_redirect' => has_action('template_redirect', array($this, 'detect_gravity_forms_early'))
+            ),
+            'quirks_mode_detection' => 'JavaScript-based',
+            'css_fixes_available' => true,
+            'jquery_compatibility' => true
+        );
     }
 
     /**
-     * Extract form IDs from gravityform shortcodes
-     * Parses shortcode attributes to find form IDs
-     * 
-     * @param string $content Post content to search
-     * @return array Array of form IDs found
-     * @since 1.0.0
-     */
-    private function extract_form_ids_from_shortcodes($content) {
-        $form_ids = array();
-        
-        // Pattern to match [gravityform id="X"] shortcodes
-        $pattern = '/\[gravityform[^\]]*id=["\'](\d+)["\'][^\]]*\]/';
-        
-        if (preg_match_all($pattern, $content, $matches)) {
-            $form_ids = array_map('intval', $matches[1]);
-        }
-        
-        return array_unique($form_ids);
-    }
-
-    /**
-     * Extract form IDs from Gravity Forms Gutenberg blocks
-     * Parses block content to find form IDs
-     * 
-     * @param WP_Post $post Post object to search
-     * @return array Array of form IDs found
-     * @since 1.0.0
-     */
-    private function extract_form_ids_from_blocks($post) {
-        $form_ids = array();
-        
-        if (function_exists('parse_blocks')) {
-            $blocks = parse_blocks($post->post_content);
-            $form_ids = $this->find_gravity_form_ids_in_blocks($blocks);
-        }
-        
-        return array_unique($form_ids);
-    }
-
-    /**
-     * Recursively find Gravity Forms block IDs
-     * Searches through nested blocks for gravityforms/form blocks
-     * 
-     * @param array $blocks Array of parsed blocks
-     * @return array Array of form IDs found
-     * @since 1.0.0
-     */
-    private function find_gravity_form_ids_in_blocks($blocks) {
-        $form_ids = array();
-        
-        foreach ($blocks as $block) {
-            if ($block['blockName'] === 'gravityforms/form') {
-                if (isset($block['attrs']['formId'])) {
-                    $form_ids[] = intval($block['attrs']['formId']);
-                }
-            }
-            
-            // Check inner blocks recursively
-            if (!empty($block['innerBlocks'])) {
-                $inner_ids = $this->find_gravity_form_ids_in_blocks($block['innerBlocks']);
-                $form_ids = array_merge($form_ids, $inner_ids);
-            }
-        }
-        
-        return $form_ids;
-    }
-
-    /**
-     * Check if any of the provided form IDs have DMN configurations
-     * Uses Gravity Forms manager to check for DMN configurations
-     * 
-     * @param array $form_ids Array of form IDs to check
-     * @return bool True if any form has DMN configuration
-     * @since 1.0.0
-     */
-    private function any_forms_have_dmn_config($form_ids) {
-        if (!$this->gravity_forms_manager) {
-            return false;
-        }
-        
-        foreach ($form_ids as $form_id) {
-            $config = $this->gravity_forms_manager->get_form_configuration($form_id);
-            if ($config !== null) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-
-    /**
-     * Clear loaded assets cache for testing or manual reset
-     * Resets the internal tracking of which assets have been loaded
-     * 
-     * @since 1.0.0
+     * Clear loaded assets cache for testing
      */
     public function reset_loaded_assets() {
         if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -1162,22 +1156,14 @@ public function enqueue_frontend_assets() {
     }
 
     /**
-     * Get plugin URL for external asset access
-     * Provides access to plugin URL for components that need to build asset paths
-     * 
-     * @return string Plugin URL with trailing slash
-     * @since 1.0.0
+     * Get plugin URL for external access
      */
     public function get_plugin_url() {
         return $this->plugin_url;
     }
 
     /**
-     * Get plugin version for external cache busting
-     * Provides access to plugin version for components that need cache busting
-     * 
-     * @return string Plugin version string
-     * @since 1.0.0
+     * Get plugin version for external access
      */
     public function get_version() {
         return $this->version;
