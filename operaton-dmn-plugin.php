@@ -1,18 +1,7 @@
 <?php
 /**
- * Plugin Name: Operaton DMN Evaluator
- * Plugin URI: https://git.open-regels.nl/showcases/operaton-dmn-evaluator
- *
- * Enhanced Operaton DMN Evaluator v1.0.0-beta.9 with Process Integration
- * 
- * Key Changes:
- * 1. Added process execution support alongside decision evaluation
- * 2. Added decision flow results summary display
- * 3. Enhanced configuration to support both modes
- * 4. Added third page summary functionality
- * 
  * Description: WordPress plugin to integrate Gravity Forms with Operaton DMN decision tables for dynamic form evaluations.
- * Version: 1.0.0-beta.9
+ * Version: 1.0.0-beta.10
  * Author: Steven Gort
  * License: EU PL v1.2
  * Text Domain: operaton-dmn
@@ -25,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('OPERATON_DMN_VERSION', '1.0.0-beta.9');
+define('OPERATON_DMN_VERSION', '1.0.0-beta.10');
 define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('OPERATON_DMN_PLUGIN_PATH', plugin_dir_path(__FILE__));
 
