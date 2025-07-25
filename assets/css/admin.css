@@ -1,319 +1,729 @@
-/* assets/css/admin.css */
+/*!
+ * Operaton DMN Admin Interface Styles
+ * 
+ * Styles for WordPress admin interface including configuration forms,
+ * management pages, and update sections.
+ * 
+ * @package OperatonDMN
+ * @version 1.0.0-beta.9
+ */
 
-.operaton-dmn-admin {
-    max-width: 1200px;
+/* CSS Custom Properties for Admin Interface */
+:root {
+    --operaton-admin-primary: #0073aa;
+    --operaton-admin-primary-dark: #005a87;
+    --operaton-admin-success: #46b450;
+    --operaton-admin-warning: #ffb900;
+    --operaton-admin-error: #d63638;
+    --operaton-admin-light: #f6f7f7;
+    --operaton-admin-dark: #1e1e1e;
+    --operaton-admin-border: #c3c4c7;
+    --operaton-admin-border-light: #dcdcde;
+    --operaton-admin-shadow: 0 1px 3px rgba(0, 0, 0, 0.13);
+    --operaton-admin-border-radius: 4px;
+    --operaton-admin-transition: 0.15s ease-in-out;
+    --operaton-admin-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 }
 
-.operaton-dmn-admin h1 {
+/* =============================================================================
+   MAIN ADMIN CONTAINERS
+   ============================================================================= */
+
+.operaton-dmn-admin-wrap {
+    margin: 20px 0;
+    font-family: var(--operaton-admin-font);
+}
+
+.operaton-dmn-header {
+    background: white;
+    border: 1px solid var(--operaton-admin-border);
+    border-radius: var(--operaton-admin-border-radius);
+    padding: 20px;
     margin-bottom: 20px;
+    box-shadow: var(--operaton-admin-shadow);
 }
 
-/* Configuration List Styles */
-.operaton-configs-table {
-    margin-top: 20px;
-}
-
-.operaton-configs-table th {
+.operaton-dmn-header h1 {
+    margin: 0 0 10px 0;
+    color: var(--operaton-admin-dark);
+    font-size: 24px;
     font-weight: 600;
-    padding: 12px;
 }
 
-.operaton-configs-table td {
-    padding: 12px;
-    vertical-align: middle;
-}
-
-.operaton-configs-table .config-name {
-    font-weight: 600;
-    color: #2271b1;
-}
-
-.operaton-configs-table .endpoint-url {
-    font-family: monospace;
-    font-size: 12px;
+.operaton-dmn-header p {
+    margin: 0;
     color: #666;
-    max-width: 300px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: 14px;
 }
 
-.operaton-configs-table .actions {
-    white-space: nowrap;
-}
+/* =============================================================================
+   UPDATE MANAGEMENT SECTION
+   ============================================================================= */
 
-.operaton-configs-table .actions .button {
-    margin-right: 5px;
-}
-
-/* Configuration Form Styles */
-.operaton-config-form {
-    background: #fff;
+.operaton-update-section {
+    background: #f9f9f9;
     padding: 20px;
-    border: 1px solid #ccd0d4;
-    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    margin: 20px 0;
+    border-left: 4px solid var(--operaton-admin-primary);
+    border-radius: var(--operaton-admin-border-radius);
+    box-shadow: var(--operaton-admin-shadow);
 }
 
-.operaton-config-section {
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid #e1e1e1;
-}
-
-.operaton-config-section:last-child {
-    border-bottom: none;
-}
-
-.operaton-config-section h3 {
-    margin-top: 0;
-    margin-bottom: 15px;
-    color: #23282d;
-}
-
-/* Field Mapping Styles */
-.field-mappings-container {
-    background: #f8f9fa;
-    border: 1px solid #e1e1e1;
-    border-radius: 4px;
-    padding: 20px;
-    margin-top: 15px;
-}
-
-.field-mapping-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 120px auto;
-    gap: 15px;
-    align-items: center;
-    margin-bottom: 15px;
-    padding: 15px;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.field-mapping-row:last-child {
-    margin-bottom: 0;
-}
-
-.field-mapping-row .form-field {
-    display: flex;
-    flex-direction: column;
-}
-
-.field-mapping-row label {
+.operaton-update-section h3 {
+    margin: 0 0 15px 0;
+    color: var(--operaton-admin-dark);
+    font-size: 18px;
     font-weight: 600;
-    margin-bottom: 5px;
+}
+
+.operaton-update-section p {
+    margin: 8px 0;
     color: #555;
-    font-size: 12px;
+    line-height: 1.5;
+}
+
+.operaton-update-section .button {
+    margin-top: 10px;
+}
+
+.operaton-update-available {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: var(--operaton-admin-border-radius);
+}
+
+.operaton-update-available p {
+    margin: 5px 0;
+    color: #856404;
+}
+
+.operaton-update-current {
+    color: var(--operaton-admin-success);
+    font-weight: 600;
+}
+
+/* =============================================================================
+   CONFIGURATION LIST TABLE
+   ============================================================================= */
+
+.operaton-config-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border: 1px solid var(--operaton-admin-border);
+    border-radius: var(--operaton-admin-border-radius);
+    box-shadow: var(--operaton-admin-shadow);
+    overflow: hidden;
+}
+
+.operaton-config-table th {
+    background: var(--operaton-admin-light);
+    padding: 15px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--operaton-admin-dark);
+    border-bottom: 1px solid var(--operaton-admin-border);
+    font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
-.field-mapping-row input,
-.field-mapping-row select {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
+.operaton-config-table td {
+    padding: 15px 12px;
+    border-bottom: 1px solid var(--operaton-admin-border-light);
+    vertical-align: top;
+    line-height: 1.4;
 }
 
-.field-mapping-row input:focus,
-.field-mapping-row select:focus {
-    border-color: #2271b1;
-    box-shadow: 0 0 0 1px #2271b1;
-    outline: none;
+.operaton-config-table tr:hover {
+    background: #f8f9fa;
+    transition: background-color var(--operaton-admin-transition);
 }
 
-.field-mapping-row .remove-mapping {
-    background: #dc3545;
-    color: white;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    transition: background-color 0.2s;
+.operaton-config-table tr:last-child td {
+    border-bottom: none;
 }
 
-.field-mapping-row .remove-mapping:hover {
-    background: #c82333;
-}
-
-.add-field-mapping {
-    background: #28a745;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
+.operaton-config-name {
     font-weight: 600;
-    transition: background-color 0.2s;
-    margin-top: 15px;
+    color: var(--operaton-admin-primary);
+    font-size: 14px;
 }
 
-.add-field-mapping:hover {
-    background: #218838;
+.operaton-config-form {
+    color: #666;
+    font-size: 13px;
 }
 
-/* Form Field Styles */
-.operaton-form-field {
+.operaton-config-endpoint {
+    font-family: "Courier New", monospace;
+    font-size: 12px;
+    color: #555;
+    word-break: break-all;
+    max-width: 300px;
+}
+
+.operaton-config-actions {
+    white-space: nowrap;
+}
+
+.operaton-config-actions .button {
+    margin-right: 5px;
+    font-size: 12px;
+    padding: 4px 8px;
+    height: auto;
+}
+
+.operaton-config-status {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.operaton-config-status.active {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.operaton-config-status.inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* =============================================================================
+   CONFIGURATION FORM
+   ============================================================================= */
+
+.operaton-config-form-wrap {
+    background: white;
+    border: 1px solid var(--operaton-admin-border);
+    border-radius: var(--operaton-admin-border-radius);
+    padding: 0;
+    box-shadow: var(--operaton-admin-shadow);
+    overflow: hidden;
+}
+
+.operaton-config-form-header {
+    background: var(--operaton-admin-light);
+    padding: 20px;
+    border-bottom: 1px solid var(--operaton-admin-border);
+}
+
+.operaton-config-form-header h2 {
+    margin: 0;
+    color: var(--operaton-admin-dark);
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.operaton-config-form-body {
+    padding: 20px;
+}
+
+.operaton-form-section {
+    margin-bottom: 30px;
+    padding-bottom: 30px;
+    border-bottom: 1px solid var(--operaton-admin-border-light);
+}
+
+.operaton-form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.operaton-form-section h3 {
+    margin: 0 0 15px 0;
+    color: var(--operaton-admin-dark);
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.operaton-form-section h3::before {
+    content: "";
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: var(--operaton-admin-primary);
+    margin-right: 10px;
+    border-radius: 2px;
+}
+
+.operaton-form-row {
     margin-bottom: 20px;
 }
 
-.operaton-form-field label {
+.operaton-form-row label {
     display: block;
+    margin-bottom: 5px;
     font-weight: 600;
-    margin-bottom: 8px;
-    color: #23282d;
-}
-
-.operaton-form-field input,
-.operaton-form-field select,
-.operaton-form-field textarea {
-    width: 100%;
-    max-width: 500px;
-    padding: 10px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    color: var(--operaton-admin-dark);
     font-size: 14px;
 }
 
-.operaton-form-field input:focus,
-.operaton-form-field select:focus,
-.operaton-form-field textarea:focus {
-    border-color: #2271b1;
-    box-shadow: 0 0 0 1px #2271b1;
+.operaton-form-row .required {
+    color: var(--operaton-admin-error);
+}
+
+.operaton-form-row input[type="text"],
+.operaton-form-row input[type="url"],
+.operaton-form-row input[type="email"],
+.operaton-form-row select,
+.operaton-form-row textarea {
+    width: 100%;
+    max-width: 500px;
+    padding: 8px 12px;
+    border: 1px solid var(--operaton-admin-border);
+    border-radius: var(--operaton-admin-border-radius);
+    font-size: 14px;
+    transition: border-color var(--operaton-admin-transition), box-shadow var(--operaton-admin-transition);
+}
+
+.operaton-form-row input[type="text"]:focus,
+.operaton-form-row input[type="url"]:focus,
+.operaton-form-row input[type="email"]:focus,
+.operaton-form-row select:focus,
+.operaton-form-row textarea:focus {
+    border-color: var(--operaton-admin-primary);
+    box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.1);
     outline: none;
 }
 
-.operaton-form-field .description {
+.operaton-form-description {
     margin-top: 5px;
     font-size: 13px;
     color: #666;
-    font-style: italic;
+    line-height: 1.4;
 }
 
-.operaton-form-field .example {
-    margin-top: 5px;
+.operaton-form-hint {
+    background: #f0f8ff;
+    border: 1px solid #b3d9ff;
+    border-radius: var(--operaton-admin-border-radius);
+    padding: 12px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: #0c5460;
+}
+
+.operaton-form-hint strong {
+    color: var(--operaton-admin-primary);
+}
+
+/* =============================================================================
+   FIELD MAPPING TABLES
+   ============================================================================= */
+
+.operaton-mapping-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    border: 1px solid var(--operaton-admin-border);
+    border-radius: var(--operaton-admin-border-radius);
+    overflow: hidden;
+}
+
+.operaton-mapping-table th {
+    background: var(--operaton-admin-light);
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
     font-size: 12px;
-    color: #888;
-    font-family: monospace;
-    background: #f1f1f1;
-    padding: 5px 8px;
+    color: var(--operaton-admin-dark);
+    border-bottom: 1px solid var(--operaton-admin-border);
+}
+
+.operaton-mapping-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--operaton-admin-border-light);
+    vertical-align: middle;
+}
+
+.operaton-mapping-table tr:hover {
+    background: #f8f9fa;
+}
+
+.operaton-mapping-table input[type="text"],
+.operaton-mapping-table select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--operaton-admin-border);
     border-radius: 3px;
-    display: inline-block;
+    font-size: 13px;
 }
 
-/* Status and Messages */
-.operaton-status {
-    padding: 10px 15px;
-    border-radius: 4px;
-    margin-bottom: 20px;
+.operaton-mapping-table .button-remove {
+    background: var(--operaton-admin-error);
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background-color var(--operaton-admin-transition);
 }
 
-.operaton-status.success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
+.operaton-mapping-table .button-remove:hover {
+    background: #a00;
 }
 
-.operaton-status.error {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
+.operaton-add-mapping {
+    margin-top: 10px;
+    background: var(--operaton-admin-success);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: var(--operaton-admin-border-radius);
+    cursor: pointer;
+    font-size: 13px;
+    transition: background-color var(--operaton-admin-transition);
 }
 
-.operaton-status.warning {
-    background: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeaa7;
+.operaton-add-mapping:hover {
+    background: #3a8b40;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-    .field-mapping-row {
-        grid-template-columns: 1fr;
-        gap: 10px;
-    }
-    
-    .field-mapping-row .remove-mapping {
-        justify-self: start;
-        width: auto;
-    }
-    
-    .operaton-configs-table {
-        font-size: 14px;
-    }
-    
-    .operaton-configs-table th,
-    .operaton-configs-table td {
-        padding: 8px;
-    }
+/* =============================================================================
+   EXECUTION MODE SELECTION
+   ============================================================================= */
+
+.operaton-execution-mode {
+    background: #f8f9fa;
+    border: 1px solid var(--operaton-admin-border-light);
+    border-radius: var(--operaton-admin-border-radius);
+    padding: 15px;
+    margin: 15px 0;
 }
 
-/* Help Text */
-.operaton-help {
-    background: #f0f6fc;
-    border: 1px solid #d0d7de;
-    border-radius: 6px;
-    padding: 16px;
-    margin: 20px 0;
+.operaton-execution-mode label {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: var(--operaton-admin-border-radius);
+    transition: background-color var(--operaton-admin-transition);
 }
 
-.operaton-help h4 {
-    margin-top: 0;
-    color: #0969da;
+.operaton-execution-mode label:hover {
+    background: rgba(0, 115, 170, 0.05);
 }
 
-.operaton-help ul {
-    margin-bottom: 0;
+.operaton-execution-mode input[type="radio"] {
+    margin-right: 10px;
+    margin-top: 2px;
 }
 
-.operaton-help li {
+.operaton-execution-mode-content {
+    flex: 1;
+}
+
+.operaton-execution-mode-title {
+    font-weight: 600;
+    color: var(--operaton-admin-dark);
     margin-bottom: 5px;
 }
 
-/* Loading States */
-.operaton-loading {
-    opacity: 0.6;
-    pointer-events: none;
+.operaton-execution-mode-description {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.4;
 }
 
-.operaton-spinner {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    border: 2px solid #f3f3f3;
-    border-top: 2px solid #2271b1;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-right: 8px;
-}
+/* =============================================================================
+   ENDPOINT TESTING
+   ============================================================================= */
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* source: admin-templates */
-.field-mapping-row {
-    margin-bottom: 15px;
+.operaton-endpoint-test {
+    background: #f0f8ff;
+    border: 1px solid #b3d9ff;
+    border-radius: var(--operaton-admin-border-radius);
     padding: 15px;
-    border: 1px solid #ddd;
-    background: #f9f9f9;
+    margin: 15px 0;
 }
 
-.field-mapping-row label {
-    display: inline-block;
-    width: 120px;
+.operaton-endpoint-test h4 {
+    margin: 0 0 10px 0;
+    color: var(--operaton-admin-primary);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.operaton-test-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.operaton-test-button {
+    background: var(--operaton-admin-primary);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: var(--operaton-admin-border-radius);
+    cursor: pointer;
+    font-size: 13px;
+    transition: background-color var(--operaton-admin-transition);
+}
+
+.operaton-test-button:hover {
+    background: var(--operaton-admin-primary-dark);
+}
+
+.operaton-test-button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.operaton-test-result {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: var(--operaton-admin-border-radius);
+    font-size: 13px;
+    display: none;
+}
+
+.operaton-test-result.success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.operaton-test-result.error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.operaton-test-result.loading {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+}
+
+/* =============================================================================
+   FORM ACTIONS
+   ============================================================================= */
+
+.operaton-form-actions {
+    background: var(--operaton-admin-light);
+    padding: 20px;
+    border-top: 1px solid var(--operaton-admin-border);
+    text-align: right;
+}
+
+.operaton-form-actions .button {
+    margin-left: 10px;
+}
+
+.operaton-form-actions .button-primary {
+    background: var(--operaton-admin-primary);
+    border-color: var(--operaton-admin-primary);
+}
+
+.operaton-form-actions .button-primary:hover {
+    background: var(--operaton-admin-primary-dark);
+    border-color: var(--operaton-admin-primary-dark);
+}
+
+/* =============================================================================
+   NOTICES AND ALERTS
+   ============================================================================= */
+
+.operaton-notice {
+    padding: 12px 16px;
+    margin: 15px 0;
+    border-radius: var(--operaton-admin-border-radius);
+    border-left: 4px solid;
+}
+
+.operaton-notice.success {
+    background: #d4edda;
+    border-left-color: var(--operaton-admin-success);
+    color: #155724;
+}
+
+.operaton-notice.warning {
+    background: #fff3cd;
+    border-left-color: var(--operaton-admin-warning);
+    color: #856404;
+}
+
+.operaton-notice.error {
+    background: #f8d7da;
+    border-left-color: var(--operaton-admin-error);
+    color: #721c24;
+}
+
+.operaton-notice.info {
+    background: #d1ecf1;
+    border-left-color: var(--operaton-admin-primary);
+    color: #0c5460;
+}
+
+.operaton-notice h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.operaton-notice p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.operaton-notice ul {
+    margin: 8px 0 0 20px;
+    font-size: 13px;
+}
+
+.operaton-notice li {
+    margin-bottom: 4px;
+}
+
+/* =============================================================================
+   DATABASE STATUS
+   ============================================================================= */
+
+.operaton-database-status {
+    background: white;
+    border: 1px solid var(--operaton-admin-border);
+    border-radius: var(--operaton-admin-border-radius);
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: var(--operaton-admin-shadow);
+}
+
+.operaton-database-status h3 {
+    margin: 0 0 15px 0;
+    color: var(--operaton-admin-dark);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.operaton-database-check {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 8px 0;
+}
+
+.operaton-database-check-icon {
     margin-right: 10px;
-    font-weight: bold;
+    font-size: 16px;
 }
 
-.field-mapping-row input,
-.field-mapping-row select {
-    margin-right: 15px;
+.operaton-database-check-icon.success {
+    color: var(--operaton-admin-success);
+}
+
+.operaton-database-check-icon.error {
+    color: var(--operaton-admin-error);
+}
+
+.operaton-database-check-text {
+    flex: 1;
+    font-size: 14px;
+    color: var(--operaton-admin-dark);
+}
+
+.operaton-manual-update {
+    background: var(--operaton-admin-warning);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: var(--operaton-admin-border-radius);
+    cursor: pointer;
+    font-size: 13px;
+    text-decoration: none;
+    display: inline-block;
+    transition: background-color var(--operaton-admin-transition);
+}
+
+.operaton-manual-update:hover {
+    background: #e6a800;
+    color: white;
+}
+
+/* =============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================= */
+
+@media (max-width: 782px) {
+    .operaton-config-table,
+    .operaton-mapping-table {
+        font-size: 12px;
+    }
+    
+    .operaton-config-table th,
+    .operaton-config-table td,
+    .operaton-mapping-table th,
+    .operaton-mapping-table td {
+        padding: 8px 6px;
+    }
+    
+    .operaton-config-endpoint {
+        max-width: 200px;
+        font-size: 11px;
+    }
+    
+    .operaton-config-actions {
+        white-space: normal;
+    }
+    
+    .operaton-config-actions .button {
+        margin-bottom: 5px;
+        display: block;
+    }
+    
+    .operaton-form-row input[type="text"],
+    .operaton-form-row input[type="url"],
+    .operaton-form-row input[type="email"],
+    .operaton-form-row select,
+    .operaton-form-row textarea {
+        max-width: 100%;
+    }
+    
+    .operaton-test-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .operaton-form-actions {
+        text-align: center;
+    }
+    
+    .operaton-form-actions .button {
+        margin: 5px;
+        display: block;
+        width: 100%;
+        max-width: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    .operaton-dmn-header,
+    .operaton-config-form-body,
+    .operaton-update-section {
+        padding: 15px;
+    }
+    
+    .operaton-form-section {
+        margin-bottom: 20px;
+        padding-bottom: 20px;
+    }
+    
+    .operaton-form-row {
+        margin-bottom: 15px;
+    }
 }
