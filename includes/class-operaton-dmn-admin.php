@@ -76,7 +76,10 @@ class Operaton_DMN_Admin {
         
         // Frontend hooks for form integration
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
-                
+    
+        // Add this action to wp_ajax
+        add_action('wp_ajax_operaton_debug_status', array($this, 'ajax_debug_status'));
+    
         // Plugin page enhancement
         $plugin_basename = plugin_basename(OPERATON_DMN_PLUGIN_PATH . 'operaton-dmn-plugin.php');
         add_filter("plugin_action_links_$plugin_basename", array($this, 'add_settings_link'));
@@ -87,6 +90,101 @@ class Operaton_DMN_Admin {
     // =============================================================================
     // ADMIN MENU AND PAGE METHODS
     // =============================================================================
+
+/**
+ * Fixed AJAX debug status method
+ * Replace your existing ajax_debug_status method with this one
+ */
+
+public function ajax_debug_status() {
+    if (!current_user_can('manage_options')) {
+        wp_die('Insufficient permissions');
+    }
+    
+    // Get performance data if available
+    $performance_data = array();
+    if (class_exists('Operaton_DMN_Performance_Monitor')) {
+        try {
+            $performance_monitor = Operaton_DMN_Performance_Monitor::get_instance();
+            $performance_data = $performance_monitor->get_summary();
+        } catch (Exception $e) {
+            $performance_data = array(
+                'error' => 'Performance monitor error: ' . $e->getMessage()
+            );
+        }
+    } else {
+        $performance_data = array(
+            'status' => 'Performance monitor class not available'
+        );
+    }
+    
+    $status = array(
+        'plugin_version' => OPERATON_DMN_VERSION,
+        'managers' => $this->core->get_managers_status(),
+        'health' => $this->core->health_check(),
+        'asset_status' => $this->assets->get_assets_status(),
+        'performance' => $performance_data,
+        'wordpress_info' => array(
+            'version' => get_bloginfo('version'),
+            'theme' => wp_get_theme()->get('Name') . ' v' . wp_get_theme()->get('Version'),
+            'php_version' => PHP_VERSION,
+            'memory_limit' => ini_get('memory_limit'),
+            'max_execution_time' => ini_get('max_execution_time')
+        ),
+        'plugin_constants' => array(
+            'WP_DEBUG' => defined('WP_DEBUG') && WP_DEBUG,
+            'OPERATON_DMN_VERSION' => OPERATON_DMN_VERSION,
+            'OPERATON_DMN_PLUGIN_URL' => OPERATON_DMN_PLUGIN_URL,
+            'OPERATON_DMN_PLUGIN_PATH' => OPERATON_DMN_PLUGIN_PATH
+        ),
+        'request_info' => array(
+            'timestamp' => current_time('mysql'),
+            'user_id' => get_current_user_id(),
+            'user_role' => implode(', ', wp_get_current_user()->roles),
+            'request_uri' => $_SERVER['REQUEST_URI'] ?? 'unknown'
+        )
+    );
+    
+    wp_send_json_success($status);
+}
+
+// Add debug button to admin pages
+public function add_debug_button() {
+    if (!current_user_can('manage_options') || !defined('WP_DEBUG') || !WP_DEBUG) {
+        return;
+    }
+    
+    ?>
+    <div style="margin: 20px 0; padding: 15px; background: #f0f8ff; border: 1px solid #0073aa; border-radius: 4px;">
+        <h3>🔧 Debug Tools</h3>
+        <button type="button" id="operaton-debug-status" class="button">
+            Get Plugin Status
+        </button>
+        <div id="operaton-debug-results" style="margin-top: 10px;"></div>
+    </div>
+    
+    <script>
+    jQuery('#operaton-debug-status').click(function() {
+        var $button = jQuery(this);
+        var $results = jQuery('#operaton-debug-results');
+        
+        $button.prop('disabled', true).text('Getting Status...');
+        
+        jQuery.post(ajaxurl, {
+            action: 'operaton_debug_status'
+        }, function(response) {
+            if (response.success) {
+                $results.html('<pre>' + JSON.stringify(response.data, null, 2) + '</pre>');
+            } else {
+                $results.html('<p style="color: red;">Error: ' + response.data + '</p>');
+            }
+        }).always(function() {
+            $button.prop('disabled', false).text('Get Plugin Status');
+        });
+    });
+    </script>
+    <?php
+}
 
     /**
      * Add plugin admin menu pages and submenus to WordPress dashboard
@@ -220,10 +318,20 @@ class Operaton_DMN_Admin {
         
         // Get configurations for display
         $configs = $this->core->get_database_instance()->get_all_configurations();
-        
-        // Include the admin list template
-        $this->load_admin_template('list', compact('configs'));
-    }
+
+    // Start the admin page wrapper
+    echo '<div class="wrap">';
+    echo '<h1>' . __('Operaton DMN Configurations', 'operaton-dmn') . '</h1>';
+    
+    // ADD DEBUG BUTTON HERE
+    $this->add_debug_button();
+    
+    // Include the admin list template
+    $this->load_admin_template('list', compact('configs'));
+    
+    echo '</div>'; // Close wrap
+
+}
 
     /**
      * Configuration creation/editing page with database migration check
@@ -264,9 +372,19 @@ class Operaton_DMN_Admin {
         $gravity_forms = $this->get_gravity_forms();
         $config = $this->core->get_database_instance()->get_configuration($_GET['edit']);
         
-        // Include the admin form template
-        $this->load_admin_template('form', compact('gravity_forms', 'config'));
-    }
+    // Start the admin page wrapper
+    echo '<div class="wrap">';
+    echo '<h1>' . __('Add/Edit Configuration', 'operaton-dmn') . '</h1>';
+    
+    // ADD DEBUG BUTTON HERE TOO
+    $this->add_debug_button();
+    
+    // Include the admin form template
+    $this->load_admin_template('form', compact('gravity_forms', 'config'));
+    
+    echo '</div>'; // Close wrap
+
+}
 
     /**
      * Temporary debug page for testing debug menu functionality
@@ -282,6 +400,9 @@ class Operaton_DMN_Admin {
         echo '<div class="wrap operaton-debug-page">';
         echo '<h1>' . __('Debug Menu Test', 'operaton-dmn') . '</h1>';
         
+        // ADD THE MAIN DEBUG BUTTON AT THE TOP
+        $this->add_debug_button();
+
         // Debug system status
         echo '<div class="debug-section">';
         echo '<div class="debug-section-header">';
@@ -297,6 +418,9 @@ class Operaton_DMN_Admin {
         echo '</div>';
         echo '</div>';
         
+        // ADD PERFORMANCE MONITOR SECTION IF AVAILABLE
+        $this->add_performance_debug_section();
+    
         // System information
         $this->display_system_info();
         
@@ -309,6 +433,61 @@ class Operaton_DMN_Admin {
     // =============================================================================
     // ASSET MANAGEMENT METHODS
     // =============================================================================
+
+/**
+ * Add performance debug section
+ */
+private function add_performance_debug_section() {
+    if (!class_exists('Operaton_DMN_Performance_Monitor')) {
+        return;
+    }
+    
+    $performance = Operaton_DMN_Performance_Monitor::get_instance();
+    $summary = $performance->get_summary();
+    
+    echo '<div class="debug-section">';
+    echo '<div class="debug-section-header">';
+    echo '<h3>' . __('Performance Monitoring', 'operaton-dmn') . '</h3>';
+    echo '</div>';
+    echo '<div class="debug-section-content">';
+    
+    echo '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 15px 0;">';
+    
+    echo '<div class="debug-stat-card" style="background: #f0f8ff; padding: 15px; border-radius: 6px; text-align: center;">';
+    echo '<div style="font-size: 20px; font-weight: bold; color: #0073aa;">' . round($summary['total_time_ms'], 2) . 'ms</div>';
+    echo '<div style="color: #666; font-size: 12px;">Total Load Time</div>';
+    echo '</div>';
+    
+    echo '<div class="debug-stat-card" style="background: #f0fff0; padding: 15px; border-radius: 6px; text-align: center;">';
+    echo '<div style="font-size: 20px; font-weight: bold; color: #28a745;">' . $summary['peak_memory_formatted'] . '</div>';
+    echo '<div style="color: #666; font-size: 12px;">Peak Memory</div>';
+    echo '</div>';
+    
+    echo '<div class="debug-stat-card" style="background: #fff5f5; padding: 15px; border-radius: 6px; text-align: center;">';
+    echo '<div style="font-size: 20px; font-weight: bold; color: #dc3545;">' . $summary['milestone_count'] . '</div>';
+    echo '<div style="color: #666; font-size: 12px;">Milestones</div>';
+    echo '</div>';
+    
+    echo '</div>';
+    
+    // Show recent milestones
+    if (!empty($summary['milestones'])) {
+        echo '<h4>Recent Performance Milestones</h4>';
+        echo '<div style="max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px;">';
+        foreach (array_slice($summary['milestones'], -10, 10, true) as $name => $milestone) {
+            echo '<div style="margin: 5px 0; font-family: monospace; font-size: 12px;">';
+            echo '<strong>' . esc_html($name) . ':</strong> ' . $milestone['time_ms'] . 'ms';
+            if ($milestone['details']) {
+                echo ' - ' . esc_html($milestone['details']);
+            }
+            echo '</div>';
+        }
+        echo '</div>';
+    }
+    
+    echo '</div>';
+    echo '</div>';
+}
 
     /**
      * Enqueue admin-specific CSS and JavaScript files for plugin configuration pages
