@@ -29,6 +29,20 @@ define('OPERATON_DMN_VERSION', '1.0.0-beta.9');
 define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('OPERATON_DMN_PLUGIN_PATH', plugin_dir_path(__FILE__));
 
+// CRITICAL FIX: Load Performance Monitor FIRST, before everything else
+$performance_file = OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-performance.php';
+if (file_exists($performance_file)) {
+    require_once $performance_file;
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN: Performance monitor loaded successfully');
+    }
+} else {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Operaton DMN: Performance monitor file not found at: ' . $performance_file);
+    }
+}
+
 // Initialize the update checker - CLEAN VERSION
 if (is_admin()) {
     // Only load auto-updater in admin context
@@ -91,6 +105,11 @@ if (is_admin()) {
  */
 class OperatonDMNEvaluator {
     
+    /**
+     * Performance monitor instance
+     */
+    private $performance;
+
     /**
      * Single instance of the plugin
      * 
@@ -182,6 +201,16 @@ class OperatonDMNEvaluator {
      * @since 1.0.0
      */
     private function __construct() {
+        // FIXED: Initialize performance monitoring FIRST
+        if (class_exists('Operaton_DMN_Performance_Monitor')) {
+            $this->performance = Operaton_DMN_Performance_Monitor::get_instance();
+            $this->performance->mark('plugin_construct_start', 'Main plugin constructor started');
+        } else {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: Performance monitor class not available');
+            }
+        }
+
         // Prevent multiple initializations
         if (self::$initialized) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -196,21 +225,27 @@ class OperatonDMNEvaluator {
 
         // NEW: Load quirks fix manager FIRST (before assets)
         $this->load_quirks_fix_manager();
+        if ($this->performance) $this->performance->mark('quirks_fix_loaded');
 
         // 1. Load assets manager first
         $this->load_assets_manager();
+        if ($this->performance) $this->performance->mark('assets_manager_loaded');
         
         // 2. Load admin manager second (depends on assets)
         $this->load_admin_manager();
+        if ($this->performance) $this->performance->mark('admin_manager_loaded');
 
         // 3. Load database manager third
         $this->load_database_manager();
+        if ($this->performance) $this->performance->mark('database_manager_loaded');
 
         // 4. Load API manager fourth (depends on core and database)
         $this->load_api_manager();
+        if ($this->performance) $this->performance->mark('api_manager_loaded');
 
         // 5. Load Gravity Forms manager fifth (depends on all others)
         $this->load_gravity_forms_manager();
+        if ($this->performance) $this->performance->mark('gravity_forms_manager_loaded');
 
         // Core WordPress hooks
         add_action('init', array($this, 'init'));
@@ -245,13 +280,48 @@ class OperatonDMNEvaluator {
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
     
+        // FIXED: Add performance hooks if available
+        if ($this->performance) {
+            add_action('wp_loaded', array($this, 'mark_wp_loaded'));
+            add_action('shutdown', array($this, 'store_performance_data'));
+        }
+    
         // Mark as initialized
         self::$initialized = true;
-        
+    
+        if ($this->performance) {
+            $this->performance->mark('plugin_construct_complete', 'Main plugin constructor completed');
+        }
+
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN: ✅ Initialization complete');
         }
     
+    }
+
+    /**
+     * Mark WordPress loaded
+     */
+    public function mark_wp_loaded() {
+        if ($this->performance) {
+            $this->performance->mark('wp_loaded', 'WordPress fully loaded');
+        }
+    }
+    
+    /**
+     * Store performance data on shutdown
+     */
+    public function store_performance_data() {
+        if ($this->performance) {
+            $this->performance->store_performance_stats();
+        }
+    }
+    
+    /**
+     * Get performance instance
+     */
+    public function get_performance_instance() {
+        return $this->performance;
     }
 
     /**
@@ -429,15 +499,24 @@ class OperatonDMNEvaluator {
     /**
      * Initialize plugin textdomain for internationalization support.
      * Loads translation files from the plugin's languages directory.
+     * Enhanced init method with performance tracking
      * 
      * @since 1.0.0
      */
     public function init() {
+        if ($this->performance) {
+            $timer_id = $this->performance->start_timer('plugin_init');
+        }
+        
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN: Initializing plugin textdomain');
         }
         
         load_plugin_textdomain('operaton-dmn', false, dirname(plugin_basename(__FILE__)) . '/languages/');
+        
+        if ($this->performance && isset($timer_id)) {
+            $this->performance->stop_timer($timer_id, 'Textdomain loaded');
+        }
     }
 
     /**
@@ -493,27 +572,33 @@ class OperatonDMNEvaluator {
     /**
      * Enhanced activation hook that creates database tables and sets default options.
      * Initializes plugin data structures and schedules cleanup tasks.
+     * Enhanced activate method with performance tracking
      * 
      * @since 1.0.0
      */
     public function activate() {
+        if ($this->performance) {
+            $timer_id = $this->performance->start_timer('plugin_activation');
+        }
+        
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN: Plugin activation started');
         }
         
-        // Create/update database tables
+        // EXISTING ACTIVATION CODE
         $this->database->create_database_tables();
-        
-        // Set default options
         add_option('operaton_dmn_version', OPERATON_DMN_VERSION);
         add_option('operaton_dmn_activated', current_time('mysql'));
         
-        // Schedule cleanup cron job
         if (!wp_next_scheduled('operaton_dmn_cleanup')) {
             wp_schedule_event(time(), 'daily', 'operaton_dmn_cleanup');
         }
         
         flush_rewrite_rules();
+        
+        if ($this->performance && isset($timer_id)) {
+            $this->performance->stop_timer($timer_id, 'Plugin activation completed');
+        }
     }
 
     /**
@@ -814,6 +899,7 @@ public function emergency_operaton_ajax_fallback() {
             'api' => isset($this->api) ? 'loaded' : 'not loaded',
             'gravity_forms' => isset($this->gravity_forms) ? 'loaded' : 'not loaded',
             'quirks_fix' => isset($this->quirks_fix) ? 'loaded' : 'not loaded', // NEW
+            'performance' => isset($this->performance) ? 'loaded' : 'not loaded', // ADDED
             'gravity_forms_available' => isset($this->gravity_forms) ? $this->gravity_forms->is_gravity_forms_available() : false
         );
     }
@@ -990,7 +1076,7 @@ function operaton_dmn_get_quirks_fix() {
 /**
  * Global convenience function to get a specific manager
  * 
- * @param string $manager Manager type (api, database, gravity_forms, assets, admin)
+ * @param string $manager Manager type (api, database, gravity_forms, assets, admin, performance)
  * @return mixed Manager instance or null
  * @since 1.0.0
  */
@@ -1008,8 +1094,10 @@ function operaton_dmn_get_manager($manager) {
             return $instance->get_assets_instance();
         case 'admin':
             return $instance->get_admin_instance();
-        case 'quirks_fix': // NEW
+        case 'quirks_fix':
             return $instance->get_quirks_fix_instance();
+        case 'performance': // ADDED
+            return $instance->get_performance_instance();
         default:
             return null;
     }
@@ -1037,6 +1125,16 @@ function operaton_dmn_debug_status() {
         error_log('Health Issues: ' . implode(', ', $health));
     } else {
         error_log('Health Status: All systems operational');
+    }
+    
+    // ADDED: Performance status
+    $performance = $instance->get_performance_instance();
+    if ($performance) {
+        error_log('Performance Monitor: Available');
+        $summary = $performance->get_summary();
+        error_log('Performance Summary: ' . print_r($summary, true));
+    } else {
+        error_log('Performance Monitor: Not available');
     }
     
     error_log('==================================');

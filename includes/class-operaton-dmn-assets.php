@@ -20,6 +20,11 @@ if (!defined('ABSPATH')) {
 class Operaton_DMN_Assets {
 
     /**
+     * Performance monitor instance
+     */
+    private $performance;
+
+    /**
      * Static loading flag to prevent cross-instance duplicates
      */
     private static $global_loading_state = array(
@@ -33,9 +38,17 @@ class Operaton_DMN_Assets {
     private $loaded_assets = array();
     private $gravity_forms_manager = null;
 
+    /**
+     * Enhanced constructor with performance monitoring
+     */
     public function __construct($plugin_url, $version) {
         $this->plugin_url = trailingslashit($plugin_url);
         $this->version = $version;
+        
+        // Get performance monitor if available
+        if (class_exists('Operaton_DMN_Performance_Monitor')) {
+            $this->performance = Operaton_DMN_Performance_Monitor::get_instance();
+        }
         
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Assets: Manager initialized with version ' . $version);
@@ -535,13 +548,21 @@ class Operaton_DMN_Assets {
 
     /**
      * FIXED: Enhanced frontend asset enqueuing with compatibility check
-     * Enhanced frontend asset enqueuing with global state check
+     * Enhanced frontend asset enqueuing with performance tracking
      */
     public function enqueue_frontend_assets() {
+        $timer_id = null;
+        if ($this->performance) {
+            $timer_id = $this->performance->start_timer('frontend_assets_enqueue');
+        }
+        
         // Check global state first
         if (self::$global_loading_state['frontend_loaded']) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Operaton DMN Assets: Frontend assets already loaded globally, skipping');
+            }
+            if ($this->performance && $timer_id) {
+                $this->performance->stop_timer($timer_id, 'Skipped - already loaded globally');
             }
             return;
         }
@@ -551,16 +572,33 @@ class Operaton_DMN_Assets {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Operaton DMN Assets: Frontend assets already loaded locally, skipping');
             }
+            if ($this->performance && $timer_id) {
+                $this->performance->stop_timer($timer_id, 'Skipped - already loaded locally');
+            }
             return;
         }
         
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: ⭐ LOADING frontend assets (optimized)');
+            error_log('Operaton DMN Assets: ⭐ LOADING frontend assets (with performance tracking)');
+        }
+        
+        // Track jQuery loading
+        if ($this->performance) {
+            $this->performance->mark('jquery_check_start', 'Checking jQuery availability');
         }
         
         // CRITICAL FIX: Ensure jQuery is loaded FIRST
         if (!wp_script_is('jquery', 'done') && !wp_script_is('jquery', 'enqueued')) {
             wp_enqueue_script('jquery');
+        }
+        
+        if ($this->performance) {
+            $this->performance->mark('jquery_check_complete', 'jQuery check completed');
+        }
+        
+        // Track script registration
+        if ($this->performance) {
+            $this->performance->mark('script_registration_start', 'Starting script registration');
         }
         
         // Force registration if not already registered
@@ -574,11 +612,18 @@ class Operaton_DMN_Assets {
             );
         }
         
-        // Enqueue CSS first
-        wp_enqueue_style('operaton-dmn-frontend');
+        if ($this->performance) {
+            $this->performance->mark('script_registration_complete', 'Script registration completed');
+        }
         
-        // Then enqueue JS with jQuery dependency
+        // Enqueue CSS and JS
+        wp_enqueue_style('operaton-dmn-frontend');
         wp_enqueue_script('operaton-dmn-frontend');
+        
+        // Track localization
+        if ($this->performance) {
+            $this->performance->mark('localization_start', 'Starting script localization');
+        }
         
         // Enhanced localization (only once)
         if (!wp_script_is('operaton-dmn-frontend', 'localized')) {
@@ -599,15 +644,26 @@ class Operaton_DMN_Assets {
                     'quirks_mode_check' => true,
                     'jquery_version_required' => '3.0'
                 ),
-                'timestamp' => time() // For cache busting
+                'performance' => array(
+                    'load_time' => $this->performance ? round(($this->performance->get_summary()['total_time_ms']), 2) : 0,
+                    'timestamp' => time()
+                )
             );
             
             wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
         }
         
+        if ($this->performance) {
+            $this->performance->mark('localization_complete', 'Script localization completed');
+        }
+        
         // Update both local and global state
         $this->loaded_assets['frontend'] = true;
         self::$global_loading_state['frontend_loaded'] = true;
+        
+        if ($this->performance && $timer_id) {
+            $this->performance->stop_timer($timer_id, 'Frontend assets loaded successfully');
+        }
         
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Assets: ✅ Frontend assets loaded successfully');
@@ -949,9 +1005,15 @@ class Operaton_DMN_Assets {
     }
 
     /**
-     * Enqueue Gravity Forms-specific assets with form configuration
+     * Enhanced Gravity Forms asset enqueuing with performance tracking
      */
     public function enqueue_gravity_form_assets($form, $config) {
+        $timer_id = null;
+        if ($this->performance) {
+            $timer_id = $this->performance->start_timer('gravity_form_assets');
+            $this->performance->mark('gravity_assets_start', 'Starting Gravity Forms assets for form: ' . $form['id']);
+        }
+        
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Assets: Enqueuing Gravity Forms assets for form: ' . $form['id']);
         }
@@ -961,11 +1023,19 @@ class Operaton_DMN_Assets {
         
         // Enqueue radio sync if needed
         $this->enqueue_radio_sync_assets($form['id']);
-
+        
         // Add form-specific scripts with proper timing
-        add_action('wp_footer', function() use ($form, $config) {
+        add_action('wp_footer', function() use ($form, $config, $timer_id) {
             $this->enqueue_gravity_integration_scripts($form, $config);
+            
+            if ($this->performance && $timer_id) {
+                $this->performance->stop_timer($timer_id, 'Gravity Forms assets completed for form: ' . $form['id']);
+            }
         }, 5);
+        
+        if ($this->performance) {
+            $this->performance->mark('gravity_assets_queued', 'Gravity Forms assets queued for form: ' . $form['id']);
+        }
     }
 
     /**
@@ -1091,18 +1161,32 @@ class Operaton_DMN_Assets {
         }
     }
 
-    /**
-     * Get asset loading status for debugging
+/**
+     * Get detailed asset status with performance data
      */
     public function get_assets_status() {
         global $wp_scripts, $wp_styles;
         
         $status = array(
             'loaded_assets' => $this->loaded_assets,
+            'global_state' => self::$global_loading_state,
             'scripts' => array(),
-            'styles' => array()
+            'styles' => array(),
+            'performance' => array()
         );
         
+        // Add performance data if available
+        if ($this->performance) {
+            $performance_summary = $this->performance->get_summary();
+            $status['performance'] = array(
+                'total_time_ms' => $performance_summary['total_time_ms'],
+                'peak_memory' => $performance_summary['peak_memory_formatted'],
+                'milestones_count' => $performance_summary['milestone_count'],
+                'asset_loading_milestones' => $this->get_asset_loading_milestones($performance_summary['milestones'])
+            );
+        }
+        
+        // EXISTING script and style checking code...
         $our_scripts = array(
             'operaton-dmn-admin',
             'operaton-dmn-frontend', 
@@ -1139,6 +1223,54 @@ class Operaton_DMN_Assets {
         return $status;
     }
 
+    /**
+     * Extract asset loading milestones from performance data
+     * 
+     * @param array $milestones All performance milestones
+     * @return array Asset-related milestones
+     */
+    private function get_asset_loading_milestones($milestones) {
+        $asset_milestones = array();
+        
+        if (!is_array($milestones)) {
+            return $asset_milestones;
+        }
+        
+        // Look for asset-related milestones
+        $asset_keywords = array(
+            'assets',
+            'frontend_assets',
+            'admin_assets', 
+            'gravity_form_assets',
+            'script',
+            'style',
+            'enqueue',
+            'localize'
+        );
+        
+        foreach ($milestones as $name => $milestone) {
+            $name_lower = strtolower($name);
+            
+            foreach ($asset_keywords as $keyword) {
+                if (strpos($name_lower, $keyword) !== false) {
+                    $asset_milestones[$name] = array(
+                        'time_ms' => $milestone['time_ms'],
+                        'details' => $milestone['details'] ?? '',
+                        'memory' => $milestone['memory_current_formatted'] ?? ''
+                    );
+                    break;
+                }
+            }
+        }
+        
+        // Sort by time
+        uasort($asset_milestones, function($a, $b) {
+            return $a['time_ms'] <=> $b['time_ms'];
+        });
+        
+        return $asset_milestones;
+    }
+        
     /**
      * Force enqueue specific assets for manual loading
      */

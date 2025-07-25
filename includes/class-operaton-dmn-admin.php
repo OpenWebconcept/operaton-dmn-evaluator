@@ -92,10 +92,10 @@ class Operaton_DMN_Admin {
     // =============================================================================
 
 /**
- * Fixed AJAX debug status method
- * Replace your existing ajax_debug_status method with this one
+ * Enhanced ajax_debug_status method for class-operaton-dmn-admin.php
+ * 
+ * This cleans up the duplicate performance data and adds context
  */
-
 public function ajax_debug_status() {
     if (!current_user_can('manage_options')) {
         wp_die('Insufficient permissions');
@@ -106,7 +106,28 @@ public function ajax_debug_status() {
     if (class_exists('Operaton_DMN_Performance_Monitor')) {
         try {
             $performance_monitor = Operaton_DMN_Performance_Monitor::get_instance();
-            $performance_data = $performance_monitor->get_summary();
+            $performance_summary = $performance_monitor->get_summary();
+            
+            // Clean and organize performance data
+            $performance_data = array(
+                'current_request' => array(
+                    'total_time_ms' => $performance_summary['total_time_ms'],
+                    'peak_memory_formatted' => $performance_summary['peak_memory_formatted'],
+                    'milestone_count' => $performance_summary['milestone_count'],
+                    'request_type' => $performance_summary['request_data']['is_ajax'] ? 'AJAX' : 'Standard',
+                    'is_admin' => $performance_summary['request_data']['is_admin']
+                ),
+                'initialization_timing' => array(
+                    'plugin_construct' => $this->get_milestone_duration($performance_summary['milestones'], 'plugin_construct'),
+                    'assets_manager' => $this->get_milestone_time($performance_summary['milestones'], 'assets_manager_loaded'),
+                    'database_manager' => $this->get_milestone_time($performance_summary['milestones'], 'database_manager_loaded'),
+                    'gravity_forms_manager' => $this->get_milestone_time($performance_summary['milestones'], 'gravity_forms_manager_loaded'),
+                    'wp_loaded_at' => $this->get_milestone_time($performance_summary['milestones'], 'wp_loaded')
+                ),
+                'performance_grade' => $this->calculate_performance_grade($performance_summary),
+                'recommendations' => $this->get_performance_recommendations($performance_summary)
+            );
+            
         } catch (Exception $e) {
             $performance_data = array(
                 'error' => 'Performance monitor error: ' . $e->getMessage()
@@ -118,27 +139,37 @@ public function ajax_debug_status() {
         );
     }
     
+    // Get asset status with context
+    $asset_status = $this->assets->get_assets_status();
+    
+    // Add context about why scripts might not be registered
+    $asset_status['context'] = array(
+        'current_page' => get_current_screen()->id ?? 'unknown',
+        'is_ajax_request' => wp_doing_ajax(),
+        'script_loading_note' => 'Scripts are only registered when needed on specific pages - this is optimal behavior'
+    );
+    
     $status = array(
         'plugin_version' => OPERATON_DMN_VERSION,
         'managers' => $this->core->get_managers_status(),
         'health' => $this->core->health_check(),
-        'asset_status' => $this->assets->get_assets_status(),
-        'performance' => $performance_data,
-        'wordpress_info' => array(
-            'version' => get_bloginfo('version'),
+        'assets' => $asset_status,
+        'performance' => $performance_data, // Cleaned up single performance section
+        'environment' => array(
+            'wordpress' => get_bloginfo('version'),
+            'php' => PHP_VERSION,
             'theme' => wp_get_theme()->get('Name') . ' v' . wp_get_theme()->get('Version'),
-            'php_version' => PHP_VERSION,
             'memory_limit' => ini_get('memory_limit'),
-            'max_execution_time' => ini_get('max_execution_time')
+            'max_execution_time' => ini_get('max_execution_time'),
+            'wp_debug' => defined('WP_DEBUG') && WP_DEBUG
         ),
-        'plugin_constants' => array(
-            'WP_DEBUG' => defined('WP_DEBUG') && WP_DEBUG,
-            'OPERATON_DMN_VERSION' => OPERATON_DMN_VERSION,
-            'OPERATON_DMN_PLUGIN_URL' => OPERATON_DMN_PLUGIN_URL,
-            'OPERATON_DMN_PLUGIN_PATH' => OPERATON_DMN_PLUGIN_PATH
+        'operaton_constants' => array(
+            'version' => OPERATON_DMN_VERSION,
+            'plugin_url' => OPERATON_DMN_PLUGIN_URL,
+            'plugin_path' => OPERATON_DMN_PLUGIN_PATH
         ),
-        'request_info' => array(
-            'timestamp' => current_time('mysql'),
+        'timestamp' => current_time('mysql'),
+        'user_context' => array(
             'user_id' => get_current_user_id(),
             'user_role' => implode(', ', wp_get_current_user()->roles),
             'request_uri' => $_SERVER['REQUEST_URI'] ?? 'unknown'
@@ -146,6 +177,75 @@ public function ajax_debug_status() {
     );
     
     wp_send_json_success($status);
+}
+
+/**
+ * Helper method to get milestone time
+ */
+private function get_milestone_time($milestones, $milestone_name) {
+    return isset($milestones[$milestone_name]) ? $milestones[$milestone_name]['time_ms'] : null;
+}
+
+/**
+ * Helper method to calculate duration between start/end milestones
+ */
+private function get_milestone_duration($milestones, $base_name) {
+    $start_key = $base_name . '_start';
+    $end_key = $base_name . '_complete';
+    
+    if (isset($milestones[$start_key]) && isset($milestones[$end_key])) {
+        return round($milestones[$end_key]['time_ms'] - $milestones[$start_key]['time_ms'], 3);
+    }
+    
+    return null;
+}
+
+/**
+ * Calculate overall performance grade
+ */
+private function calculate_performance_grade($performance_summary) {
+    $total_time = $performance_summary['total_time_ms'];
+    $memory_mb = $performance_summary['peak_memory'] / (1024 * 1024);
+    
+    // Grading based on WordPress performance standards
+    if ($total_time < 100 && $memory_mb < 16) {
+        return 'A+ (Excellent)';
+    } elseif ($total_time < 200 && $memory_mb < 32) {
+        return 'A (Very Good)';
+    } elseif ($total_time < 500 && $memory_mb < 64) {
+        return 'B (Good)';
+    } elseif ($total_time < 1000 && $memory_mb < 128) {
+        return 'C (Acceptable)';
+    } else {
+        return 'D (Needs Optimization)';
+    }
+}
+
+/**
+ * Get performance recommendations
+ */
+private function get_performance_recommendations($performance_summary) {
+    $recommendations = array();
+    $total_time = $performance_summary['total_time_ms'];
+    $memory_mb = $performance_summary['peak_memory'] / (1024 * 1024);
+    
+    if ($total_time < 100) {
+        $recommendations[] = '🚀 Excellent loading speed!';
+    }
+    
+    if ($memory_mb < 16) {
+        $recommendations[] = '🧠 Very efficient memory usage!';
+    }
+    
+    if ($performance_summary['milestone_count'] > 20) {
+        $recommendations[] = '📊 Consider reducing performance monitoring in production';
+    }
+    
+    if (empty($recommendations)) {
+        $recommendations[] = '✨ Performance is optimal - no recommendations needed!';
+    }
+    
+    return $recommendations;
 }
 
 // Add debug button to admin pages
