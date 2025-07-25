@@ -100,6 +100,11 @@ class OperatonDMNEvaluator {
     private static $instance = null;
 
     /**
+     * Initialization flag to prevent multiple setups
+     */
+    private static $initialized = false;
+
+    /**
      * Assets manager instance
      * Handles CSS and JavaScript loading
      * 
@@ -177,6 +182,18 @@ class OperatonDMNEvaluator {
      * @since 1.0.0
      */
     private function __construct() {
+        // Prevent multiple initializations
+        if (self::$initialized) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN: Preventing duplicate initialization');
+            }
+            return;
+        }
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: Starting fresh initialization - v' . OPERATON_DMN_VERSION);
+        }
+
         // NEW: Load quirks fix manager FIRST (before assets)
         $this->load_quirks_fix_manager();
 
@@ -227,6 +244,26 @@ class OperatonDMNEvaluator {
         // Plugin lifecycle hooks
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+    
+        // Mark as initialized
+        self::$initialized = true;
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN: ✅ Initialization complete');
+        }
+    
+    }
+
+    /**
+     * Prevent cloning
+     */
+    private function __clone() {}
+    
+    /**
+     * Prevent unserialization
+     */
+    public function __wakeup() {
+        throw new Exception("Cannot unserialize singleton");
     }
 
     // =============================================================================
