@@ -18,6 +18,15 @@ if (!defined('ABSPATH')) {
 }
 
 class Operaton_DMN_Assets {
+
+    /**
+     * Static loading flag to prevent cross-instance duplicates
+     */
+    private static $global_loading_state = array(
+        'frontend_loaded' => false,
+        'admin_loaded' => false,
+        'gravity_loaded' => false
+    );
     
     private $plugin_url;
     private $version;
@@ -526,18 +535,27 @@ class Operaton_DMN_Assets {
 
     /**
      * FIXED: Enhanced frontend asset enqueuing with compatibility check
+     * Enhanced frontend asset enqueuing with global state check
      */
     public function enqueue_frontend_assets() {
-        // Prevent duplicate loading
+        // Check global state first
+        if (self::$global_loading_state['frontend_loaded']) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN Assets: Frontend assets already loaded globally, skipping');
+            }
+            return;
+        }
+        
+        // Prevent duplicate loading during same request
         if (isset($this->loaded_assets['frontend'])) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Assets: Frontend assets already loaded, skipping');
+                error_log('Operaton DMN Assets: Frontend assets already loaded locally, skipping');
             }
             return;
         }
         
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: ⭐ STARTING enqueue_frontend_assets');
+            error_log('Operaton DMN Assets: ⭐ LOADING frontend assets (optimized)');
         }
         
         // CRITICAL FIX: Ensure jQuery is loaded FIRST
@@ -547,16 +565,12 @@ class Operaton_DMN_Assets {
         
         // Force registration if not already registered
         if (!wp_script_is('operaton-dmn-frontend', 'registered')) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Assets: 🔧 Script not registered, registering now');
-            }
-            
             wp_register_script(
                 'operaton-dmn-frontend',
                 $this->plugin_url . 'assets/js/frontend.js',
-                array('jquery'), // Explicit jQuery dependency
+                array('jquery'),
                 $this->version,
-                true // Load in footer AFTER jQuery
+                true
             );
         }
         
@@ -566,38 +580,69 @@ class Operaton_DMN_Assets {
         // Then enqueue JS with jQuery dependency
         wp_enqueue_script('operaton-dmn-frontend');
         
-        // CRITICAL: Enhanced localization data
-        $localization_data = array(
-            'url' => rest_url('operaton-dmn/v1/evaluate'),
-            'nonce' => wp_create_nonce('wp_rest'),
-            'debug' => defined('WP_DEBUG') && WP_DEBUG ? '1' : '0',
-            'strings' => array(
-                'evaluating' => __('Evaluating...', 'operaton-dmn'),
-                'error' => __('Evaluation failed', 'operaton-dmn'),
-                'success' => __('Evaluation completed', 'operaton-dmn'),
-                'loading' => __('Loading...', 'operaton-dmn'),
-                'no_config' => __('Configuration not found', 'operaton-dmn'),
-                'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
-                'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
-            ),
-            'compatibility' => array(
-                'quirks_mode_check' => true,
-                'jquery_version_required' => '3.0'
-            )
-        );
-        
-        // Enhanced localization with error handling
-        $localize_result = wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
-        
-        if (!$localize_result && defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: ❌ wp_localize_script failed');
+        // Enhanced localization (only once)
+        if (!wp_script_is('operaton-dmn-frontend', 'localized')) {
+            $localization_data = array(
+                'url' => rest_url('operaton-dmn/v1/evaluate'),
+                'nonce' => wp_create_nonce('wp_rest'),
+                'debug' => defined('WP_DEBUG') && WP_DEBUG ? '1' : '0',
+                'strings' => array(
+                    'evaluating' => __('Evaluating...', 'operaton-dmn'),
+                    'error' => __('Evaluation failed', 'operaton-dmn'),
+                    'success' => __('Evaluation completed', 'operaton-dmn'),
+                    'loading' => __('Loading...', 'operaton-dmn'),
+                    'no_config' => __('Configuration not found', 'operaton-dmn'),
+                    'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
+                    'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
+                ),
+                'compatibility' => array(
+                    'quirks_mode_check' => true,
+                    'jquery_version_required' => '3.0'
+                ),
+                'timestamp' => time() // For cache busting
+            );
+            
+            wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
         }
         
+        // Update both local and global state
         $this->loaded_assets['frontend'] = true;
+        self::$global_loading_state['frontend_loaded'] = true;
         
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: ⭐ FINISHED enqueue_frontend_assets');
+            error_log('Operaton DMN Assets: ✅ Frontend assets loaded successfully');
         }
+    }
+
+    /**
+     * Reset global state (for testing or specific scenarios)
+     */
+    public static function reset_global_state() {
+        self::$global_loading_state = array(
+            'frontend_loaded' => false,
+            'admin_loaded' => false,
+            'gravity_loaded' => false
+        );
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN Assets: Global loading state reset');
+        }
+    }
+    
+    /**
+     * Get current loading state for debugging
+     */
+    public function get_loading_state() {
+        return array(
+            'local' => $this->loaded_assets,
+            'global' => self::$global_loading_state,
+            'wordpress_states' => array(
+                'frontend_registered' => wp_script_is('operaton-dmn-frontend', 'registered'),
+                'frontend_enqueued' => wp_script_is('operaton-dmn-frontend', 'enqueued'),
+                'frontend_done' => wp_script_is('operaton-dmn-frontend', 'done'),
+                'jquery_enqueued' => wp_script_is('jquery', 'enqueued')
+            )
+        );
     }
 
     /**
