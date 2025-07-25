@@ -237,6 +237,40 @@ class Operaton_DMN_Quirks_Fix {
                     if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
                         console.log('Operaton DMN jQuery Compatibility:', jqueryCompatibility);
                     }
+                
+                // Enhanced jQuery Migrate warning suppression
+if (typeof jQuery !== 'undefined' && jQuery.migrateWarnings) {
+    // Store original console methods
+    var originalWarn = console.warn;
+    var originalTrace = console.trace;
+    
+    // Override console.warn to filter jQuery Migrate warnings
+    console.warn = function() {
+        var message = arguments[0];
+        if (typeof message === 'string') {
+            // Suppress specific jQuery Migrate warnings
+            if (message.includes('JQMIGRATE') || 
+                message.includes('jQuery.fn.click() event shorthand is deprecated') ||
+                message.includes('Quirks Mode')) {
+                return; // Suppress these warnings
+            }
+        }
+        // Call original warn for other messages
+        originalWarn.apply(console, arguments);
+    };
+    
+    // Also suppress console.trace for jQuery Migrate
+    console.trace = function() {
+        var stack = (new Error()).stack;
+        if (stack && stack.includes('migrateWarn')) {
+            return; // Suppress jQuery Migrate traces
+        }
+        originalTrace.apply(console, arguments);
+    };
+    
+    console.log('✅ Operaton DMN: jQuery Migrate warnings suppressed');
+}
+
                 }
             }
             
