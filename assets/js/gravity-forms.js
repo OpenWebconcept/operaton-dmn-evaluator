@@ -372,8 +372,20 @@
         return;
       }
 
-      // Perform evaluation
-      OperatonGravityForms.performEvaluation(formId, configId, formData, $button);
+      // FIXED: Use the centralized button manager instead of local button handling
+      if (typeof window.operatonButtonManager !== 'undefined') {
+        // Let the frontend.js button manager handle the button state
+        console.log('Delegating button management to centralized manager');
+
+        // Trigger the main evaluation handler instead of duplicating logic
+        if (typeof handleEvaluateClick === 'function') {
+          handleEvaluateClick($button);
+          return;
+        }
+      }
+
+      // FALLBACK: Simplified evaluation if button manager not available
+      OperatonGravityForms.performEvaluationSimplified(formId, configId, formData, $button);
     },
 
     /**
@@ -489,23 +501,36 @@
      * @param {object} formData Form data to evaluate
      * @param {jQuery} $button Evaluate button element
      */
-    performEvaluation: function (formId, configId, formData, $button) {
-      var originalText = $button.val();
-
-      // Update button state
-      $button.prop('disabled', true).val(operaton_gravity.strings.evaluation_in_progress);
-
-      console.log('Performing evaluation:', {
+    performEvaluationSimplified: function (formId, configId, formData, $button) {
+      console.log('Performing simplified evaluation:', {
         formId: formId,
         configId: configId,
         formData: formData,
       });
 
+      // FIXED: Use button manager if available, otherwise basic state management
+      var useButtonManager = typeof window.operatonButtonManager !== 'undefined';
+      var originalText = 'Evaluate'; // Safe fallback
+
+      if (useButtonManager) {
+        window.operatonButtonManager.setEvaluatingState($button, formId);
+      } else {
+        // Basic fallback button state
+        originalText = $button.val();
+        $button.prop('disabled', true).val('Evaluating...');
+      }
+
       // CRITICAL FIX: Ensure operaton_ajax is available
       if (typeof window.operaton_ajax === 'undefined') {
         console.error('❌ operaton_ajax not available');
         OperatonGravityForms.handleEvaluationError('System configuration error. Please refresh the page.');
-        $button.prop('disabled', false).val(originalText);
+
+        // Restore button state
+        if (useButtonManager) {
+          window.operatonButtonManager.restoreOriginalState($button, formId);
+        } else {
+          $button.prop('disabled', false).val(originalText);
+        }
         return;
       }
 
@@ -551,8 +576,13 @@
           OperatonGravityForms.handleEvaluationError(errorMessage);
         },
         complete: function () {
-          // Restore button state
-          $button.prop('disabled', false).val(originalText);
+          // FIXED: Use centralized button manager for restoration
+          if (useButtonManager) {
+            window.operatonButtonManager.restoreOriginalState($button, formId);
+          } else {
+            // Basic fallback restoration
+            $button.prop('disabled', false).val(originalText);
+          }
         },
       });
     },
@@ -606,6 +636,8 @@
 
       // Trigger custom event
       $(document).trigger('operaton_evaluation_success', [formId, results]);
+
+      // REMOVED: Button state management - now handled by centralized manager
     },
 
     /**
