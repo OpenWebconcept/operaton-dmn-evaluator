@@ -1122,36 +1122,47 @@ document.addEventListener("DOMContentLoaded", function() {
     console.log("Target page:", targetPage, "Decision flow:", showDecisionFlow, "Process mode:", useProcess);
 
     function getCurrentPage() {
-        // Check URL parameter first
+        // Method 1: Check URL parameter first (most reliable for multi-page forms)
         var urlParams = new URLSearchParams(window.location.search);
         var gfPage = urlParams.get("gf_page");
         if (gfPage) {
-            return parseInt(gfPage);
+            var pageNum = parseInt(gfPage);
+            console.log("Current page from URL:", pageNum);
+            return pageNum;
         }
 
-        // Check Gravity Forms page field
+        // Method 2: Check Gravity Forms hidden field
         var pageField = $("#gform_source_page_number_" + formId);
         if (pageField.length && pageField.val()) {
-            return parseInt(pageField.val());
+            var pageNum = parseInt(pageField.val());
+            console.log("Current page from hidden field:", pageNum);
+            return pageNum;
         }
 
-        // Determine page by visible fields
-        return determinePageByVisibleFields();
+        // Method 3: Check which page container is visible
+        var form = $("#gform_" + formId);
+        var visiblePageNumber = 1;
+
+        // Look for page break indicators
+        form.find(".gf_page_break").each(function(index) {
+            if ($(this).is(":visible") || $(this).siblings(":visible").length > 0) {
+                visiblePageNumber = index + 2; // Page breaks are 0-indexed, pages are 1-indexed
+            }
+        });
+
+        // Method 4: Check for page-specific elements
+        if (form.find("#decision-flow-summary-" + formId + ":visible").length > 0) {
+            console.log("Decision flow summary visible - assuming final page");
+            return targetPage + 1; // This should be the decision flow page
+        }
+
+        console.log("Current page determined by visibility:", visiblePageNumber);
+        return visiblePageNumber;
     }
 
-    function determinePageByVisibleFields() {
-        var form = $("#gform_" + formId);
-
-        // Look for page breaks and visible fields
-        var visibleFields = form.find(".gfield:visible").length;
-        var pageBreaks = form.find(".gf_page_break").length;
-
-        if (pageBreaks === 0) {
-            return 1; // Single page form
-        }
-
-        // More sophisticated page detection can be added here
-        return 1; // Default to page 1
+    function hideAllButtons() {
+        $("#operaton-evaluate-" + formId).hide();
+        $("#decision-flow-summary-" + formId).hide();
     }
 
     function handleButtonAndSummary() {
@@ -1159,29 +1170,41 @@ document.addEventListener("DOMContentLoaded", function() {
         var evaluateBtn = $("#operaton-evaluate-" + formId);
         var summaryContainer = $("#decision-flow-summary-" + formId);
 
-        console.log("Current page:", currentPage, "Target page:", targetPage);
+        console.log("📍 Current page:", currentPage, "Target page:", targetPage);
 
-        // Hide both initially
-        evaluateBtn.hide();
-        summaryContainer.hide();
+        // CRITICAL FIX: Hide everything first to prevent multiple showings
+        hideAllButtons();
 
         if (currentPage === targetPage) {
-            // Show button on target page
-            console.log("Showing evaluate button on page", currentPage);
+            // Show ONLY the evaluate button on the target page
+            console.log("✅ Showing evaluate button ONLY on target page", currentPage);
 
             var form = $("#gform_" + formId);
-            var targetContainer = form.find(".gform_body");
+            var targetContainer = form.find(".gform_body").first();
 
             if (targetContainer.length) {
                 evaluateBtn.detach().appendTo(targetContainer);
-                evaluateBtn.show();
+                showEvaluateButton(formId);
+
+                // Ensure decision flow summary is hidden
+                hideAllElements(formId);
             }
 
         } else if (currentPage === (targetPage + 1) && showDecisionFlow && useProcess) {
-            // Show decision flow on next page if configured
-            console.log("Showing decision flow on page", currentPage);
-            summaryContainer.show();
+            // Show ONLY decision flow on the next page
+            console.log("✅ Showing decision flow ONLY on page", currentPage);
+
+            // Ensure evaluate button is hidden
+            hideAllElements(formId);
+
+            // Show and load decision flow
+            showDecisionFlowSummary(formId);
             loadDecisionFlowSummary();
+
+        } else {
+            // Hide both on all other pages
+            console.log("❌ Hiding both button and summary on page", currentPage);
+            hideAllElements(formId);
         }
     }
 
@@ -1192,9 +1215,9 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
-        console.log("Loading decision flow summary...");
+        console.log("📊 Loading decision flow summary...");
         container.addClass("loading");
-        container.html("<p>Loading decision flow summary...</p>");
+        container.html("<div style=\"padding: 20px; text-align: center;\"><p>⏳ Loading decision flow summary...</p></div>");
 
         $.ajax({
             url: "%s/wp-json/operaton-dmn/v1/decision-flow/" + formId + "?cache_bust=" + Date.now(),
@@ -1203,13 +1226,14 @@ document.addEventListener("DOMContentLoaded", function() {
             success: function(response) {
                 if (response.success && response.html) {
                     container.html(response.html);
+                    console.log("✅ Decision flow loaded successfully");
                 } else {
-                    container.html("<p><em>No decision flow data available.</em></p>");
+                    container.html("<div style=\"padding: 20px;\"><p><em>No decision flow data available.</em></p></div>");
                 }
             },
             error: function(xhr, status, error) {
-                console.log("Decision flow error:", error);
-                container.html("<p><em>Error loading decision flow summary.</em></p>");
+                console.error("❌ Decision flow error:", error);
+                container.html("<div style=\"padding: 20px;\"><p><em>Error loading decision flow summary.</em></p></div>");
             },
             complete: function() {
                 container.removeClass("loading");
@@ -1217,26 +1241,62 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // Initialize after DOM ready
-    $(document).ready(function() {
-        setTimeout(handleButtonAndSummary, 500);
+    // CRITICAL FIX: More robust initialization with multiple detection methods
+    function initializeButtonPlacement() {
+        console.log("🚀 Initializing button placement for form", formId);
+
+        // Wait a bit for Gravity Forms to settle
+        setTimeout(function() {
+            handleButtonAndSummary();
+        }, 300);
 
         // Handle Gravity Forms page changes
         $(document).on("gform_page_loaded", function(event, form_id, current_page) {
             if (form_id == formId) {
-                console.log("GF page loaded:", current_page);
-                setTimeout(handleButtonAndSummary, 200);
+                console.log("📄 GF page loaded event - Form:", form_id, "Page:", current_page);
+                setTimeout(function() {
+                    handleButtonAndSummary();
+                }, 200);
             }
         });
+
+        // Handle URL changes (for multi-page navigation)
+        var currentUrl = window.location.href;
+        setInterval(function() {
+            if (window.location.href !== currentUrl) {
+                currentUrl = window.location.href;
+                console.log("🔄 URL changed, re-evaluating button placement");
+                setTimeout(handleButtonAndSummary, 300);
+            }
+        }, 500);
+
+        // Additional fallback for forms that don\'t trigger proper events
+        setTimeout(function() {
+            var evaluateBtn = $("#operaton-evaluate-" + formId);
+            var currentPage = getCurrentPage();
+
+            if (currentPage === targetPage && !evaluateBtn.is(":visible")) {
+                console.log("🔧 Fallback: Button should be visible but isn\'t");
+                handleButtonAndSummary();
+            } else if (currentPage !== targetPage && evaluateBtn.is(":visible")) {
+                console.log("🔧 Fallback: Button is visible but shouldn\'t be");
+                hideAllElements(formId);
+            }
+        }, 1500);
+    }
+
+    // Initialize when DOM is ready
+    $(document).ready(function() {
+        initializeButtonPlacement();
     });
 
-    // FALLBACK INITIALIZATION for forms that don\'t trigger gform_page_loaded
-    setTimeout(function() {
-        if ($("#operaton-evaluate-" + formId + ":visible").length === 0) {
-            console.log("Fallback initialization");
+    // Additional initialization when window loads (for edge cases)
+    $(window).on("load", function() {
+        setTimeout(function() {
+            console.log("🔄 Window loaded - checking button placement");
             handleButtonAndSummary();
-        }
-    }, 1000);
+        }, 500);
+    });
 
 })(jQuery);',
             $form_id,

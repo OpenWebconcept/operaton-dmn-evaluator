@@ -359,3 +359,52 @@
     color: black !important;
   }
 }
+
+/* Add this to your frontend.css file */
+
+/* CRITICAL FIX: Ensure buttons are hidden by default and only shown when explicitly needed */
+.operaton-evaluate-btn {
+  display: none !important;
+}
+
+/* Only show the button when explicitly made visible by JavaScript */
+.operaton-evaluate-btn.operaton-show-button {
+  display: inline-block !important;
+}
+
+/* Decision flow summary hidden by default */
+.decision-flow-summary {
+  display: none !important;
+}
+
+/* Only show decision flow when explicitly made visible */
+.decision-flow-summary.operaton-show-summary {
+  display: block !important;
+}
+
+/* Page-specific hiding rules for extra safety */
+.gform_wrapper .gform_page:nth-child(3) .operaton-evaluate-btn {
+  display: none !important;
+}
+
+/* Ensure proper spacing when elements are hidden */
+.gform_wrapper .operaton-evaluate-btn + .decision-flow-summary {
+  margin-top: 20px;
+}
+
+/* Loading state for decision flow */
+.decision-flow-summary.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.decision-flow-summary.loading::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  z-index: 1;
+}
