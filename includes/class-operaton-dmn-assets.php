@@ -8,6 +8,7 @@
  * 2. Better Gravity Forms detection
  * 3. Improved compatibility checks
  * 4. DOCTYPE validation and fixes
+ * 5. FIXED: Button text localization conflicts
  *
  * @package OperatonDMN
  * @since 1.0.0
@@ -691,7 +692,7 @@ class Operaton_DMN_Assets
             $this->performance->mark('localization_start', 'Starting script localization');
         }
 
-        // Enhanced localization (only once)
+        // FIXED: Clean and simplified localization with consistent button text strings
         if (!wp_script_is('operaton-dmn-frontend', 'localized'))
         {
             $localization_data = array(
@@ -705,7 +706,12 @@ class Operaton_DMN_Assets
                     'loading' => __('Loading...', 'operaton-dmn'),
                     'no_config' => __('Configuration not found', 'operaton-dmn'),
                     'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
-                    'connection_error' => __('Connection error. Please try again.', 'operaton-dmn')
+                    'connection_error' => __('Connection error. Please try again.', 'operaton-dmn'),
+
+                    // FIXED: Simplified button text management - single source of truth
+                    'button_text_default' => __('Evaluate', 'operaton-dmn'),
+                    'button_text_evaluating' => __('Evaluating...', 'operaton-dmn'),
+                    'button_text_error' => __('Try again', 'operaton-dmn')
                 ),
                 'compatibility' => array(
                     'quirks_mode_check' => true,
@@ -1171,24 +1177,13 @@ class Operaton_DMN_Assets
     }
 
     /**
-     * Separate method for Gravity Forms integration scripts
+     * FIXED: Separate method for Gravity Forms integration scripts
+     * This method now uses consistent button text strings from the main localization
      */
     private function enqueue_gravity_integration_scripts($form, $config)
     {
         // Enqueue Gravity Forms integration script
         wp_enqueue_script('operaton-dmn-gravity-integration');
-
-        // Localize Gravity Forms specific data
-        wp_localize_script('operaton-dmn-gravity-integration', 'operaton_gravity', array(
-            'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('operaton_gravity_nonce'),
-            'debug' => defined('WP_DEBUG') && WP_DEBUG,
-            'strings' => array(
-                'validation_failed' => __('Please complete all required fields before evaluation.', 'operaton-dmn'),
-                'evaluation_in_progress' => __('Evaluation in progress...', 'operaton-dmn'),
-                'form_error' => __('Form validation failed. Please check your entries.', 'operaton-dmn')
-            )
-        ));
 
         // Process configuration for JavaScript
         $field_mappings = json_decode($config->field_mappings, true);
@@ -1203,10 +1198,11 @@ class Operaton_DMN_Assets
             $result_mappings = array();
         }
 
-        // Localize form-specific configuration
+        // FIXED: Only localize form-specific configuration, NOT button text strings
+        // This prevents conflicts with the main operaton_ajax localization
         wp_localize_script('operaton-dmn-gravity-integration', 'operaton_config_' . $form['id'], array(
             'config_id' => $config->id,
-            'button_text' => $config->button_text,
+            'button_text' => $config->button_text, // Keep this for reference, but don't use for state management
             'field_mappings' => $field_mappings,
             'result_mappings' => $result_mappings,
             'form_id' => $form['id'],
@@ -1215,8 +1211,15 @@ class Operaton_DMN_Assets
             'show_decision_flow' => isset($config->show_decision_flow) ? $config->show_decision_flow : false,
             'debug' => defined('WP_DEBUG') && WP_DEBUG
         ));
-    }
 
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN Assets: Form-specific configuration localized for form ' . $form['id']);
+            error_log('Operaton DMN Assets: Button text from config: ' . $config->button_text);
+            error_log('Operaton DMN Assets: IMPORTANT - Button state management handled by frontend.js button manager');
+        }
+    }
+    
     /**
      * Enqueue decision flow CSS and JavaScript
      */

@@ -1,13 +1,110 @@
 /**
- * Enhanced Operaton DMN Frontend Script - FIXED VERSION
+ * FINAL FIX: Enhanced Operaton DMN Frontend Script
  *
  * Fixed jQuery loading issues and improved initialization timing
+ * FINAL FIX: Self-contained button text management to prevent all conflicts
  *
  * @package OperatonDMN
  * @since 1.0.0
  */
 
 console.log('Operaton DMN frontend script loading (enhanced with decision flow)...');
+
+window.operatonButtonManager = window.operatonButtonManager || {
+  originalTexts: new Map(),
+
+  /**
+   * Store original button text safely
+   */
+  storeOriginalText: function ($button, formId) {
+    var buttonId = 'form_' + formId;
+
+    // Get original text from multiple sources
+    var originalText = $button.attr('data-original-text') || $button.val() || $button.attr('value') || 'Evaluate';
+
+    // Clean up the text (remove evaluation states)
+    if (
+      originalText.indexOf('Evaluation') !== -1 ||
+      originalText.indexOf('Evaluating') !== -1 ||
+      originalText.indexOf('progress') !== -1
+    ) {
+      originalText = 'Evaluate'; // Fallback to default
+    }
+
+    this.originalTexts.set(buttonId, originalText);
+    $button.attr('data-original-text', originalText);
+
+    console.log('📝 ButtonManager: Stored original text for form', formId + ':', originalText);
+    return originalText;
+  },
+
+  /**
+   * Get stored original text
+   */
+  getOriginalText: function (formId) {
+    var buttonId = 'form_' + formId;
+    var storedText = this.originalTexts.get(buttonId);
+
+    if (!storedText) {
+      // Try to get from button element
+      var $button = $('#operaton-evaluate-' + formId);
+      if ($button.length) {
+        storedText = $button.attr('data-original-text') || 'Evaluate';
+        this.originalTexts.set(buttonId, storedText);
+      } else {
+        storedText = 'Evaluate'; // Ultimate fallback
+      }
+    }
+
+    console.log('🔍 ButtonManager: Retrieved original text for form', formId + ':', storedText);
+    return storedText;
+  },
+
+  /**
+   * Set button to evaluating state
+   */
+  setEvaluatingState: function ($button, formId) {
+    // Ensure original text is stored first
+    this.storeOriginalText($button, formId);
+
+    $button.val('Evaluating...').prop('disabled', true).addClass('operaton-evaluating');
+
+    console.log('🔄 ButtonManager: Set evaluating state for form', formId);
+  },
+
+  /**
+   * Restore button to original state with multiple fallback attempts
+   */
+  restoreOriginalState: function ($button, formId) {
+    var originalText = this.getOriginalText(formId);
+
+    console.log('🔄 ButtonManager: Restoring button for form', formId, 'to:', originalText);
+
+    // Primary restoration
+    $button
+      .val(originalText)
+      .prop('value', originalText)
+      .attr('value', originalText)
+      .prop('disabled', false)
+      .removeClass('operaton-evaluating');
+
+    // Failsafe restoration after a short delay
+    setTimeout(function () {
+      $button.val(originalText).prop('disabled', false);
+      console.log('✅ ButtonManager: Failsafe restoration completed for form', formId);
+    }, 100);
+
+    // Final failsafe after longer delay
+    setTimeout(function () {
+      if ($button.val() !== originalText || $button.prop('disabled')) {
+        $button.val(originalText).prop('disabled', false);
+        console.log('🆘 ButtonManager: Emergency restoration triggered for form', formId);
+      }
+    }, 1000);
+
+    console.log('✅ ButtonManager: Restoration complete for form', formId);
+  },
+};
 
 // Global registry to prevent duplicate initialization
 window.operatonInitialized = window.operatonInitialized || {
@@ -505,12 +602,11 @@ window.operatonInitialized = window.operatonInitialized || {
     // =============================================================================
 
     /**
-     * Handle evaluate button click
+     * FINAL FIX: Handle evaluate button click with self-contained button text management
      */
     function handleEvaluateClick($button) {
       var formId = $button.data('form-id');
       var configId = $button.data('config-id');
-      var originalText = $button.val();
 
       console.log('Enhanced evaluate button clicked for form:', formId, 'config:', configId);
 
@@ -523,6 +619,9 @@ window.operatonInitialized = window.operatonInitialized || {
 
       var config = window[configVar];
       var fieldMappings = config.field_mappings;
+
+      // FIXED: Use centralized button manager
+      window.operatonButtonManager.storeOriginalText($button, formId);
 
       // Force radio button synchronization before validation
       forceSyncRadioButtons(formId);
@@ -537,7 +636,7 @@ window.operatonInitialized = window.operatonInitialized || {
           return;
         }
 
-        // Collect form data
+        // Collect form data (keeping existing logic)
         var formData = {};
         var hasRequiredData = true;
         var missingFields = [];
@@ -602,14 +701,14 @@ window.operatonInitialized = window.operatonInitialized || {
           return;
         }
 
-        // Show loading state
-        $button.val('Evaluating...').prop('disabled', true);
+        // FIXED: Use centralized button manager for evaluating state
+        window.operatonButtonManager.setEvaluatingState($button, formId);
 
         // Check if operaton_ajax is available
         if (typeof window.operaton_ajax === 'undefined') {
           console.error('❌ operaton_ajax not available');
           showError('System error: AJAX configuration not loaded. Please refresh the page.');
-          $button.val(originalText).prop('disabled', false);
+          window.operatonButtonManager.restoreOriginalState($button, formId);
           return;
         }
 
@@ -728,7 +827,8 @@ window.operatonInitialized = window.operatonInitialized || {
             showError(errorMessage);
           },
           complete: function () {
-            $button.val(originalText).prop('disabled', false);
+            // FIXED: Always use centralized button manager for restoration
+            window.operatonButtonManager.restoreOriginalState($button, formId);
           },
         });
       }
