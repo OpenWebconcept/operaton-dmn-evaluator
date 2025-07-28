@@ -246,261 +246,60 @@ class Operaton_DMN_Assets
             return;
         }
 
+        // Only add compatibility check if we're actually loading assets
+        if (!self::should_load_frontend_assets())
+        {
+            return;
+        }
+
+        // Add to footer to ensure it runs after jQuery is loaded
+        add_action('wp_footer', array($this, 'add_footer_compatibility_check'), 1);
+    }
+
+    /**
+     * NEW: Footer-based compatibility check that runs after jQuery
+     */
+    public function add_footer_compatibility_check()
+    {
 ?>
         <script type="text/javascript">
-            /* Operaton DMN: Enhanced jQuery Compatibility Fix */
+            /* Operaton DMN: Post-Load Compatibility Check */
             (function() {
                 'use strict';
 
-                // Store original console methods
-                var originalLog = console.log;
-                var originalError = console.error;
-                var originalWarn = console.warn;
+                // This runs after jQuery should be loaded
+                var compatibilityInfo = {
+                    jqueryAvailable: typeof jQuery !== 'undefined',
+                    jqueryVersion: typeof jQuery !== 'undefined' ? jQuery.fn.jquery : 'none',
+                    quirksMode: document.compatMode === "BackCompat",
+                    doctype: document.doctype ? document.doctype.name : 'missing',
+                    issues: []
+                };
 
-                // Enhanced jQuery detection
-                function checkjQueryCompatibility() {
-                    var compatibilityInfo = {
-                        jqueryAvailable: typeof jQuery !== 'undefined',
-                        jqueryVersion: typeof jQuery !== 'undefined' ? jQuery.fn.jquery : 'none',
-                        quirksMode: document.compatMode === "BackCompat",
-                        doctype: document.doctype ? document.doctype.name : 'missing',
-                        issues: []
-                    };
-
-                    // Check for common issues
-                    if (!compatibilityInfo.jqueryAvailable) {
-                        compatibilityInfo.issues.push('jQuery not loaded');
-                    }
-
-                    if (compatibilityInfo.quirksMode) {
-                        compatibilityInfo.issues.push('Quirks Mode detected');
-                    }
-
-                    if (compatibilityInfo.doctype === 'missing') {
-                        compatibilityInfo.issues.push('DOCTYPE missing');
-                    }
-
-                    // Store globally for other scripts
-                    window.operatonCompatibilityInfo = compatibilityInfo;
-
-                    if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
-                        console.log('Operaton DMN Compatibility Check:', compatibilityInfo);
-                    }
-
-                    return compatibilityInfo;
-                }
-
-                // Run compatibility check immediately
-                var compatInfo = checkjQueryCompatibility();
-
-                // If jQuery is not available, set up detection
-                if (!compatInfo.jqueryAvailable) {
-                    var jqueryWaitAttempts = 0;
-                    var maxWaitAttempts = 50;
-
-                    function waitForjQuery() {
-                        jqueryWaitAttempts++;
-
-                        if (typeof jQuery !== 'undefined') {
-                            console.log('✅ Operaton DMN: jQuery loaded after', jqueryWaitAttempts, 'attempts');
-
-                            // Update compatibility info
-                            window.operatonCompatibilityInfo.jqueryAvailable = true;
-                            window.operatonCompatibilityInfo.jqueryVersion = jQuery.fn.jquery;
-
-                            // Trigger custom event
-                            if (typeof jQuery !== 'undefined') {
-                                jQuery(document).trigger('operaton_jquery_ready');
-                            }
-
-                        } else if (jqueryWaitAttempts < maxWaitAttempts) {
-                            setTimeout(waitForjQuery, 100);
-                        } else {
-                            console.error('❌ Operaton DMN: jQuery not found after', maxWaitAttempts, 'attempts');
-
-                            // Create emergency notification
-                            if (document.body) {
-                                var notice = document.createElement('div');
-                                notice.style.cssText = 'position:fixed;top:10px;right:10px;background:#f44336;color:white;padding:10px;z-index:99999;border-radius:4px;font-size:12px;';
-                                notice.innerHTML = '⚠️ Operaton DMN: jQuery loading failed';
-                                document.body.appendChild(notice);
-
-                                setTimeout(function() {
-                                    if (notice.parentNode) {
-                                        notice.parentNode.removeChild(notice);
-                                    }
-                                }, 5000);
-                            }
-                        }
-                    }
-
-                    waitForjQuery();
-                }
-
-            })();
-        </script>
-    <?php
-    }
-
-    /**
-     * FIXED: Enhanced document compatibility checking
-     */
-    public function check_document_compatibility()
-    {
-        if (is_admin())
-        {
-            return;
-        }
-
-        // Only run on pages that might have Gravity Forms
-        if (!$this->should_run_compatibility_check())
-        {
-            return;
-        }
-
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Assets: Running document compatibility check');
-        }
-
-    ?>
-        <script type="text/javascript">
-            /* Operaton DMN Document Compatibility Check */
-            (function() {
-                'use strict';
-
-                // Check document compatibility mode
-                var isQuirksMode = document.compatMode === "BackCompat";
-                var hasDoctype = document.doctype !== null;
-                var doctypeName = document.doctype ? document.doctype.name : 'none';
-
-                if (isQuirksMode || !hasDoctype) {
-                    console.warn('⚠️ Operaton DMN: Document compatibility issues detected');
-                    console.warn('- Quirks Mode:', isQuirksMode);
-                    console.warn('- DOCTYPE present:', hasDoctype);
-                    console.warn('- DOCTYPE name:', doctypeName);
-
-                    // Try to provide helpful information
-                    if (!hasDoctype) {
-                        console.warn('💡 Add <!DOCTYPE html> to your theme header.php file');
-                    }
-
-                    // Store compatibility info for other scripts
-                    window.operatonCompatibilityInfo = window.operatonCompatibilityInfo || {};
-                    window.operatonCompatibilityInfo.quirksMode = isQuirksMode;
-                    window.operatonCompatibilityInfo.doctype = doctypeName;
-                    window.operatonCompatibilityInfo.hasDoctype = hasDoctype;
-
-                    // Add body class for CSS fixes
-                    function addCompatibilityClass() {
-                        if (document.body) {
-                            document.body.className += ' operaton-quirks-mode-detected';
-                            document.body.setAttribute('data-operaton-quirks', 'true');
-                        }
-                    }
-
-                    if (document.readyState === 'loading') {
-                        document.addEventListener('DOMContentLoaded', addCompatibilityClass);
-                    } else {
-                        addCompatibilityClass();
-                    }
-
+                // Only log issues, don't try to fix them
+                if (!compatibilityInfo.jqueryAvailable) {
+                    compatibilityInfo.issues.push('jQuery not loaded');
+                    console.error('❌ Operaton DMN: jQuery still not available after page load');
                 } else {
                     if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
-                        console.log('✅ Operaton DMN: Document in Standards Mode');
+                        console.log('✅ Operaton DMN: jQuery loaded successfully, version:', compatibilityInfo.jqueryVersion);
                     }
+                }
 
-                    window.operatonCompatibilityInfo = window.operatonCompatibilityInfo || {};
-                    window.operatonCompatibilityInfo.quirksMode = false;
-                    window.operatonCompatibilityInfo.doctype = doctypeName;
-                    window.operatonCompatibilityInfo.hasDoctype = hasDoctype;
+                if (compatibilityInfo.quirksMode) {
+                    compatibilityInfo.issues.push('Quirks Mode detected');
+                    document.body.className += ' operaton-quirks-mode-detected';
+                }
+
+                // Store globally for debugging
+                window.operatonCompatibilityInfo = compatibilityInfo;
+
+                if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
+                    console.log('Operaton DMN Compatibility Check:', compatibilityInfo);
                 }
             })();
         </script>
-
     <?php
-        // Add comprehensive CSS fixes for Quirks Mode
-        $this->add_enhanced_quirks_mode_css_fixes();
-    }
-
-    /**
-     * Enhanced CSS fixes for Quirks Mode compatibility
-     */
-    private function add_enhanced_quirks_mode_css_fixes()
-    {
-    ?>
-        <style type="text/css">
-            /* Operaton DMN Enhanced Quirks Mode Compatibility Fixes */
-
-            /* Force box-sizing for all elements in quirks mode */
-            .operaton-quirks-mode-detected *,
-            .operaton-quirks-mode-detected *:before,
-            .operaton-quirks-mode-detected *:after {
-                -webkit-box-sizing: border-box !important;
-                -moz-box-sizing: border-box !important;
-                box-sizing: border-box !important;
-            }
-
-            /* Fix Gravity Forms in Quirks Mode */
-            .operaton-quirks-mode-detected .gform_wrapper {
-                width: 100% !important;
-            }
-
-            .operaton-quirks-mode-detected .gform_wrapper .operaton-evaluate-btn {
-                display: inline-block !important;
-                vertical-align: top !important;
-                margin: 10px 0 !important;
-                padding: 8px 16px !important;
-                line-height: 1.4 !important;
-            }
-
-            /* Decision flow tables in Quirks Mode */
-            .operaton-quirks-mode-detected .decision-table.excel-style {
-                table-layout: fixed !important;
-                width: 100% !important;
-                border-collapse: collapse !important;
-            }
-
-            /* Fix jQuery UI conflicts in Quirks Mode */
-            .operaton-quirks-mode-detected .ui-widget {
-                font-family: inherit !important;
-            }
-
-            /* Ensure proper form field sizing */
-            .operaton-quirks-mode-detected .gform_wrapper input[type="text"],
-            .operaton-quirks-mode-detected .gform_wrapper input[type="email"],
-            .operaton-quirks-mode-detected .gform_wrapper input[type="number"],
-            .operaton-quirks-mode-detected .gform_wrapper select,
-            .operaton-quirks-mode-detected .gform_wrapper textarea {
-                width: 100% !important;
-                max-width: 100% !important;
-            }
-
-            /* Hide quirks mode warning in production */
-            <?php if (!defined('WP_DEBUG') || !WP_DEBUG): ?>.operaton-quirks-mode-detected::before {
-                display: none !important;
-            }
-
-            <?php else: ?>
-
-            /* Quirks mode notification for debug */
-            .operaton-quirks-mode-detected::before {
-                content: "⚠️ Quirks Mode Detected - Some features may not work optimally";
-                display: block;
-                background: #fff3cd;
-                border: 1px solid #ffeaa7;
-                color: #856404;
-                padding: 8px 12px;
-                margin: 0 0 15px 0;
-                border-radius: 4px;
-                font-size: 12px;
-                font-weight: bold;
-                text-align: center;
-            }
-
-            <?php endif; ?>
-        </style>
-<?php
     }
 
     /**
@@ -708,6 +507,9 @@ class Operaton_DMN_Assets
         );
     }
 
+    /**
+     * FIXED: Enhanced frontend asset loading with guaranteed jQuery dependency
+     */
     public function enqueue_frontend_assets()
     {
         $timer_id = null;
@@ -716,7 +518,7 @@ class Operaton_DMN_Assets
             $timer_id = $this->performance->start_timer('frontend_assets_enqueue');
         }
 
-        // CRITICAL FIX: Atomic loading check with multiple safety layers
+        // Prevent duplicate loading
         if (self::$global_loading_state['frontend_loaded'])
         {
             if (defined('WP_DEBUG') && WP_DEBUG)
@@ -730,90 +532,44 @@ class Operaton_DMN_Assets
             return;
         }
 
-        if (self::$loading_coordinator['loading_in_progress'])
-        {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN Assets: ⏭️ SKIPPED - Loading already in progress');
-            }
-            if ($this->performance && $timer_id)
-            {
-                $this->performance->stop_timer($timer_id, 'Skipped - loading in progress');
-            }
-            return;
-        }
-
-        if (isset($this->loaded_assets['frontend']))
-        {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN Assets: ⏭️ SKIPPED - Already loaded locally');
-            }
-            if ($this->performance && $timer_id)
-            {
-                $this->performance->stop_timer($timer_id, 'Skipped - already loaded locally');
-            }
-            return;
-        }
-
-        // Set loading flag immediately to prevent race conditions
-        self::$loading_coordinator['loading_in_progress'] = true;
-
         if (defined('WP_DEBUG') && WP_DEBUG)
         {
-            error_log('Operaton DMN Assets: 🚀 LOADING frontend assets (centralized control)');
+            error_log('Operaton DMN Assets: 🚀 LOADING frontend assets with jQuery dependency check');
         }
 
         try
         {
-            // Ensure jQuery is loaded first
-            if ($this->performance)
-            {
-                $this->performance->mark('jquery_check_start', 'Checking jQuery availability');
-            }
-
-            if (!wp_script_is('jquery', 'done') && !wp_script_is('jquery', 'enqueued'))
+            // CRITICAL FIX: Ensure jQuery is available before proceeding
+            if (!wp_script_is('jquery', 'enqueued') && !wp_script_is('jquery', 'done'))
             {
                 wp_enqueue_script('jquery');
+
+                if (defined('WP_DEBUG') && WP_DEBUG)
+                {
+                    error_log('Operaton DMN Assets: Explicitly enqueued jQuery');
+                }
             }
 
-            if ($this->performance)
-            {
-                $this->performance->mark('jquery_check_complete', 'jQuery check completed');
-            }
-
-            // Register scripts if not already registered
-            if ($this->performance)
-            {
-                $this->performance->mark('script_registration_start', 'Starting script registration');
-            }
-
+            // Register our script with explicit jQuery dependency
             if (!wp_script_is('operaton-dmn-frontend', 'registered'))
             {
                 wp_register_script(
                     'operaton-dmn-frontend',
                     $this->plugin_url . 'assets/js/frontend.js',
-                    array('jquery'),
+                    array('jquery'), // Explicit dependency
                     $this->version,
-                    true
+                    true // Load in footer AFTER jQuery
                 );
-            }
 
-            if ($this->performance)
-            {
-                $this->performance->mark('script_registration_complete', 'Script registration completed');
+                // CRITICAL: Add script dependency data for WordPress
+                wp_script_add_data('operaton-dmn-frontend', 'group', 1);
             }
 
             // Enqueue assets
             wp_enqueue_style('operaton-dmn-frontend');
             wp_enqueue_script('operaton-dmn-frontend');
 
-            // Localization (only if not already done)
-            if ($this->performance)
-            {
-                $this->performance->mark('localization_start', 'Starting script localization');
-            }
-
+            // CRITICAL FIX: Only localize once and after jQuery is guaranteed
             if (!wp_script_is('operaton-dmn-frontend', 'localized'))
             {
                 $localization_data = array(
@@ -840,24 +596,22 @@ class Operaton_DMN_Assets
                         'load_time' => $this->performance ? round(($this->performance->get_summary()['total_time_ms']), 2) : 0,
                         'timestamp' => time()
                     ),
-                    'loading_source' => 'centralized_controller'
+                    'loading_source' => 'enhanced_dependency_management'
                 );
 
                 wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
+
+                // Mark as localized to prevent duplicate localization
+                wp_script_add_data('operaton-dmn-frontend', 'localized', true);
             }
 
-            if ($this->performance)
-            {
-                $this->performance->mark('localization_complete', 'Script localization completed');
-            }
-
-            // Update all state flags atomically
+            // Update state flags
             $this->loaded_assets['frontend'] = true;
             self::$global_loading_state['frontend_loaded'] = true;
 
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
-                error_log('Operaton DMN Assets: ✅ Frontend assets loaded successfully via centralized controller');
+                error_log('Operaton DMN Assets: ✅ Frontend assets loaded with enhanced dependency management');
             }
         }
         catch (Exception $e)
@@ -869,9 +623,6 @@ class Operaton_DMN_Assets
         }
         finally
         {
-            // Always clear the loading flag
-            self::$loading_coordinator['loading_in_progress'] = false;
-
             if ($this->performance && $timer_id)
             {
                 $this->performance->stop_timer($timer_id, 'Frontend assets loading completed');
@@ -1600,6 +1351,134 @@ class Operaton_DMN_Assets
                     error_log('Operaton DMN Assets: Unknown asset group: ' . $asset_group);
                 }
         }
+    }
+
+    /**
+     * FIXED: Simplified document compatibility check without jQuery dependencies
+     */
+    public function check_document_compatibility()
+    {
+        if (is_admin() || !$this->should_run_compatibility_check())
+        {
+            return;
+        }
+
+    ?>
+        <script type="text/javascript">
+            /* Operaton DMN: Basic Document Check - No jQuery Required */
+            (function() {
+                'use strict';
+
+                var isQuirksMode = document.compatMode === "BackCompat";
+                var hasDoctype = document.doctype !== null;
+
+                if (isQuirksMode || !hasDoctype) {
+                    console.warn('⚠️ Operaton DMN: Document compatibility issues detected');
+
+                    // Add compatibility class when DOM is ready
+                    function addCompatibilityClass() {
+                        if (document.body) {
+                            document.body.className += ' operaton-quirks-mode-detected';
+                            document.body.setAttribute('data-operaton-quirks', 'true');
+                        }
+                    }
+
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', addCompatibilityClass);
+                    } else {
+                        addCompatibilityClass();
+                    }
+                } else {
+                    if (<?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>) {
+                        console.log('✅ Operaton DMN: Document in Standards Mode');
+                    }
+                }
+            })();
+        </script>
+    <?php
+
+        // Add CSS fixes
+        $this->add_enhanced_quirks_mode_css_fixes();
+    }
+
+    /**
+     * Enhanced CSS fixes for Quirks Mode compatibility
+     */
+    private function add_enhanced_quirks_mode_css_fixes()
+    {
+    ?>
+        <style type="text/css">
+            /* Operaton DMN Enhanced Quirks Mode Compatibility Fixes */
+
+            /* Force box-sizing for all elements in quirks mode */
+            .operaton-quirks-mode-detected *,
+            .operaton-quirks-mode-detected *:before,
+            .operaton-quirks-mode-detected *:after {
+                -webkit-box-sizing: border-box !important;
+                -moz-box-sizing: border-box !important;
+                box-sizing: border-box !important;
+            }
+
+            /* Fix Gravity Forms in Quirks Mode */
+            .operaton-quirks-mode-detected .gform_wrapper {
+                width: 100% !important;
+            }
+
+            .operaton-quirks-mode-detected .gform_wrapper .operaton-evaluate-btn {
+                display: inline-block !important;
+                vertical-align: top !important;
+                margin: 10px 0 !important;
+                padding: 8px 16px !important;
+                line-height: 1.4 !important;
+            }
+
+            /* Decision flow tables in Quirks Mode */
+            .operaton-quirks-mode-detected .decision-table.excel-style {
+                table-layout: fixed !important;
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+
+            /* Fix jQuery UI conflicts in Quirks Mode */
+            .operaton-quirks-mode-detected .ui-widget {
+                font-family: inherit !important;
+            }
+
+            /* Ensure proper form field sizing */
+            .operaton-quirks-mode-detected .gform_wrapper input[type="text"],
+            .operaton-quirks-mode-detected .gform_wrapper input[type="email"],
+            .operaton-quirks-mode-detected .gform_wrapper input[type="number"],
+            .operaton-quirks-mode-detected .gform_wrapper select,
+            .operaton-quirks-mode-detected .gform_wrapper textarea {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            /* Hide quirks mode warning in production */
+            <?php if (!defined('WP_DEBUG') || !WP_DEBUG): ?>.operaton-quirks-mode-detected::before {
+                display: none !important;
+            }
+
+            <?php else: ?>
+
+            /* Quirks mode notification for debug */
+            .operaton-quirks-mode-detected::before {
+                content: "⚠️ Quirks Mode Detected - Some features may not work optimally";
+                display: block;
+                background: #fff3cd;
+                border: 1px solid #ffeaa7;
+                color: #856404;
+                padding: 8px 12px;
+                margin: 0 0 15px 0;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+                text-align: center;
+            }
+
+            <?php endif; ?>
+        </style>
+<?php
     }
 
     /**

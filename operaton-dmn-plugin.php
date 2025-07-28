@@ -724,42 +724,29 @@ class OperatonDMNEvaluator
             return;
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('🚀 OPERATON DMN: force_frontend_assets_on_gravity_forms called - using centralized controller');
-        }
-
-        // Use centralized detection instead of duplicate logic
+        // Use centralized detection
         if (Operaton_DMN_Assets::should_load_frontend_assets())
         {
             if (isset($this->assets))
             {
-                if (defined('WP_DEBUG') && WP_DEBUG)
+                // Ensure jQuery is loaded first with high priority
+                add_action('wp_enqueue_scripts', function ()
                 {
-                    error_log('🚀 OPERATON DMN: Centralized controller approved asset loading');
-                }
+                    if (!wp_script_is('jquery', 'enqueued'))
+                    {
+                        wp_enqueue_script('jquery');
+                    }
+                }, 1);
 
-                // Use high priority to ensure early loading
+                // Load our assets after jQuery is guaranteed
                 add_action('wp_enqueue_scripts', function ()
                 {
                     $this->assets->enqueue_frontend_assets();
-                }, 5);
-
-                // Also load immediately if we're past wp_enqueue_scripts
-                if (did_action('wp_enqueue_scripts'))
-                {
-                    $this->assets->enqueue_frontend_assets();
-                }
-            }
-        }
-        else
-        {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('🚀 OPERATON DMN: Centralized controller determined assets not needed');
+                }, 15);
             }
         }
     }
+
     /**
      * Emergency fallback for operaton_ajax availability
      * Ensures operaton_ajax is always available even if normal loading fails
@@ -771,65 +758,8 @@ class OperatonDMNEvaluator
      */
     public function emergency_operaton_ajax_fallback()
     {
-        // Skip in admin
-        if (is_admin())
-        {
-            return;
-        }
-
-        // Only add fallback if we detect Gravity Forms on the page
-        global $post;
-        $has_gf = false;
-
-        if ($post)
-        {
-            $has_gf = has_shortcode($post->post_content, 'gravityform') ||
-                has_block('gravityforms/form', $post);
-        }
-
-        if (!$has_gf && !class_exists('GFForms'))
-        {
-            return;
-        }
-
-?>
-        <script type="text/javascript">
-            /* Operaton DMN Enhanced Emergency Fallback */
-            (function() {
-                'use strict';
-
-                // Wait a bit to see if operaton_ajax loads normally
-                setTimeout(function() {
-                    if (typeof window.operaton_ajax === 'undefined') {
-                        console.log('🆘 Emergency: operaton_ajax not found, creating fallback');
-
-                        window.operaton_ajax = {
-                            url: '<?php echo rest_url('operaton-dmn/v1/evaluate'); ?>',
-                            nonce: '<?php echo wp_create_nonce('wp_rest'); ?>',
-                            debug: <?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>,
-                            strings: {
-                                evaluating: <?php echo json_encode(__('Evaluating...', 'operaton-dmn')); ?>,
-                                error: <?php echo json_encode(__('Evaluation failed', 'operaton-dmn')); ?>,
-                                success: <?php echo json_encode(__('Evaluation completed', 'operaton-dmn')); ?>,
-                                loading: <?php echo json_encode(__('Loading...', 'operaton-dmn')); ?>,
-                                no_config: <?php echo json_encode(__('Configuration not found', 'operaton-dmn')); ?>,
-                                validation_failed: <?php echo json_encode(__('Please fill in all required fields', 'operaton-dmn')); ?>,
-                                connection_error: <?php echo json_encode(__('Connection error. Please try again.', 'operaton-dmn')); ?>
-                            },
-                            emergency_mode: true
-                        };
-
-                        console.log('🆘 Emergency operaton_ajax created:', window.operaton_ajax);
-
-                        // Trigger custom event to notify scripts
-                        if (typeof jQuery !== 'undefined') {
-                            jQuery(document).trigger('operaton_ajax_emergency_loaded');
-                        }
-                    }
-                }, 1000);
-            })();
-        </script>
-<?php
+        // This function is now empty - all jQuery handling moved to assets manager
+        return;
     }
 
     // =============================================================================
