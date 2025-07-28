@@ -1,226 +1,230 @@
 /**
  * Radio Synchronization CSS for Operaton DMN Plugin
- * 
+ *
  * Styles for radio button synchronization indicators and debug features
- * 
+ *
  * @package OperatonDMN
  * @since 1.0.0
  */
 
 /* Radio button synchronization indicator */
 .operaton-radio-sync-indicator {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: #28a745;
-    margin-left: 5px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    position: relative;
-    top: -1px;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #28a745;
+  margin-left: 5px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  position: relative;
+  top: -1px;
 }
 
 /* Show indicator when radio is synced */
 .operaton-radio-synced .operaton-radio-sync-indicator {
-    opacity: 1;
+  opacity: 1;
 }
 
 /* Sync error indicator */
 .operaton-radio-sync-error .operaton-radio-sync-indicator {
-    background-color: #dc3545;
-    opacity: 1;
+  background-color: #dc3545;
+  opacity: 1;
 }
 
 /* Radio button container enhancements for sync */
 .operaton-radio-container {
-    position: relative;
+  position: relative;
 }
 
-.operaton-radio-container input[type="radio"] {
-    margin-right: 8px;
+.operaton-radio-container input[type='radio'] {
+  margin-right: 8px;
 }
 
 .operaton-radio-container label {
-    cursor: pointer;
-    user-select: none;
-    position: relative;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
 }
 
 /* Debug mode styles */
 .operaton-debug-mode .gf-table-row {
-    border-left: 3px solid #007cba;
-    position: relative;
+  border-left: 3px solid #007cba;
+  position: relative;
 }
 
 .operaton-debug-mode .gf-table-row::before {
-    content: "🔄";
-    position: absolute;
-    left: -15px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 12px;
-    opacity: 0.7;
+  content: '🔄';
+  position: absolute;
+  left: -15px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  opacity: 0.7;
 }
 
-.operaton-debug-mode .gf-table-row input[type="radio"]:checked + label {
-    font-weight: bold;
-    color: #007cba;
-    position: relative;
+.operaton-debug-mode .gf-table-row input[type='radio']:checked + label {
+  font-weight: bold;
+  color: #007cba;
+  position: relative;
 }
 
-.operaton-debug-mode .gf-table-row input[type="radio"]:checked + label::after {
-    content: " ✓";
-    color: #28a745;
-    font-weight: bold;
+.operaton-debug-mode .gf-table-row input[type='radio']:checked + label::after {
+  content: ' ✓';
+  color: #28a745;
+  font-weight: bold;
 }
 
 /* Hidden field debug indicator */
-.operaton-debug-mode input[type="hidden"][id*="input_8_"] {
-    display: block !important;
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    width: 200px;
-    height: auto;
-    background: rgba(0, 123, 186, 0.1);
-    border: 1px solid #007cba;
-    color: #007cba;
-    font-size: 11px;
-    padding: 2px 5px;
-    z-index: 9999;
+.operaton-debug-mode input[type='hidden'][id*='input_8_'] {
+  display: block !important;
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  width: 200px;
+  height: auto;
+  background: rgba(0, 123, 186, 0.1);
+  border: 1px solid #007cba;
+  color: #007cba;
+  font-size: 11px;
+  padding: 2px 5px;
+  z-index: 9999;
 }
 
 /* Sync status notifications */
 .operaton-sync-notification {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 10px 15px;
-    border-radius: 4px;
-    color: white;
-    font-weight: bold;
-    font-size: 12px;
-    z-index: 10000;
-    opacity: 0;
-    transform: translateX(100%);
-    transition: all 0.3s ease;
-    max-width: 250px;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 10px 15px;
+  border-radius: 4px;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+  z-index: 10000;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: all 0.3s ease;
+  max-width: 250px;
 }
 
 .operaton-sync-notification.show {
-    opacity: 1;
-    transform: translateX(0);
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .operaton-sync-notification.success {
-    background-color: #28a745;
+  background-color: #28a745;
 }
 
 .operaton-sync-notification.error {
-    background-color: #dc3545;
+  background-color: #dc3545;
 }
 
 .operaton-sync-notification.info {
-    background-color: #17a2b8;
+  background-color: #17a2b8;
 }
 
 /* Loading state for radio sync */
 .operaton-radio-loading {
-    position: relative;
+  position: relative;
 }
 
 .operaton-radio-loading::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 16px;
-    height: 16px;
-    margin: -8px 0 0 -8px;
-    border: 2px solid #f3f3f3;
-    border-top: 2px solid #007cba;
-    border-radius: 50%;
-    animation: operaton-spin 1s linear infinite;
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #007cba;
+  border-radius: 50%;
+  animation: operaton-spin 1s linear infinite;
 }
 
 @keyframes operaton-spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Enhanced table styling for radio sync */
 .gf-table-row.operaton-sync-enabled {
-    background: linear-gradient(90deg, transparent 0%, rgba(0, 123, 186, 0.05) 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(0, 123, 186, 0.05) 100%);
 }
 
 .gf-table-row.operaton-sync-enabled:hover {
-    background: linear-gradient(90deg, rgba(0, 123, 186, 0.05) 0%, rgba(0, 123, 186, 0.1) 100%);
+  background: linear-gradient(90deg, rgba(0, 123, 186, 0.05) 0%, rgba(0, 123, 186, 0.1) 100%);
 }
 
 /* Radio button focus enhancements */
-.gf-table-row input[type="radio"]:focus {
-    outline: 2px solid #007cba;
-    outline-offset: 2px;
+.gf-table-row input[type='radio']:focus {
+  outline: 2px solid #007cba;
+  outline-offset: 2px;
 }
 
-.gf-table-row input[type="radio"]:focus + label {
-    color: #007cba;
-    font-weight: 500;
+.gf-table-row input[type='radio']:focus + label {
+  color: #007cba;
+  font-weight: 500;
 }
 
 /* Accessibility improvements */
 .operaton-radio-sync-indicator[aria-label] {
-    cursor: help;
+  cursor: help;
 }
 
-.operaton-radio-container[data-sync-status="synced"] {
-    border-left: 2px solid #28a745;
-    padding-left: 8px;
-    margin-left: -10px;
+.operaton-radio-container[data-sync-status='synced'] {
+  border-left: 2px solid #28a745;
+  padding-left: 8px;
+  margin-left: -10px;
 }
 
-.operaton-radio-container[data-sync-status="error"] {
-    border-left: 2px solid #dc3545;
-    padding-left: 8px;
-    margin-left: -10px;
+.operaton-radio-container[data-sync-status='error'] {
+  border-left: 2px solid #dc3545;
+  padding-left: 8px;
+  margin-left: -10px;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    .operaton-sync-notification {
-        position: relative;
-        top: auto;
-        right: auto;
-        margin: 10px 0;
-        transform: none;
-        opacity: 1;
-    }
-    
-    .operaton-radio-sync-indicator {
-        width: 6px;
-        height: 6px;
-    }
-    
-    .operaton-debug-mode .gf-table-row::before {
-        font-size: 10px;
-        left: -12px;
-    }
+  .operaton-sync-notification {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin: 10px 0;
+    transform: none;
+    opacity: 1;
+  }
+
+  .operaton-radio-sync-indicator {
+    width: 6px;
+    height: 6px;
+  }
+
+  .operaton-debug-mode .gf-table-row::before {
+    font-size: 10px;
+    left: -12px;
+  }
 }
 
 /* Print styles */
 @media print {
-    .operaton-radio-sync-indicator,
-    .operaton-sync-notification,
-    .operaton-radio-loading::after {
-        display: none !important;
-    }
-    
-    .operaton-debug-mode .gf-table-row {
-        border-left: none;
-    }
-    
-    .operaton-debug-mode .gf-table-row::before {
-        display: none;
-    }
+  .operaton-radio-sync-indicator,
+  .operaton-sync-notification,
+  .operaton-radio-loading::after {
+    display: none !important;
+  }
+
+  .operaton-debug-mode .gf-table-row {
+    border-left: none;
+  }
+
+  .operaton-debug-mode .gf-table-row::before {
+    display: none;
+  }
 }
