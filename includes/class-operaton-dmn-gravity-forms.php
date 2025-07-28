@@ -191,24 +191,37 @@ class Operaton_DMN_Gravity_Forms
      * @param array $form Gravity Forms form array
      * @since 1.0.0
      */
+    /**
+     * PHASE 1 FIX: Streamlined asset loading check
+     */
     public function ensure_assets_loaded($form)
     {
         if (!is_admin())
         {
-            // Check if this form has DMN configuration
+            // Only check if this form has DMN configuration
             $config = $this->get_form_config($form['id']);
             if ($config)
             {
                 if (defined('WP_DEBUG') && WP_DEBUG)
                 {
-                    error_log('Operaton DMN Gravity Forms: Ensuring assets for DMN form: ' . $form['id']);
+                    error_log('Operaton DMN Gravity Forms: Form ' . $form['id'] . ' has DMN config - checking centralized controller');
                 }
 
-                // Force load frontend assets
-                $this->assets->enqueue_frontend_assets();
+                // Use centralized detection instead of forcing
+                if (Operaton_DMN_Assets::should_load_frontend_assets())
+                {
+                    $this->assets->enqueue_frontend_assets();
 
-                // Load form-specific configuration
-                $this->enqueue_gravity_scripts($form, false);
+                    // Load form-specific configuration
+                    $this->enqueue_gravity_scripts($form, false);
+                }
+                else
+                {
+                    if (defined('WP_DEBUG') && WP_DEBUG)
+                    {
+                        error_log('Operaton DMN Gravity Forms: Centralized controller determined assets not needed for form ' . $form['id']);
+                    }
+                }
             }
         }
 
@@ -270,6 +283,9 @@ class Operaton_DMN_Gravity_Forms
      *
      * @since 1.0.0
      */
+    /**
+     * PHASE 1 FIX: Updated detection method
+     */
     public function maybe_enqueue_gravity_forms_assets()
     {
         if (is_admin() || !$this->check_gravity_forms_availability())
@@ -279,25 +295,23 @@ class Operaton_DMN_Gravity_Forms
 
         if (defined('WP_DEBUG') && WP_DEBUG)
         {
-            error_log('Operaton DMN Gravity Forms: Checking if assets should be loaded');
+            error_log('Operaton DMN Gravity Forms: Checking if assets should be loaded via centralized controller');
         }
 
-        // Check if we're on a page with DMN-enabled Gravity Forms
-        if ($this->has_dmn_enabled_forms_on_page())
+        // Use centralized detection
+        if (Operaton_DMN_Assets::should_load_frontend_assets() && $this->has_dmn_enabled_forms_on_page())
         {
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
-                error_log('Operaton DMN Gravity Forms: DMN-enabled forms detected, loading assets');
+                error_log('Operaton DMN Gravity Forms: Centralized controller approved asset loading for DMN forms');
             }
 
-            // Force load frontend assets
+            // Load assets through centralized controller
             $this->assets->enqueue_frontend_assets();
-
-            // Load Gravity Forms specific scripts
             $this->enqueue_gravity_forms_scripts();
         }
     }
-
+    
     /**
      * Add these methods to your class-operaton-dmn-gravity-forms.php file
      * Radio Button Synchronization Integration

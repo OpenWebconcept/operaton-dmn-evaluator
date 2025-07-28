@@ -713,6 +713,9 @@ class OperatonDMNEvaluator
      * ENHANCED: Ensure frontend assets are loaded when Gravity Forms renders
      * This fixes the operaton_ajax not being available issue
      */
+    /**
+     * PHASE 1 FIX: Updated method to use centralized detection
+     */
     public function force_frontend_assets_on_gravity_forms()
     {
         // Skip in admin
@@ -723,85 +726,40 @@ class OperatonDMNEvaluator
 
         if (defined('WP_DEBUG') && WP_DEBUG)
         {
-            error_log('🚀 OPERATON DMN: force_frontend_assets_on_gravity_forms called!');
-            error_log('🚀 OPERATON DMN: GFForms available = ' . (class_exists('GFForms') ? 'TRUE' : 'FALSE'));
+            error_log('🚀 OPERATON DMN: force_frontend_assets_on_gravity_forms called - using centralized controller');
         }
 
-        // Check multiple conditions for when to force load assets
-        $should_load = false;
-
-        // Condition 1: Gravity Forms is available
-        if (class_exists('GFForms'))
+        // Use centralized detection instead of duplicate logic
+        if (Operaton_DMN_Assets::should_load_frontend_assets())
         {
-            $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG)
+            if (isset($this->assets))
             {
-                error_log('🚀 OPERATON DMN: GFForms class exists - will load assets');
-            }
-        }
-
-        // Condition 2: Current page has Gravity Forms content
-        global $post;
-        if ($post)
-        {
-            if (
-                has_shortcode($post->post_content, 'gravityform') ||
-                has_block('gravityforms/form', $post)
-            )
-            {
-                $should_load = true;
                 if (defined('WP_DEBUG') && WP_DEBUG)
                 {
-                    error_log('🚀 OPERATON DMN: GF shortcode/block detected - will load assets');
+                    error_log('🚀 OPERATON DMN: Centralized controller approved asset loading');
                 }
-            }
-        }
 
-        // Condition 3: GF preview page
-        if (isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview')
-        {
-            $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('🚀 OPERATON DMN: GF preview page - will load assets');
-            }
-        }
+                // Use high priority to ensure early loading
+                add_action('wp_enqueue_scripts', function ()
+                {
+                    $this->assets->enqueue_frontend_assets();
+                }, 5);
 
-        if ($should_load && isset($this->assets))
-        {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('🚀 OPERATON DMN: Loading frontend assets...');
-            }
-
-            // CRITICAL: Ensure assets are loaded with high priority
-            add_action('wp_enqueue_scripts', function ()
-            {
-                $this->assets->enqueue_frontend_assets();
-            }, 5); // High priority
-
-            // ALSO: Load immediately if we're past wp_enqueue_scripts
-            if (did_action('wp_enqueue_scripts'))
-            {
-                $this->assets->enqueue_frontend_assets();
-            }
-
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('🚀 OPERATON DMN: Frontend assets loading initiated');
+                // Also load immediately if we're past wp_enqueue_scripts
+                if (did_action('wp_enqueue_scripts'))
+                {
+                    $this->assets->enqueue_frontend_assets();
+                }
             }
         }
         else
         {
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
-                error_log('🚀 OPERATON DMN: Conditions not met for asset loading');
-                error_log('  - Should load: ' . ($should_load ? 'YES' : 'NO'));
-                error_log('  - Assets manager: ' . (isset($this->assets) ? 'AVAILABLE' : 'NOT AVAILABLE'));
+                error_log('🚀 OPERATON DMN: Centralized controller determined assets not needed');
             }
         }
     }
-
     /**
      * Emergency fallback for operaton_ajax availability
      * Ensures operaton_ajax is always available even if normal loading fails
@@ -1116,6 +1074,41 @@ function debug_operaton_assets_loading()
     }
 }
 
+/**
+ * PHASE 1 FIX: Global debug function for asset loading status
+ */
+function operaton_dmn_debug_asset_loading()
+{
+    if (!defined('WP_DEBUG') || !WP_DEBUG)
+    {
+        return;
+    }
+
+    $status = Operaton_DMN_Assets::get_coordinator_status();
+
+    error_log('=== OPERATON DMN ASSET LOADING DEBUG ===');
+    error_log('Coordinator Status: ' . wp_json_encode($status['coordinator_state']));
+    error_log('Global State: ' . wp_json_encode($status['global_state']));
+    error_log('WordPress States: ' . wp_json_encode($status['wordpress_states']));
+    error_log('=========================================');
+}
+
+/**
+ * PHASE 1 FIX: Admin function to reset asset loading state (for testing)
+ */
+function operaton_dmn_reset_asset_loading()
+{
+    if (is_admin() && current_user_can('manage_options'))
+    {
+        Operaton_DMN_Assets::reset_loading_coordinator();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN: Asset loading coordinator manually reset');
+        }
+    }
+}
+
 function debug_operaton_assets_loading_late()
 {
     if (defined('WP_DEBUG') && WP_DEBUG)
@@ -1147,6 +1140,27 @@ function debug_operaton_assets_loading_late()
         error_log('====================================');
     }
 }
+
+/**
+ * Hook the debug function to WordPress shutdown for final status
+ */
+add_action('shutdown', 'operaton_dmn_debug_asset_loading', 999);
+
+// Add admin action to reset coordinator state
+add_action('wp_ajax_operaton_reset_coordinator', function ()
+{
+    if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'operaton_admin_nonce'))
+    {
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    }
+
+    Operaton_DMN_Assets::reset_loading_coordinator();
+
+    wp_send_json_success(array(
+        'message' => 'Asset loading coordinator reset successfully',
+        'status' => Operaton_DMN_Assets::get_coordinator_status()
+    ));
+});
 
 // Hook the debug functions AFTER the class is defined
 add_action('wp_enqueue_scripts', 'debug_operaton_assets_loading', 1);

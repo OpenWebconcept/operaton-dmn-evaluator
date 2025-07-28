@@ -75,6 +75,116 @@ class Operaton_DMN_Assets
     }
 
     /**
+     * PHASE 1 FIX: Centralized loading coordinator
+     * This replaces the fragmented loading logic with a single source of truth
+     */
+    private static $loading_coordinator = array(
+        'detection_complete' => false,
+        'should_load_assets' => false,
+        'loading_in_progress' => false,
+        'detection_reasons' => array(),
+        'detection_timestamp' => 0,
+        'form_detection_cache' => array()
+    );
+
+    /**
+     * PHASE 1 FIX: Single detection method that all other methods must use
+     * This eliminates redundant detection logic across multiple methods
+     */
+    public static function should_load_frontend_assets()
+    {
+        // Return cached result if detection already complete
+        if (self::$loading_coordinator['detection_complete'])
+        {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN Assets: Using cached detection result: ' .
+                    (self::$loading_coordinator['should_load_assets'] ? 'LOAD' : 'SKIP') .
+                    ' (reasons: ' . implode(', ', self::$loading_coordinator['detection_reasons']) . ')');
+            }
+            return self::$loading_coordinator['should_load_assets'];
+        }
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('🔍 Operaton DMN Assets: Running centralized asset detection');
+        }
+
+        $should_load = false;
+        $reasons = array();
+
+        // DETECTION METHOD 1: Class existence (most reliable)
+        if (class_exists('GFForms'))
+        {
+            $should_load = true;
+            $reasons[] = 'GFForms class available';
+        }
+
+        // DETECTION METHOD 2: Admin context with GF pages
+        if (!$should_load && is_admin())
+        {
+            $screen = get_current_screen();
+            if ($screen && strpos($screen->id, 'toplevel_page_gf_') === 0)
+            {
+                $should_load = true;
+                $reasons[] = 'GF admin page detected';
+            }
+        }
+
+        // DETECTION METHOD 3: Post content analysis (only if not already determined)
+        if (!$should_load && !is_admin())
+        {
+            global $post;
+            if ($post)
+            {
+                if (has_shortcode($post->post_content, 'gravityform'))
+                {
+                    $should_load = true;
+                    $reasons[] = 'gravityform shortcode found';
+                }
+                elseif (has_block('gravityforms/form', $post))
+                {
+                    $should_load = true;
+                    $reasons[] = 'gravityforms block found';
+                }
+            }
+        }
+
+        // DETECTION METHOD 4: URL-based detection (preview pages, etc.)
+        if (!$should_load && isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview')
+        {
+            $should_load = true;
+            $reasons[] = 'GF preview page';
+        }
+
+        // DETECTION METHOD 5: Template-based detection
+        if (!$should_load && !is_admin())
+        {
+            $template = get_page_template_slug();
+            if (strpos($template, 'gravity') !== false || strpos($template, 'form') !== false)
+            {
+                $should_load = true;
+                $reasons[] = 'form template detected';
+            }
+        }
+
+        // Cache the results
+        self::$loading_coordinator['detection_complete'] = true;
+        self::$loading_coordinator['should_load_assets'] = $should_load;
+        self::$loading_coordinator['detection_reasons'] = $reasons;
+        self::$loading_coordinator['detection_timestamp'] = time();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            $result_text = $should_load ? '✅ LOAD ASSETS' : '❌ SKIP ASSETS';
+            $reasons_text = empty($reasons) ? 'no triggers found' : implode(', ', $reasons);
+            error_log("🔍 Operaton DMN Assets: Detection complete - {$result_text} ({$reasons_text})");
+        }
+
+        return $should_load;
+    }
+
+    /**
      * FIXED: Enhanced initialization hooks with better timing
      */
     private function init_hooks()
@@ -508,7 +618,7 @@ class Operaton_DMN_Assets
     }
 
     /**
-     * FIXED: Enhanced frontend asset detection and loading
+     * Updated detection method that uses centralized logic
      */
     public function maybe_enqueue_frontend_assets()
     {
@@ -519,88 +629,85 @@ class Operaton_DMN_Assets
 
         if (defined('WP_DEBUG') && WP_DEBUG)
         {
-            error_log('🔥 OPERATON DMN: maybe_enqueue_frontend_assets called!');
+            error_log('🔍 Operaton DMN Assets: maybe_enqueue_frontend_assets called - checking centralized controller');
         }
 
-        // Multiple detection methods
-        $should_load = false;
-        $detection_reason = '';
-
-        // Method 1: Class exists check
-        if (class_exists('GFForms'))
+        // Use centralized detection
+        if (self::should_load_frontend_assets())
         {
-            $should_load = true;
-            $detection_reason = 'GFForms class exists';
-        }
-
-        // Method 2: Post content check
-        if (!$should_load)
-        {
-            global $post;
-            if ($post)
-            {
-                if (has_shortcode($post->post_content, 'gravityform'))
-                {
-                    $should_load = true;
-                    $detection_reason = 'gravityform shortcode found';
-                }
-                elseif (has_block('gravityforms/form', $post))
-                {
-                    $should_load = true;
-                    $detection_reason = 'gravityforms block found';
-                }
-            }
-        }
-
-        // Method 3: Preview page check
-        if (!$should_load && isset($_GET['gf_page']) && $_GET['gf_page'] === 'preview')
-        {
-            $should_load = true;
-            $detection_reason = 'GF preview page';
-        }
-
-        // Method 4: DMN-enabled forms check
-        if (!$should_load && $this->has_dmn_enabled_forms_on_page())
-        {
-            $should_load = true;
-            $detection_reason = 'DMN-enabled forms detected';
-        }
-
-        if ($should_load)
-        {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('🔥 OPERATON DMN: Loading assets - Reason: ' . $detection_reason);
-            }
-
             $this->enqueue_frontend_assets();
         }
         else
         {
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
-                error_log('🔥 OPERATON DMN: No Gravity Forms detected, not loading assets');
+                error_log('🔍 Operaton DMN Assets: Centralized controller determined assets not needed');
             }
         }
     }
 
     /**
-     * FIXED: Force enqueue frontend assets
+     * Forced loading now uses centralized control
+     */
+
+    /**
+     * Atomic asset loading with comprehensive duplicate prevention
+     * This replaces the existing method with centralized control
      */
     public function force_enqueue_frontend_assets()
     {
         if (defined('WP_DEBUG') && WP_DEBUG)
         {
-            error_log('🔥 OPERATON DMN: force_enqueue_frontend_assets called!');
+            error_log('🔍 Operaton DMN Assets: force_enqueue_frontend_assets called');
         }
 
+        // Even forced loading should check for duplicates
         $this->enqueue_frontend_assets();
     }
 
     /**
-     * FIXED: Enhanced frontend asset enqueuing with compatibility check
-     * Enhanced frontend asset enqueuing with performance tracking
+     * PHASE 1 FIX: Reset method for testing and clearing state
      */
+    public static function reset_loading_coordinator()
+    {
+        self::$loading_coordinator = array(
+            'detection_complete' => false,
+            'should_load_assets' => false,
+            'loading_in_progress' => false,
+            'detection_reasons' => array(),
+            'detection_timestamp' => 0,
+            'form_detection_cache' => array()
+        );
+
+        self::$global_loading_state = array(
+            'frontend_loaded' => false,
+            'admin_loaded' => false,
+            'gravity_loaded' => false
+        );
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN Assets: 🔄 Loading coordinator reset');
+        }
+    }
+
+    /**
+     * PHASE 1 FIX: Get coordinator status for debugging
+     */
+    public static function get_coordinator_status()
+    {
+        return array(
+            'coordinator_state' => self::$loading_coordinator,
+            'global_state' => self::$global_loading_state,
+            'wordpress_states' => array(
+                'frontend_registered' => wp_script_is('operaton-dmn-frontend', 'registered'),
+                'frontend_enqueued' => wp_script_is('operaton-dmn-frontend', 'enqueued'),
+                'frontend_done' => wp_script_is('operaton-dmn-frontend', 'done'),
+                'jquery_enqueued' => wp_script_is('jquery', 'enqueued')
+            )
+        );
+    }
+
     public function enqueue_frontend_assets()
     {
         $timer_id = null;
@@ -609,12 +716,12 @@ class Operaton_DMN_Assets
             $timer_id = $this->performance->start_timer('frontend_assets_enqueue');
         }
 
-        // Check global state first
+        // CRITICAL FIX: Atomic loading check with multiple safety layers
         if (self::$global_loading_state['frontend_loaded'])
         {
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
-                error_log('Operaton DMN Assets: Frontend assets already loaded globally, skipping');
+                error_log('Operaton DMN Assets: ⏭️ SKIPPED - Already loaded globally');
             }
             if ($this->performance && $timer_id)
             {
@@ -623,12 +730,24 @@ class Operaton_DMN_Assets
             return;
         }
 
-        // Prevent duplicate loading during same request
+        if (self::$loading_coordinator['loading_in_progress'])
+        {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN Assets: ⏭️ SKIPPED - Loading already in progress');
+            }
+            if ($this->performance && $timer_id)
+            {
+                $this->performance->stop_timer($timer_id, 'Skipped - loading in progress');
+            }
+            return;
+        }
+
         if (isset($this->loaded_assets['frontend']))
         {
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
-                error_log('Operaton DMN Assets: Frontend assets already loaded locally, skipping');
+                error_log('Operaton DMN Assets: ⏭️ SKIPPED - Already loaded locally');
             }
             if ($this->performance && $timer_id)
             {
@@ -637,112 +756,126 @@ class Operaton_DMN_Assets
             return;
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Assets: ⭐ LOADING frontend assets (with performance tracking)');
-        }
-
-        // Track jQuery loading
-        if ($this->performance)
-        {
-            $this->performance->mark('jquery_check_start', 'Checking jQuery availability');
-        }
-
-        // CRITICAL FIX: Ensure jQuery is loaded FIRST
-        if (!wp_script_is('jquery', 'done') && !wp_script_is('jquery', 'enqueued'))
-        {
-            wp_enqueue_script('jquery');
-        }
-
-        if ($this->performance)
-        {
-            $this->performance->mark('jquery_check_complete', 'jQuery check completed');
-        }
-
-        // Track script registration
-        if ($this->performance)
-        {
-            $this->performance->mark('script_registration_start', 'Starting script registration');
-        }
-
-        // Force registration if not already registered
-        if (!wp_script_is('operaton-dmn-frontend', 'registered'))
-        {
-            wp_register_script(
-                'operaton-dmn-frontend',
-                $this->plugin_url . 'assets/js/frontend.js',
-                array('jquery'),
-                $this->version,
-                true
-            );
-        }
-
-        if ($this->performance)
-        {
-            $this->performance->mark('script_registration_complete', 'Script registration completed');
-        }
-
-        // Enqueue CSS and JS
-        wp_enqueue_style('operaton-dmn-frontend');
-        wp_enqueue_script('operaton-dmn-frontend');
-
-        // Track localization
-        if ($this->performance)
-        {
-            $this->performance->mark('localization_start', 'Starting script localization');
-        }
-
-        // FIXED: Clean and simplified localization with consistent button text strings
-        if (!wp_script_is('operaton-dmn-frontend', 'localized'))
-        {
-            $localization_data = array(
-                'url' => rest_url('operaton-dmn/v1/evaluate'),
-                'nonce' => wp_create_nonce('wp_rest'),
-                'debug' => defined('WP_DEBUG') && WP_DEBUG ? '1' : '0',
-                'strings' => array(
-                    'evaluating' => __('Evaluating...', 'operaton-dmn'),
-                    'error' => __('Evaluation failed', 'operaton-dmn'),
-                    'success' => __('Evaluation completed', 'operaton-dmn'),
-                    'loading' => __('Loading...', 'operaton-dmn'),
-                    'no_config' => __('Configuration not found', 'operaton-dmn'),
-                    'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
-                    'connection_error' => __('Connection error. Please try again.', 'operaton-dmn'),
-
-                    // FIXED: Simplified button text management - single source of truth
-                    'button_text_default' => __('Evaluate', 'operaton-dmn'),
-                    'button_text_evaluating' => __('Evaluating...', 'operaton-dmn'),
-                    'button_text_error' => __('Try again', 'operaton-dmn')
-                ),
-                'compatibility' => array(
-                    'quirks_mode_check' => true,
-                    'jquery_version_required' => '3.0'
-                ),
-                'performance' => array(
-                    'load_time' => $this->performance ? round(($this->performance->get_summary()['total_time_ms']), 2) : 0,
-                    'timestamp' => time()
-                )
-            );
-
-            wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
-        }
-
-        if ($this->performance)
-        {
-            $this->performance->mark('localization_complete', 'Script localization completed');
-        }
-
-        // Update both local and global state
-        $this->loaded_assets['frontend'] = true;
-        self::$global_loading_state['frontend_loaded'] = true;
-
-        if ($this->performance && $timer_id)
-        {
-            $this->performance->stop_timer($timer_id, 'Frontend assets loaded successfully');
-        }
+        // Set loading flag immediately to prevent race conditions
+        self::$loading_coordinator['loading_in_progress'] = true;
 
         if (defined('WP_DEBUG') && WP_DEBUG)
         {
-            error_log('Operaton DMN Assets: ✅ Frontend assets loaded successfully');
+            error_log('Operaton DMN Assets: 🚀 LOADING frontend assets (centralized control)');
+        }
+
+        try
+        {
+            // Ensure jQuery is loaded first
+            if ($this->performance)
+            {
+                $this->performance->mark('jquery_check_start', 'Checking jQuery availability');
+            }
+
+            if (!wp_script_is('jquery', 'done') && !wp_script_is('jquery', 'enqueued'))
+            {
+                wp_enqueue_script('jquery');
+            }
+
+            if ($this->performance)
+            {
+                $this->performance->mark('jquery_check_complete', 'jQuery check completed');
+            }
+
+            // Register scripts if not already registered
+            if ($this->performance)
+            {
+                $this->performance->mark('script_registration_start', 'Starting script registration');
+            }
+
+            if (!wp_script_is('operaton-dmn-frontend', 'registered'))
+            {
+                wp_register_script(
+                    'operaton-dmn-frontend',
+                    $this->plugin_url . 'assets/js/frontend.js',
+                    array('jquery'),
+                    $this->version,
+                    true
+                );
+            }
+
+            if ($this->performance)
+            {
+                $this->performance->mark('script_registration_complete', 'Script registration completed');
+            }
+
+            // Enqueue assets
+            wp_enqueue_style('operaton-dmn-frontend');
+            wp_enqueue_script('operaton-dmn-frontend');
+
+            // Localization (only if not already done)
+            if ($this->performance)
+            {
+                $this->performance->mark('localization_start', 'Starting script localization');
+            }
+
+            if (!wp_script_is('operaton-dmn-frontend', 'localized'))
+            {
+                $localization_data = array(
+                    'url' => rest_url('operaton-dmn/v1/evaluate'),
+                    'nonce' => wp_create_nonce('wp_rest'),
+                    'debug' => defined('WP_DEBUG') && WP_DEBUG ? '1' : '0',
+                    'strings' => array(
+                        'evaluating' => __('Evaluating...', 'operaton-dmn'),
+                        'error' => __('Evaluation failed', 'operaton-dmn'),
+                        'success' => __('Evaluation completed', 'operaton-dmn'),
+                        'loading' => __('Loading...', 'operaton-dmn'),
+                        'no_config' => __('Configuration not found', 'operaton-dmn'),
+                        'validation_failed' => __('Please fill in all required fields', 'operaton-dmn'),
+                        'connection_error' => __('Connection error. Please try again.', 'operaton-dmn'),
+                        'button_text_default' => __('Evaluate', 'operaton-dmn'),
+                        'button_text_evaluating' => __('Evaluating...', 'operaton-dmn'),
+                        'button_text_error' => __('Try again', 'operaton-dmn')
+                    ),
+                    'compatibility' => array(
+                        'quirks_mode_check' => true,
+                        'jquery_version_required' => '3.0'
+                    ),
+                    'performance' => array(
+                        'load_time' => $this->performance ? round(($this->performance->get_summary()['total_time_ms']), 2) : 0,
+                        'timestamp' => time()
+                    ),
+                    'loading_source' => 'centralized_controller'
+                );
+
+                wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
+            }
+
+            if ($this->performance)
+            {
+                $this->performance->mark('localization_complete', 'Script localization completed');
+            }
+
+            // Update all state flags atomically
+            $this->loaded_assets['frontend'] = true;
+            self::$global_loading_state['frontend_loaded'] = true;
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN Assets: ✅ Frontend assets loaded successfully via centralized controller');
+            }
+        }
+        catch (Exception $e)
+        {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN Assets: ❌ Error during asset loading: ' . $e->getMessage());
+            }
+        }
+        finally
+        {
+            // Always clear the loading flag
+            self::$loading_coordinator['loading_in_progress'] = false;
+
+            if ($this->performance && $timer_id)
+            {
+                $this->performance->stop_timer($timer_id, 'Frontend assets loading completed');
+            }
         }
     }
 
@@ -1219,7 +1352,7 @@ class Operaton_DMN_Assets
             error_log('Operaton DMN Assets: IMPORTANT - Button state management handled by frontend.js button manager');
         }
     }
-    
+
     /**
      * Enqueue decision flow CSS and JavaScript
      */
