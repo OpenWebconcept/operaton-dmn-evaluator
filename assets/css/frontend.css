@@ -367,6 +367,10 @@
   display: none !important;
 }
 
+.operaton-evaluate-btn, .decision-flow-summary {
+    transition: opacity 0.2s ease;
+}
+
 /* Only show the button when explicitly made visible by JavaScript */
 .operaton-evaluate-btn.operaton-show-button {
   display: inline-block !important;

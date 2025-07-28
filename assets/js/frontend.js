@@ -630,11 +630,18 @@ window.operatonInitialized = window.operatonInitialized || {
 
     /**
      * Enhanced button placement management with strict page detection
+     * Prevents excessive page detection calls by using caching and debouncing
      */
     function enhanceButtonPlacement() {
       'use strict';
 
       console.log('🎯 Starting enhanced button placement');
+
+      // Page detection cache and throttling
+      const pageDetectionCache = new Map();
+      const PAGE_CACHE_DURATION = 2000; // Cache page results for 2 seconds
+      let lastPageDetection = 0;
+      let cachedPageResult = null;
 
       // Find all Operaton evaluate buttons
       $('.operaton-evaluate-btn').each(function () {
@@ -660,39 +667,76 @@ window.operatonInitialized = window.operatonInitialized || {
 
         console.log('🎯 Enhanced button placement for form', formId, '- Target page:', targetPage);
 
-        // Enhanced page detection
-        function getAccuratePage() {
+        // FIXED: Efficient page detection with caching
+        function getAccuratePageCached(forceRefresh = false) {
+          const now = Date.now();
+          const cacheKey = `form_${formId}_page`;
+
+          // Use cached result if recent and not forcing refresh
+          if (!forceRefresh && cachedPageResult !== null && now - lastPageDetection < PAGE_CACHE_DURATION) {
+            return cachedPageResult;
+          }
+
+          // Check cache map for this specific form
+          const cached = pageDetectionCache.get(cacheKey);
+          if (!forceRefresh && cached && now - cached.timestamp < PAGE_CACHE_DURATION) {
+            cachedPageResult = cached.page;
+            return cached.page;
+          }
+
           var $form = $('#gform_' + formId);
 
           // Method 1: URL parameter (most reliable)
           var urlParams = new URLSearchParams(window.location.search);
           var gfPage = urlParams.get('gf_page');
           if (gfPage) {
-            console.log('Page from URL:', gfPage);
-            return parseInt(gfPage);
+            const page = parseInt(gfPage);
+            pageDetectionCache.set(cacheKey, { page, timestamp: now });
+            cachedPageResult = page;
+            lastPageDetection = now;
+            return page;
           }
 
           // Method 2: Gravity Forms hidden field
           var $pageField = $form.find('input[name="gform_source_page_number_' + formId + '"]');
           if ($pageField.length && $pageField.val()) {
-            console.log('Page from hidden field:', $pageField.val());
-            return parseInt($pageField.val());
+            const page = parseInt($pageField.val());
+            pageDetectionCache.set(cacheKey, { page, timestamp: now });
+            cachedPageResult = page;
+            lastPageDetection = now;
+            return page;
           }
 
           // Method 3: Check for decision flow summary visibility
           var $summaryContainer = $('#decision-flow-summary-' + formId);
           if ($summaryContainer.length && $summaryContainer.hasClass('operaton-show-summary')) {
-            console.log('Summary visible - assuming final page');
-            return targetPage + 1; // This is the summary page
+            const page = targetPage + 1; // This is the summary page
+            pageDetectionCache.set(cacheKey, { page, timestamp: now });
+            cachedPageResult = page;
+            lastPageDetection = now;
+            return page;
           }
 
-          console.log('Defaulting to page 1');
-          return 1; // Default to page 1
+          // Default to page 1
+          const page = 1;
+          pageDetectionCache.set(cacheKey, { page, timestamp: now });
+          cachedPageResult = page;
+          lastPageDetection = now;
+          return page;
         }
 
-        // Strict button management
+        // FIXED: Debounced button management
+        let buttonManagementTimeout;
+        function debouncedButtonManagement(delay = 100) {
+          clearTimeout(buttonManagementTimeout);
+          buttonManagementTimeout = setTimeout(() => {
+            manageButtonVisibility();
+          }, delay);
+        }
+
+        // FIXED: Efficient button management
         function manageButtonVisibility() {
-          var currentPage = getAccuratePage();
+          var currentPage = getAccuratePageCached();
 
           console.log('📍 Form', formId, '- Current page:', currentPage, 'Target:', targetPage);
 
@@ -711,53 +755,121 @@ window.operatonInitialized = window.operatonInitialized || {
           }
         }
 
-        // Initial setup
-        setTimeout(function () {
-          manageButtonVisibility();
-        }, 100);
+        // FIXED: Single-use initialization with better timing
+        let initialized = false;
+        function initializeOnce() {
+          if (initialized) return;
+          initialized = true;
 
-        // Monitor for changes
-        var lastPage = getAccuratePage();
-        setInterval(function () {
-          var currentPage = getAccuratePage();
-          if (currentPage !== lastPage) {
-            console.log('🔄 Page changed from', lastPage, 'to', currentPage);
-            lastPage = currentPage;
-            manageButtonVisibility();
+          // Initial setup with delay
+          setTimeout(() => {
+            debouncedButtonManagement(100);
+          }, 300);
+        }
+
+        // FIXED: Efficient change monitoring
+        let lastUrl = window.location.href;
+        let lastPageValue = null;
+
+        // Monitor URL changes (throttled)
+        const urlCheckInterval = setInterval(() => {
+          const currentUrl = window.location.href;
+          if (currentUrl !== lastUrl) {
+            lastUrl = currentUrl;
+            console.log('🔄 URL changed, invalidating page cache');
+            pageDetectionCache.clear();
+            cachedPageResult = null;
+            debouncedButtonManagement(200);
           }
-        }, 1000);
+        }, 1000); // Check every second instead of 500ms
 
-        // Handle Gravity Forms events
-        $(document).on('gform_page_loaded', function (event, form_id, current_page) {
+        // Monitor hidden field changes (throttled)
+        const $form = $('#gform_' + formId);
+        const $pageField = $form.find('input[name="gform_source_page_number_' + formId + '"]');
+        if ($pageField.length) {
+          const pageFieldCheckInterval = setInterval(() => {
+            const currentValue = $pageField.val();
+            if (currentValue !== lastPageValue) {
+              lastPageValue = currentValue;
+              console.log('🔄 Page field changed to:', currentValue);
+              pageDetectionCache.clear();
+              cachedPageResult = null;
+              debouncedButtonManagement(200);
+            }
+          }, 1500); // Check every 1.5 seconds
+
+          // Clean up intervals when form is no longer present
+          setTimeout(() => {
+            if (!document.contains($form[0])) {
+              clearInterval(urlCheckInterval);
+              clearInterval(pageFieldCheckInterval);
+            }
+          }, 30000); // Clean up after 30 seconds if form is gone
+        }
+
+        // FIXED: Single Gravity Forms event handler per form
+        $(document).off(`gform_page_loaded.operaton_${formId}`);
+        $(document).on(`gform_page_loaded.operaton_${formId}`, function (event, form_id, current_page) {
           if (form_id == formId) {
-            console.log('📄 GF page loaded:', current_page);
-            setTimeout(manageButtonVisibility, 300);
+            console.log('📄 GF page loaded event - Form:', form_id, 'Page:', current_page);
+            pageDetectionCache.clear();
+            cachedPageResult = null;
+            debouncedButtonManagement(300);
           }
         });
+
+        // FIXED: One-time fallback check instead of continuous monitoring
+        setTimeout(() => {
+          const currentPage = getAccuratePageCached();
+          const $evaluateBtn = $('#operaton-evaluate-' + formId);
+
+          if (currentPage === targetPage && !$evaluateBtn.is(':visible')) {
+            console.log("🔧 One-time fallback: Button should be visible but isn't");
+            debouncedButtonManagement(100);
+          }
+        }, 2000); // Single check after 2 seconds
+
+        // Initialize
+        initializeOnce();
       });
+
+      // FIXED: Global cleanup function
+      window.operatonCleanupButtonPlacement = function () {
+        pageDetectionCache.clear();
+        cachedPageResult = null;
+        console.log('🧹 Cleaned up button placement cache');
+      };
     }
 
     // IMPORTANT: Make sure this runs AFTER the DOM is ready but BEFORE other scripts
+    // Add this to prevent duplicate initializations
+    let buttonPlacementInitialized = false;
+
+    // FIXED: Initialize only once with proper timing
     if (typeof jQuery !== 'undefined') {
       jQuery(document).ready(function ($) {
-        // Wait a bit for everything to load
-        setTimeout(function () {
-          console.log('🚀 Initializing enhanced button placement');
-          enhanceButtonPlacement();
-        }, 2000);
+        if (!buttonPlacementInitialized) {
+          setTimeout(function () {
+            console.log('🚀 Initializing enhanced button placement (once)');
+            enhanceButtonPlacement();
+            buttonPlacementInitialized = true;
+          }, 1000);
+        }
       });
 
-      // Also run when window loads (for edge cases)
+      // FIXED: Window load fallback (only if not already initialized)
       jQuery(window).on('load', function () {
         setTimeout(function () {
-          console.log('🔄 Window loaded - running enhanced button placement');
-          enhanceButtonPlacement();
-        }, 3000);
+          if (!buttonPlacementInitialized && $('.operaton-evaluate-btn').length > 0) {
+            console.log('🔄 Window load fallback - running button placement');
+            enhanceButtonPlacement();
+            buttonPlacementInitialized = true;
+          }
+        }, 1500);
       });
     } else {
       console.error('jQuery not available for enhanced button placement');
     }
-
     /**
      * FINAL FIX: Handle evaluate button click with self-contained button text management
      */
