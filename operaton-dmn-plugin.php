@@ -1014,12 +1014,34 @@ function operaton_dmn_debug_asset_loading()
         return;
     }
 
-    $status = Operaton_DMN_Assets::get_coordinator_status();
+    // FIXED: Add safety check for class existence
+    if (!class_exists('Operaton_DMN_Assets'))
+    {
+        error_log('Operaton DMN: Assets class not available for debug');
+        return;
+    }
+
+    // FIXED: Check if method exists before calling
+    if (method_exists('Operaton_DMN_Assets', 'get_coordinator_status'))
+    {
+        $status = Operaton_DMN_Assets::get_coordinator_status();
+    }
+    else
+    {
+        // Fallback for enhanced assets manager
+        if (method_exists('Operaton_DMN_Assets', 'get_enhanced_status'))
+        {
+            $status = Operaton_DMN_Assets::get_enhanced_status();
+        }
+        else
+        {
+            error_log('Operaton DMN: No debug status method available');
+            return;
+        }
+    }
 
     error_log('=== OPERATON DMN ASSET LOADING DEBUG ===');
-    error_log('Coordinator Status: ' . wp_json_encode($status['coordinator_state']));
-    error_log('Global State: ' . wp_json_encode($status['global_state']));
-    error_log('WordPress States: ' . wp_json_encode($status['wordpress_states']));
+    error_log('Status: ' . wp_json_encode($status));
     error_log('=========================================');
 }
 
@@ -1030,11 +1052,19 @@ function operaton_dmn_reset_asset_loading()
 {
     if (is_admin() && current_user_can('manage_options'))
     {
-        Operaton_DMN_Assets::reset_loading_coordinator();
+        // FIXED: Check if method exists
+        if (method_exists('Operaton_DMN_Assets', 'reset_loading_coordinator'))
+        {
+            Operaton_DMN_Assets::reset_loading_coordinator();
+        }
+        elseif (method_exists('Operaton_DMN_Assets', 'reset_all_loading_states'))
+        {
+            Operaton_DMN_Assets::reset_all_loading_states();
+        }
 
         if (defined('WP_DEBUG') && WP_DEBUG)
         {
-            error_log('Operaton DMN: Asset loading coordinator manually reset');
+            error_log('Operaton DMN: Asset loading state manually reset');
         }
     }
 }
