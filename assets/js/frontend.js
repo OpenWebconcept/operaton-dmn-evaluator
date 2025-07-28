@@ -211,6 +211,33 @@ window.operatonInitialized = window.operatonInitialized || {
       return;
     }
 
+    /**
+     * Enhanced button visibility management using CSS classes
+     */
+    window.showEvaluateButton = function (formId) {
+      var $button = $('#operaton-evaluate-' + formId);
+      var $summary = $('#decision-flow-summary-' + formId);
+      console.log('✅ Showing evaluate button for form', formId);
+      $button.addClass('operaton-show-button');
+      $summary.removeClass('operaton-show-summary');
+    };
+
+    window.showDecisionFlowSummary = function (formId) {
+      var $button = $('#operaton-evaluate-' + formId);
+      var $summary = $('#decision-flow-summary-' + formId);
+      console.log('📊 Showing decision flow summary for form', formId);
+      $button.removeClass('operaton-show-button');
+      $summary.addClass('operaton-show-summary');
+    };
+
+    window.hideAllElements = function (formId) {
+      var $button = $('#operaton-evaluate-' + formId);
+      var $summary = $('#decision-flow-summary-' + formId);
+      console.log('❌ Hiding all elements for form', formId);
+      $button.removeClass('operaton-show-button');
+      $summary.removeClass('operaton-show-summary');
+    };
+
     console.log('Enhanced Operaton DMN frontend script loaded with jQuery', $.fn.jquery);
 
     // =============================================================================
@@ -600,6 +627,136 @@ window.operatonInitialized = window.operatonInitialized || {
     // =============================================================================
     // FORM EVALUATION FUNCTIONS
     // =============================================================================
+
+    /**
+     * Enhanced button placement management with strict page detection
+     */
+    function enhanceButtonPlacement() {
+      'use strict';
+
+      console.log('🎯 Starting enhanced button placement');
+
+      // Find all Operaton evaluate buttons
+      $('.operaton-evaluate-btn').each(function () {
+        var $button = $(this);
+        var formId = $button.data('form-id');
+
+        if (!formId) {
+          console.warn('No form ID found for button');
+          return;
+        }
+
+        // Get form configuration from localized data
+        var configVar = 'operaton_config_' + formId;
+        if (typeof window[configVar] === 'undefined') {
+          console.warn('No configuration found for form:', formId);
+          return;
+        }
+
+        var config = window[configVar];
+        var targetPage = parseInt(config.evaluation_step) || 2;
+        var showDecisionFlow = config.show_decision_flow || false;
+        var useProcess = config.use_process || false;
+
+        console.log('🎯 Enhanced button placement for form', formId, '- Target page:', targetPage);
+
+        // Enhanced page detection
+        function getAccuratePage() {
+          var $form = $('#gform_' + formId);
+
+          // Method 1: URL parameter (most reliable)
+          var urlParams = new URLSearchParams(window.location.search);
+          var gfPage = urlParams.get('gf_page');
+          if (gfPage) {
+            console.log('Page from URL:', gfPage);
+            return parseInt(gfPage);
+          }
+
+          // Method 2: Gravity Forms hidden field
+          var $pageField = $form.find('input[name="gform_source_page_number_' + formId + '"]');
+          if ($pageField.length && $pageField.val()) {
+            console.log('Page from hidden field:', $pageField.val());
+            return parseInt($pageField.val());
+          }
+
+          // Method 3: Check for decision flow summary visibility
+          var $summaryContainer = $('#decision-flow-summary-' + formId);
+          if ($summaryContainer.length && $summaryContainer.hasClass('operaton-show-summary')) {
+            console.log('Summary visible - assuming final page');
+            return targetPage + 1; // This is the summary page
+          }
+
+          console.log('Defaulting to page 1');
+          return 1; // Default to page 1
+        }
+
+        // Strict button management
+        function manageButtonVisibility() {
+          var currentPage = getAccuratePage();
+
+          console.log('📍 Form', formId, '- Current page:', currentPage, 'Target:', targetPage);
+
+          if (currentPage === targetPage) {
+            // Show button ONLY on target page
+            console.log('✅ Showing evaluate button on target page', currentPage);
+            showEvaluateButton(formId);
+          } else if (currentPage === targetPage + 1 && showDecisionFlow && useProcess) {
+            // Show decision flow ONLY on summary page
+            console.log('📊 Showing decision flow on summary page', currentPage);
+            showDecisionFlowSummary(formId);
+          } else {
+            // Hide both on all other pages
+            console.log('❌ Hiding button and summary on page', currentPage);
+            hideAllElements(formId);
+          }
+        }
+
+        // Initial setup
+        setTimeout(function () {
+          manageButtonVisibility();
+        }, 100);
+
+        // Monitor for changes
+        var lastPage = getAccuratePage();
+        setInterval(function () {
+          var currentPage = getAccuratePage();
+          if (currentPage !== lastPage) {
+            console.log('🔄 Page changed from', lastPage, 'to', currentPage);
+            lastPage = currentPage;
+            manageButtonVisibility();
+          }
+        }, 1000);
+
+        // Handle Gravity Forms events
+        $(document).on('gform_page_loaded', function (event, form_id, current_page) {
+          if (form_id == formId) {
+            console.log('📄 GF page loaded:', current_page);
+            setTimeout(manageButtonVisibility, 300);
+          }
+        });
+      });
+    }
+
+    // IMPORTANT: Make sure this runs AFTER the DOM is ready but BEFORE other scripts
+    if (typeof jQuery !== 'undefined') {
+      jQuery(document).ready(function ($) {
+        // Wait a bit for everything to load
+        setTimeout(function () {
+          console.log('🚀 Initializing enhanced button placement');
+          enhanceButtonPlacement();
+        }, 2000);
+      });
+
+      // Also run when window loads (for edge cases)
+      jQuery(window).on('load', function () {
+        setTimeout(function () {
+          console.log('🔄 Window loaded - running enhanced button placement');
+          enhanceButtonPlacement();
+        }, 3000);
+      });
+    } else {
+      console.error('jQuery not available for enhanced button placement');
+    }
 
     /**
      * FINAL FIX: Handle evaluate button click with self-contained button text management
