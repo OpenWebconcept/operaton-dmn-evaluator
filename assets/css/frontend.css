@@ -1,32 +1,33 @@
 /*!
  * Operaton DMN Frontend Styles
- * 
+ *
  * Frontend interface styles for form evaluation buttons, result displays,
  * and Gravity Forms integration with responsive design and accessibility support.
- * 
+ *
  * @package OperatonDMN
  * @version 1.0.0-beta.9
  */
 
 /* CSS Custom Properties for Frontend Interface */
 :root {
-    --operaton-frontend-primary: var(--gf-ctrl-btn-bg-color, #204ce5);
-    --operaton-frontend-primary-hover: var(--gf-ctrl-btn-bg-color-hover, #1a3bb8);
-    --operaton-frontend-primary-active: var(--gf-ctrl-btn-bg-color-active, #15338a);
-    --operaton-frontend-success: #28a745;
-    --operaton-frontend-warning: #ffc107;
-    --operaton-frontend-danger: #dc3545;
-    --operaton-frontend-light: #f8f9fa;
-    --operaton-frontend-dark: #343a40;
-    --operaton-frontend-border: #dee2e6;
-    --operaton-frontend-border-light: #e9ecef;
-    --operaton-frontend-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    --operaton-frontend-border-radius: var(--gf-ctrl-border-radius, 3px);
-    --operaton-frontend-transition: 0.2s ease;
-    --operaton-frontend-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    --operaton-frontend-button-height: 44px;
-    --operaton-frontend-button-padding: 12px 24px;
-    --operaton-frontend-font-size: 14px;
+  --operaton-frontend-primary: var(--gf-ctrl-btn-bg-color, #204ce5);
+  --operaton-frontend-primary-hover: var(--gf-ctrl-btn-bg-color-hover, #1a3bb8);
+  --operaton-frontend-primary-active: var(--gf-ctrl-btn-bg-color-active, #15338a);
+  --operaton-frontend-success: #28a745;
+  --operaton-frontend-warning: #ffc107;
+  --operaton-frontend-danger: #dc3545;
+  --operaton-frontend-light: #f8f9fa;
+  --operaton-frontend-dark: #343a40;
+  --operaton-frontend-border: #dee2e6;
+  --operaton-frontend-border-light: #e9ecef;
+  --operaton-frontend-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --operaton-frontend-border-radius: var(--gf-ctrl-border-radius, 3px);
+  --operaton-frontend-transition: 0.2s ease;
+  --operaton-frontend-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell,
+    'Helvetica Neue', sans-serif;
+  --operaton-frontend-button-height: 44px;
+  --operaton-frontend-button-padding: 12px 24px;
+  --operaton-frontend-font-size: 14px;
 }
 
 /* =============================================================================
@@ -34,97 +35,97 @@
    ============================================================================= */
 
 .operaton-evaluate-btn {
-    /* Core button styling with Gravity Forms integration */
-    background: var(--operaton-frontend-primary) !important;
-    color: var(--gf-ctrl-btn-text-color, #ffffff) !important;
-    border: 1px solid var(--gf-ctrl-btn-border-color, var(--operaton-frontend-primary)) !important;
-    border-radius: var(--operaton-frontend-border-radius) !important;
-    
-    /* Sizing and spacing */
-    padding: var(--operaton-frontend-button-padding) !important;
-    margin-left: 10px !important;
-    font-size: var(--operaton-frontend-font-size) !important;
-    font-weight: 600 !important;
-    line-height: 1.2 !important;
-    font-family: var(--operaton-frontend-font) !important;
-    
-    /* Layout and display */
-    cursor: pointer !important;
-    display: inline-block !important;
-    vertical-align: middle !important;
-    text-decoration: none !important;
-    text-align: center !important;
-    
-    /* Consistent sizing */
-    height: var(--operaton-frontend-button-height) !important;
-    min-height: var(--operaton-frontend-button-height) !important;
-    max-height: var(--operaton-frontend-button-height) !important;
-    box-sizing: border-box !important;
-    
-    /* Visual effects */
-    transition: all var(--operaton-frontend-transition) !important;
-    box-shadow: var(--operaton-frontend-shadow) !important;
-    
-    /* Reset default button styles */
-    outline: none !important;
-    -webkit-appearance: none !important;
-    -moz-appearance: none !important;
-    appearance: none !important;
-    
-    /* Flex properties for consistent layout */
-    flex-shrink: 0 !important;
-    flex-grow: 0 !important;
+  /* Core button styling with Gravity Forms integration */
+  background: var(--operaton-frontend-primary) !important;
+  color: var(--gf-ctrl-btn-text-color, #ffffff) !important;
+  border: 1px solid var(--gf-ctrl-btn-border-color, var(--operaton-frontend-primary)) !important;
+  border-radius: var(--operaton-frontend-border-radius) !important;
+
+  /* Sizing and spacing */
+  padding: var(--operaton-frontend-button-padding) !important;
+  margin-left: 10px !important;
+  font-size: var(--operaton-frontend-font-size) !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  font-family: var(--operaton-frontend-font) !important;
+
+  /* Layout and display */
+  cursor: pointer !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  text-decoration: none !important;
+  text-align: center !important;
+
+  /* Consistent sizing */
+  height: var(--operaton-frontend-button-height) !important;
+  min-height: var(--operaton-frontend-button-height) !important;
+  max-height: var(--operaton-frontend-button-height) !important;
+  box-sizing: border-box !important;
+
+  /* Visual effects */
+  transition: all var(--operaton-frontend-transition) !important;
+  box-shadow: var(--operaton-frontend-shadow) !important;
+
+  /* Reset default button styles */
+  outline: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+
+  /* Flex properties for consistent layout */
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
 }
 
 /* Button hover state */
 .operaton-evaluate-btn:hover {
-    background: var(--operaton-frontend-primary-hover) !important;
-    border-color: var(--gf-ctrl-btn-border-color-hover, var(--operaton-frontend-primary-hover)) !important;
-    color: var(--gf-ctrl-btn-text-color-hover, #ffffff) !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+  background: var(--operaton-frontend-primary-hover) !important;
+  border-color: var(--gf-ctrl-btn-border-color-hover, var(--operaton-frontend-primary-hover)) !important;
+  color: var(--gf-ctrl-btn-text-color-hover, #ffffff) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Button active and focus states */
 .operaton-evaluate-btn:active,
 .operaton-evaluate-btn:focus {
-    background: var(--operaton-frontend-primary-active) !important;
-    border-color: var(--gf-ctrl-btn-border-color-active, var(--operaton-frontend-primary-active)) !important;
-    transform: translateY(0) !important;
-    outline: 2px solid #005fcc !important;
-    outline-offset: 2px !important;
+  background: var(--operaton-frontend-primary-active) !important;
+  border-color: var(--gf-ctrl-btn-border-color-active, var(--operaton-frontend-primary-active)) !important;
+  transform: translateY(0) !important;
+  outline: 2px solid #005fcc !important;
+  outline-offset: 2px !important;
 }
 
 /* Button disabled state */
 .operaton-evaluate-btn:disabled {
-    background: #cccccc !important;
-    border-color: #cccccc !important;
-    color: #666666 !important;
-    cursor: not-allowed !important;
-    opacity: 0.7 !important;
-    transform: none !important;
-    box-shadow: none !important;
+  background: #cccccc !important;
+  border-color: #cccccc !important;
+  color: #666666 !important;
+  cursor: not-allowed !important;
+  opacity: 0.7 !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* Button loading state */
 .operaton-evaluate-btn.loading {
-    position: relative;
-    color: transparent !important;
-    pointer-events: none;
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
 }
 
 .operaton-evaluate-btn.loading::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 16px;
-    height: 16px;
-    margin: -8px 0 0 -8px;
-    border: 2px solid transparent;
-    border-top: 2px solid white;
-    border-radius: 50%;
-    animation: operaton-spin 1s linear infinite;
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid transparent;
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: operaton-spin 1s linear infinite;
 }
 
 /* =============================================================================
@@ -133,37 +134,37 @@
 
 /* Button container layout */
 .gform_footer .gform_button_wrapper {
-    display: flex !important;
-    align-items: center !important;
-    gap: 10px !important;
-    flex-wrap: wrap !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
 }
 
 /* Ensure all buttons have consistent heights */
-.gform_wrapper .gform_footer input[type="submit"],
-.gform_wrapper .gform_footer input[type="button"],
+.gform_wrapper .gform_footer input[type='submit'],
+.gform_wrapper .gform_footer input[type='button'],
 .gform_wrapper .gform_footer .operaton-evaluate-btn,
 .gform_wrapper .gform_previous_button input,
 .gform_wrapper .gform_next_button input {
-    height: var(--operaton-frontend-button-height) !important;
-    min-height: var(--operaton-frontend-button-height) !important;
-    max-height: var(--operaton-frontend-button-height) !important;
-    padding: var(--operaton-frontend-button-padding) !important;
-    line-height: 1.2 !important;
-    box-sizing: border-box !important;
-    font-size: var(--operaton-frontend-font-size) !important;
-    vertical-align: middle !important;
-    flex-shrink: 0 !important;
-    flex-grow: 0 !important;
+  height: var(--operaton-frontend-button-height) !important;
+  min-height: var(--operaton-frontend-button-height) !important;
+  max-height: var(--operaton-frontend-button-height) !important;
+  padding: var(--operaton-frontend-button-padding) !important;
+  line-height: 1.2 !important;
+  box-sizing: border-box !important;
+  font-size: var(--operaton-frontend-font-size) !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
 }
 
 /* Button container sizing */
 .gform_wrapper .gform_footer .gform_previous_button,
 .gform_wrapper .gform_footer .gform_next_button {
-    height: var(--operaton-frontend-button-height) !important;
-    display: inline-block !important;
-    flex-shrink: 0 !important;
-    flex-grow: 0 !important;
+  height: var(--operaton-frontend-button-height) !important;
+  display: inline-block !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
 }
 
 /* Additional specificity for stubborn buttons */
@@ -171,19 +172,19 @@
 .gform_wrapper form .gform_footer .gform_next_button input,
 body .gform_wrapper .gform_footer .gform_previous_button input,
 body .gform_wrapper .gform_footer .gform_next_button input {
-    height: var(--operaton-frontend-button-height) !important;
-    min-height: var(--operaton-frontend-button-height) !important;
-    max-height: var(--operaton-frontend-button-height) !important;
-    padding: var(--operaton-frontend-button-padding) !important;
-    box-sizing: border-box !important;
-    line-height: 1.2 !important;
-    font-size: var(--operaton-frontend-font-size) !important;
+  height: var(--operaton-frontend-button-height) !important;
+  min-height: var(--operaton-frontend-button-height) !important;
+  max-height: var(--operaton-frontend-button-height) !important;
+  padding: var(--operaton-frontend-button-padding) !important;
+  box-sizing: border-box !important;
+  line-height: 1.2 !important;
+  font-size: var(--operaton-frontend-font-size) !important;
 }
 
 /* Theme compatibility */
 .gform_wrapper .operaton-evaluate-btn {
-    font-family: inherit !important;
-    line-height: normal !important;
+  font-family: inherit !important;
+  line-height: normal !important;
 }
 
 /* =============================================================================
@@ -191,38 +192,38 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 .operaton-result {
-    display: block;
-    margin: 20px 0;
-    padding: 16px;
-    background-color: var(--operaton-frontend-light);
-    border: 1px solid var(--operaton-frontend-border);
-    border-radius: calc(var(--operaton-frontend-border-radius) + 2px);
-    box-shadow: var(--operaton-frontend-shadow);
-    font-family: var(--operaton-frontend-font);
-    animation: fadeIn 0.3s ease-in;
+  display: block;
+  margin: 20px 0;
+  padding: 16px;
+  background-color: var(--operaton-frontend-light);
+  border: 1px solid var(--operaton-frontend-border);
+  border-radius: calc(var(--operaton-frontend-border-radius) + 2px);
+  box-shadow: var(--operaton-frontend-shadow);
+  font-family: var(--operaton-frontend-font);
+  animation: fadeIn 0.3s ease-in;
 }
 
 .operaton-result h4 {
-    margin: 0 0 8px 0 !important;
-    font-size: 1.1em !important;
-    color: #495057 !important;
-    font-weight: 600 !important;
+  margin: 0 0 8px 0 !important;
+  font-size: 1.1em !important;
+  color: #495057 !important;
+  font-weight: 600 !important;
 }
 
 .operaton-result .result-content {
-    margin: 0 !important;
-    font-weight: 600 !important;
-    color: var(--operaton-frontend-success) !important;
-    font-size: 1.05em !important;
-    word-wrap: break-word;
+  margin: 0 !important;
+  font-weight: 600 !important;
+  color: var(--operaton-frontend-success) !important;
+  font-size: 1.05em !important;
+  word-wrap: break-word;
 }
 
 .operaton-result p {
-    margin: 0 !important;
+  margin: 0 !important;
 }
 
 .operaton-result * {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 /* =============================================================================
@@ -231,45 +232,45 @@ body .gform_wrapper .gform_footer .gform_next_button input {
 
 /* Success state */
 .operaton-result.success {
-    background-color: #d4edda;
-    border-color: #c3e6cb;
-    color: #155724;
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+  color: #155724;
 }
 
 .operaton-result.success .result-content {
-    color: #155724 !important;
+  color: #155724 !important;
 }
 
 /* Error state */
 .operaton-result.error {
-    background-color: #f8d7da;
-    border-color: #f5c6cb;
-    color: #721c24;
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
 }
 
 .operaton-result.error .result-content {
-    color: #721c24 !important;
+  color: #721c24 !important;
 }
 
 /* Warning state */
 .operaton-result.warning {
-    background-color: #fff3cd;
-    border-color: #ffeaa7;
-    color: #856404;
+  background-color: #fff3cd;
+  border-color: #ffeaa7;
+  color: #856404;
 }
 
 .operaton-result.warning .result-content {
-    color: #856404 !important;
+  color: #856404 !important;
 }
 
 /* Loading state */
 .operaton-result.loading {
-    background-color: var(--operaton-frontend-light);
-    color: #6c757d;
+  background-color: var(--operaton-frontend-light);
+  color: #6c757d;
 }
 
 .operaton-result.loading .result-content {
-    color: #6c757d !important;
+  color: #6c757d !important;
 }
 
 /* =============================================================================
@@ -278,20 +279,20 @@ body .gform_wrapper .gform_footer .gform_next_button input {
 
 /* Result field containers */
 .gfield_operaton_result {
-    margin-top: 20px !important;
+  margin-top: 20px !important;
 }
 
 .gfield_operaton_result .ginput_container {
-    margin-top: 0 !important;
+  margin-top: 0 !important;
 }
 
 /* Conditional logic compatibility */
 .gform_wrapper .gfield.gfield_operaton_result {
-    display: block !important;
+  display: block !important;
 }
 
 .gform_wrapper .gfield.gfield_operaton_result.gfield_hidden {
-    display: none !important;
+  display: none !important;
 }
 
 /* =============================================================================
@@ -299,15 +300,15 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 .operaton-spinner {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    border: 2px solid #f3f3f3;
-    border-top: 2px solid var(--operaton-frontend-primary);
-    border-radius: 50%;
-    animation: operaton-spin 1s linear infinite;
-    margin-right: 8px;
-    vertical-align: middle;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid var(--operaton-frontend-primary);
+  border-radius: 50%;
+  animation: operaton-spin 1s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
 }
 
 /* =============================================================================
@@ -318,29 +319,29 @@ body .gform_wrapper .gform_footer .gform_next_button input {
 .gform_wrapper.gravity-theme .operaton-evaluate-btn,
 .gform_wrapper.gf_browser_chrome .operaton-evaluate-btn,
 .gform_wrapper.gf_browser_safari .operaton-evaluate-btn {
-    font-family: inherit !important;
+  font-family: inherit !important;
 }
 
 /* Orbital theme specific adjustments */
 .gform_wrapper.gf-orbital-theme .operaton-evaluate-btn {
-    background: var(--gf-color-primary, var(--operaton-frontend-primary)) !important;
-    border-color: var(--gf-color-primary, var(--operaton-frontend-primary)) !important;
+  background: var(--gf-color-primary, var(--operaton-frontend-primary)) !important;
+  border-color: var(--gf-color-primary, var(--operaton-frontend-primary)) !important;
 }
 
 .gform_wrapper.gf-orbital-theme .operaton-evaluate-btn:hover {
-    background: var(--gf-color-primary-darker, var(--operaton-frontend-primary-hover)) !important;
-    border-color: var(--gf-color-primary-darker, var(--operaton-frontend-primary-hover)) !important;
+  background: var(--gf-color-primary-darker, var(--operaton-frontend-primary-hover)) !important;
+  border-color: var(--gf-color-primary-darker, var(--operaton-frontend-primary-hover)) !important;
 }
 
 /* Legacy theme support */
 .gform_wrapper.gf_browser_unknown .operaton-evaluate-btn {
-    background: #0073aa !important;
-    border-color: #0073aa !important;
+  background: #0073aa !important;
+  border-color: #0073aa !important;
 }
 
 .gform_wrapper.gf_browser_unknown .operaton-evaluate-btn:hover {
-    background: #005a87 !important;
-    border-color: #005a87 !important;
+  background: #005a87 !important;
+  border-color: #005a87 !important;
 }
 
 /* =============================================================================
@@ -348,19 +349,23 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 @keyframes operaton-spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes fadeIn {
-    from { 
-        opacity: 0; 
-        transform: translateY(-10px); 
-    }
-    to { 
-        opacity: 1; 
-        transform: translateY(0); 
-    }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* =============================================================================
@@ -368,53 +373,53 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 @media (max-width: 768px) {
-    /* Mobile button layout */
-    .gform_footer .gform_button_wrapper {
-        flex-direction: column !important;
-        align-items: stretch !important;
-    }
-    
-    .operaton-evaluate-btn {
-        display: block !important;
-        width: 100% !important;
-        margin: 10px 0 !important;
-        text-align: center !important;
-    }
-    
-    /* Result containers on mobile */
-    .operaton-result {
-        margin: 10px 0;
-        padding: 12px;
-    }
-    
-    .operaton-result h4 {
-        font-size: 1em !important;
-    }
-    
-    .operaton-result .result-content {
-        font-size: 1em !important;
-    }
-    
-    /* Maintain consistent button heights on mobile */
-    .gform_wrapper .gform_footer input[type="submit"],
-    .gform_wrapper .gform_footer input[type="button"],
-    .gform_wrapper .gform_footer .operaton-evaluate-btn {
-        height: var(--operaton-frontend-button-height) !important;
-        min-height: var(--operaton-frontend-button-height) !important;
-        max-height: var(--operaton-frontend-button-height) !important;
-    }
+  /* Mobile button layout */
+  .gform_footer .gform_button_wrapper {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .operaton-evaluate-btn {
+    display: block !important;
+    width: 100% !important;
+    margin: 10px 0 !important;
+    text-align: center !important;
+  }
+
+  /* Result containers on mobile */
+  .operaton-result {
+    margin: 10px 0;
+    padding: 12px;
+  }
+
+  .operaton-result h4 {
+    font-size: 1em !important;
+  }
+
+  .operaton-result .result-content {
+    font-size: 1em !important;
+  }
+
+  /* Maintain consistent button heights on mobile */
+  .gform_wrapper .gform_footer input[type='submit'],
+  .gform_wrapper .gform_footer input[type='button'],
+  .gform_wrapper .gform_footer .operaton-evaluate-btn {
+    height: var(--operaton-frontend-button-height) !important;
+    min-height: var(--operaton-frontend-button-height) !important;
+    max-height: var(--operaton-frontend-button-height) !important;
+  }
 }
 
 @media (max-width: 480px) {
-    :root {
-        --operaton-frontend-button-padding: 10px 16px;
-        --operaton-frontend-font-size: 13px;
-    }
-    
-    .operaton-result {
-        padding: 10px;
-        margin: 8px 0;
-    }
+  :root {
+    --operaton-frontend-button-padding: 10px 16px;
+    --operaton-frontend-font-size: 13px;
+  }
+
+  .operaton-result {
+    padding: 10px;
+    margin: 8px 0;
+  }
 }
 
 /* =============================================================================
@@ -423,42 +428,42 @@ body .gform_wrapper .gform_footer .gform_next_button input {
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {
-    .operaton-evaluate-btn {
-        border-width: 2px !important;
-    }
-    
-    .operaton-result {
-        border-width: 2px !important;
-    }
+  .operaton-evaluate-btn {
+    border-width: 2px !important;
+  }
+
+  .operaton-result {
+    border-width: 2px !important;
+  }
 }
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-    .operaton-spinner {
-        animation: none;
-    }
-    
-    .operaton-result {
-        animation: none;
-    }
-    
-    .operaton-evaluate-btn {
-        transition: none !important;
-    }
-    
-    .operaton-evaluate-btn:hover {
-        transform: none !important;
-    }
-    
-    .operaton-evaluate-btn:active {
-        transform: none !important;
-    }
+  .operaton-spinner {
+    animation: none;
+  }
+
+  .operaton-result {
+    animation: none;
+  }
+
+  .operaton-evaluate-btn {
+    transition: none !important;
+  }
+
+  .operaton-evaluate-btn:hover {
+    transform: none !important;
+  }
+
+  .operaton-evaluate-btn:active {
+    transform: none !important;
+  }
 }
 
 /* Focus management for keyboard navigation */
 .operaton-evaluate-btn:focus-visible {
-    outline: 2px solid var(--operaton-frontend-primary) !important;
-    outline-offset: 2px !important;
+  outline: 2px solid var(--operaton-frontend-primary) !important;
+  outline-offset: 2px !important;
 }
 
 /* =============================================================================
@@ -466,39 +471,39 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 @media (prefers-color-scheme: dark) {
-    .operaton-result {
-        background-color: #2d3748;
-        border-color: #4a5568;
-        color: #e2e8f0;
-    }
-    
-    .operaton-result h4 {
-        color: #e2e8f0 !important;
-    }
-    
-    .operaton-result .result-content {
-        color: #68d391 !important;
-    }
-    
-    .operaton-result.error {
-        background-color: #742a2a;
-        border-color: #9b2c2c;
-        color: #fed7d7;
-    }
-    
-    .operaton-result.error .result-content {
-        color: #fed7d7 !important;
-    }
-    
-    .operaton-result.warning {
-        background-color: #744210;
-        border-color: #975a16;
-        color: #faf089;
-    }
-    
-    .operaton-result.warning .result-content {
-        color: #faf089 !important;
-    }
+  .operaton-result {
+    background-color: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+  }
+
+  .operaton-result h4 {
+    color: #e2e8f0 !important;
+  }
+
+  .operaton-result .result-content {
+    color: #68d391 !important;
+  }
+
+  .operaton-result.error {
+    background-color: #742a2a;
+    border-color: #9b2c2c;
+    color: #fed7d7;
+  }
+
+  .operaton-result.error .result-content {
+    color: #fed7d7 !important;
+  }
+
+  .operaton-result.warning {
+    background-color: #744210;
+    border-color: #975a16;
+    color: #faf089;
+  }
+
+  .operaton-result.warning .result-content {
+    color: #faf089 !important;
+  }
 }
 
 /* =============================================================================
@@ -506,25 +511,25 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 @media print {
-    .operaton-evaluate-btn {
-        display: none !important;
-    }
-    
-    .operaton-result {
-        border: 1px solid #000 !important;
-        background: white !important;
-        color: black !important;
-        box-shadow: none !important;
-        break-inside: avoid;
-    }
-    
-    .operaton-result .result-content {
-        color: black !important;
-    }
-    
-    .operaton-result h4 {
-        color: black !important;
-    }
+  .operaton-evaluate-btn {
+    display: none !important;
+  }
+
+  .operaton-result {
+    border: 1px solid #000 !important;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .operaton-result .result-content {
+    color: black !important;
+  }
+
+  .operaton-result h4 {
+    color: black !important;
+  }
 }
 
 /**
@@ -537,35 +542,35 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 .operaton-evaluate-btn {
-    background: linear-gradient(135deg, #0073aa 0%, #005a87 100%) !important;
-    border: none !important;
-    color: white !important;
-    padding: 12px 24px !important;
-    font-size: 16px !important;
-    font-weight: 600 !important;
-    border-radius: 6px !important;
-    cursor: pointer !important;
-    transition: all 0.3s ease !important;
-    margin: 15px 0 !important;
-    box-shadow: 0 2px 8px rgba(0, 115, 170, 0.3) !important;
+  background: linear-gradient(135deg, #0073aa 0%, #005a87 100%) !important;
+  border: none !important;
+  color: white !important;
+  padding: 12px 24px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  margin: 15px 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 115, 170, 0.3) !important;
 }
 
 .operaton-evaluate-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, #005a87 0%, #004a73 100%) !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 4px 12px rgba(0, 115, 170, 0.4) !important;
+  background: linear-gradient(135deg, #005a87 0%, #004a73 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(0, 115, 170, 0.4) !important;
 }
 
 .operaton-evaluate-btn:active:not(:disabled) {
-    transform: translateY(0) !important;
-    box-shadow: 0 2px 6px rgba(0, 115, 170, 0.3) !important;
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 6px rgba(0, 115, 170, 0.3) !important;
 }
 
 .operaton-evaluate-btn:disabled {
-    background: #cccccc !important;
-    cursor: not-allowed !important;
-    transform: none !important;
-    box-shadow: none !important;
+  background: #cccccc !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* =============================================================================
@@ -573,36 +578,36 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 .operaton-message {
-    padding: 12px 16px;
-    margin: 15px 0;
-    border-radius: 6px;
-    font-weight: 500;
-    font-size: 14px;
-    border-left: 4px solid;
-    animation: slideInDown 0.3s ease;
+  padding: 12px 16px;
+  margin: 15px 0;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  border-left: 4px solid;
+  animation: slideInDown 0.3s ease;
 }
 
 .operaton-message-success {
-    background-color: #d4edda;
-    color: #155724;
-    border-left-color: #28a745;
+  background-color: #d4edda;
+  color: #155724;
+  border-left-color: #28a745;
 }
 
 .operaton-message-error {
-    background-color: #f8d7da;
-    color: #721c24;
-    border-left-color: #dc3545;
+  background-color: #f8d7da;
+  color: #721c24;
+  border-left-color: #dc3545;
 }
 
 @keyframes slideInDown {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* =============================================================================
@@ -610,43 +615,43 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 .decision-flow-summary {
-    background: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    margin: 20px 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin: 20px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 
 .decision-flow-summary h3 {
-    background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
-    color: white;
-    margin: 0;
-    padding: 15px 20px;
-    font-size: 18px;
-    font-weight: 600;
+  background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
+  color: white;
+  margin: 0;
+  padding: 15px 20px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .decision-flow-summary .operaton-loading {
-    padding: 30px;
-    text-align: center;
-    color: #666;
+  padding: 30px;
+  text-align: center;
+  color: #666;
 }
 
 .decision-flow-summary .operaton-loading p {
-    margin: 0;
-    font-size: 16px;
+  margin: 0;
+  font-size: 16px;
 }
 
 .decision-flow-summary .operaton-no-data,
 .decision-flow-summary .operaton-error {
-    padding: 20px;
-    text-align: center;
-    color: #666;
+  padding: 20px;
+  text-align: center;
+  color: #666;
 }
 
 .decision-flow-summary .operaton-error {
-    color: #dc3545;
+  color: #dc3545;
 }
 
 /* =============================================================================
@@ -654,23 +659,23 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 .operaton-dmn-field {
-    position: relative;
+  position: relative;
 }
 
 .operaton-dmn-field::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 4px;
-    height: 100%;
-    background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
-    border-radius: 0 4px 4px 0;
-    opacity: 0.3;
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
+  border-radius: 0 4px 4px 0;
+  opacity: 0.3;
 }
 
 .operaton-dmn-field:focus-within::after {
-    opacity: 1;
+  opacity: 1;
 }
 
 /* =============================================================================
@@ -678,26 +683,30 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 .operaton-loading {
-    position: relative;
+  position: relative;
 }
 
 .operaton-loading::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 20px;
-    height: 20px;
-    margin: -10px 0 0 -10px;
-    border: 2px solid #f3f3f3;
-    border-top: 2px solid #0073aa;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #0073aa;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* =============================================================================
@@ -705,25 +714,25 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 @media (max-width: 768px) {
-    .operaton-evaluate-btn {
-        width: 100% !important;
-        font-size: 14px !important;
-        padding: 10px 20px !important;
-    }
-    
-    .operaton-message {
-        font-size: 13px;
-        padding: 10px 14px;
-    }
-    
-    .decision-flow-summary {
-        margin: 15px 0;
-    }
-    
-    .decision-flow-summary h3 {
-        font-size: 16px;
-        padding: 12px 15px;
-    }
+  .operaton-evaluate-btn {
+    width: 100% !important;
+    font-size: 14px !important;
+    padding: 10px 20px !important;
+  }
+
+  .operaton-message {
+    font-size: 13px;
+    padding: 10px 14px;
+  }
+
+  .decision-flow-summary {
+    margin: 15px 0;
+  }
+
+  .decision-flow-summary h3 {
+    font-size: 16px;
+    padding: 12px 15px;
+  }
 }
 
 /* =============================================================================
@@ -732,18 +741,18 @@ body .gform_wrapper .gform_footer .gform_next_button input {
 
 /* Ensure button works with different GF themes */
 .gform_wrapper .operaton-evaluate-btn {
-    border: none !important;
-    outline: none !important;
+  border: none !important;
+  outline: none !important;
 }
 
 /* Orbital theme compatibility */
 .gform_wrapper.gravity-theme .operaton-evaluate-btn {
-    border-radius: 3px !important;
+  border-radius: 3px !important;
 }
 
 /* Legacy theme compatibility */
 .gform_wrapper.gform_legacy_markup .operaton-evaluate-btn {
-    display: inline-block !important;
+  display: inline-block !important;
 }
 
 /* =============================================================================
@@ -751,41 +760,41 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 .operaton-evaluate-btn:focus {
-    outline: 2px solid #0073aa !important;
-    outline-offset: 2px !important;
+  outline: 2px solid #0073aa !important;
+  outline-offset: 2px !important;
 }
 
 .operaton-message {
-    role: alert;
+  role: alert;
 }
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {
-    .operaton-evaluate-btn {
-        border: 2px solid #000000 !important;
-    }
-    
-    .operaton-message-success {
-        border: 2px solid #000000;
-    }
-    
-    .operaton-message-error {
-        border: 2px solid #000000;
-    }
+  .operaton-evaluate-btn {
+    border: 2px solid #000000 !important;
+  }
+
+  .operaton-message-success {
+    border: 2px solid #000000;
+  }
+
+  .operaton-message-error {
+    border: 2px solid #000000;
+  }
 }
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-    .operaton-evaluate-btn,
-    .operaton-message,
-    .operaton-loading::before {
-        animation: none !important;
-        transition: none !important;
-    }
-    
-    .operaton-evaluate-btn:hover:not(:disabled) {
-        transform: none !important;
-    }
+  .operaton-evaluate-btn,
+  .operaton-message,
+  .operaton-loading::before {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .operaton-evaluate-btn:hover:not(:disabled) {
+    transform: none !important;
+  }
 }
 
 /* =============================================================================
@@ -793,13 +802,13 @@ body .gform_wrapper .gform_footer .gform_next_button input {
    ============================================================================= */
 
 @media print {
-    .operaton-evaluate-btn,
-    .decision-flow-summary .refresh-decision-flow-controlled {
-        display: none !important;
-    }
-    
-    .decision-flow-summary {
-        box-shadow: none !important;
-        border: 1px solid #000000 !important;
-    }
+  .operaton-evaluate-btn,
+  .decision-flow-summary .refresh-decision-flow-controlled {
+    display: none !important;
+  }
+
+  .decision-flow-summary {
+    box-shadow: none !important;
+    border: 1px solid #000000 !important;
+  }
 }

@@ -1,6 +1,6 @@
 # Operaton DMN Evaluator
 
-The Operaton DMN Evaluator plugin integrates WordPress Gravity Forms with Operaton DMN (Decision Model and Notation) engines to provide real-time decision evaluation capabilities. **ENHANCED in v1.0.0-beta.10.1.1**: Completely refactored architecture with performance monitoring, manager-based design, and comprehensive debugging capabilities.
+The Operaton DMN Evaluator plugin integrates WordPress Gravity Forms with Operaton DMN (Decision Model and Notation) engines to provide real-time decision evaluation capabilities. **ENHANCED in v1.0.0-beta.10.1**: Completely refactored architecture with performance monitoring, manager-based design, and comprehensive debugging capabilities.
 
 ## 📍 Repository Information
 
@@ -97,7 +97,7 @@ The plugin now uses a sophisticated manager-based architecture for optimal perfo
 ```
 Plugin Performance Metrics (Typical):
 ├── Total Initialization: 0.41ms
-├── Assets Manager Load: 0.21ms  
+├── Assets Manager Load: 0.21ms
 ├── Database Manager Load: 0.35ms
 ├── Gravity Forms Load: 0.46ms
 ├── Peak Memory Usage: 10MB
@@ -194,7 +194,7 @@ operaton-dmn-evaluator/
 
 # Demo
 
-The familiar [Dish example configured as demo](https://owc-gemeente.open-regels.nl/operaton-dmn-evaluator-2/) shows a multi-step form with a DMN evaluation at the end. The result is displayed in a short popup in the top-right corner of your screen, and the designated field on the form is populated.  
+The familiar [Dish example configured as demo](https://owc-gemeente.open-regels.nl/operaton-dmn-evaluator-2/) shows a multi-step form with a DMN evaluation at the end. The result is displayed in a short popup in the top-right corner of your screen, and the designated field on the form is populated.
 
 ![Form step 2](./assets/images/Screenshot%202025-07-11%20164610.png)
 
@@ -212,7 +212,7 @@ The plugin includes comprehensive performance monitoring:
   "plugin_version": "1.0.0-beta.10",
   "managers": {
     "assets": "loaded",
-    "admin": "loaded", 
+    "admin": "loaded",
     "database": "loaded",
     "api": "loaded",
     "gravity_forms": "loaded",
@@ -330,7 +330,7 @@ $results = array(
         'extraction_method' => 'process_variable_direct'
     ),
     'aanmerkingKindPakket' => array(
-        'value' => true, 
+        'value' => true,
         'field_id' => 36,
         'extraction_method' => 'nested_container_search'
     )
@@ -346,7 +346,7 @@ Enhanced decision flow summaries with improved performance and styling:
 
 #### Advanced Caching System ✨ NEW
 - **Intelligent Caching**: 10-minute cache for successful retrievals
-- **Error Caching**: 2-minute cache for failed requests  
+- **Error Caching**: 2-minute cache for failed requests
 - **Cache Busting**: Manual refresh with cache invalidation
 - **Performance Optimization**: Reduced API calls with smart caching
 
@@ -414,7 +414,7 @@ Enhanced decision flow summaries with improved performance and styling:
   "managers": {
     "assets": "loaded",
     "admin": "loaded",
-    "database": "loaded", 
+    "database": "loaded",
     "api": "loaded",
     "gravity_forms": "loaded",
     "quirks_fix": "loaded",
@@ -534,7 +534,7 @@ Key Milestones:
 - **Solution**: Check context - scripts only load when Gravity Forms detected
 - **Debug**: Review `assets.context.script_loading_note` in debug status
 
-#### Database Manager Issues  
+#### Database Manager Issues
 - **Symptom**: Configuration save failures
 - **Solution**: Check database permissions and WordPress debug log
 - **Debug**: Review `health` array for database-specific issues
@@ -597,7 +597,7 @@ class Operaton_DMN_API {
     private $performance;        // Performance monitoring integration
     private $core;              // Core plugin reference
     private $database;          // Database manager integration
-    
+
     // Enhanced evaluation with performance tracking
     public function handle_evaluation($request) {
         $timer_id = $this->performance->start_timer('api_evaluation');

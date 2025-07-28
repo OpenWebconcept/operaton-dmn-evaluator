@@ -1,9 +1,9 @@
 /**
  * Debug Interface Styling for Operaton DMN Plugin
- * 
+ *
  * Styles for debug pages, error displays, and development tools.
  * Only loaded when WP_DEBUG is enabled.
- * 
+ *
  * @package OperatonDMN
  * @since 1.0.0
  */
@@ -13,29 +13,29 @@
    ============================================================================= */
 
 .operaton-debug-page {
-    background: #f1f1f1;
-    padding: 20px;
-    border-radius: 8px;
-    margin: 20px 0;
+  background: #f1f1f1;
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px 0;
 }
 
 .operaton-debug-page h1 {
-    color: #0073aa;
-    border-bottom: 2px solid #0073aa;
-    padding-bottom: 10px;
-    margin-bottom: 20px;
+  color: #0073aa;
+  border-bottom: 2px solid #0073aa;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
 }
 
 .operaton-debug-page h2 {
-    color: #135e96;
-    margin-top: 30px;
-    margin-bottom: 15px;
+  color: #135e96;
+  margin-top: 30px;
+  margin-bottom: 15px;
 }
 
 .operaton-debug-page h3 {
-    color: #1e6091;
-    margin-top: 25px;
-    margin-bottom: 12px;
+  color: #1e6091;
+  margin-top: 25px;
+  margin-bottom: 12px;
 }
 
 /* =============================================================================
@@ -43,39 +43,39 @@
    ============================================================================= */
 
 .debug-status-success {
-    color: #46b450;
-    font-weight: bold;
+  color: #46b450;
+  font-weight: bold;
 }
 
 .debug-status-success::before {
-    content: "✅ ";
+  content: '✅ ';
 }
 
 .debug-status-error {
-    color: #dc3232;
-    font-weight: bold;
+  color: #dc3232;
+  font-weight: bold;
 }
 
 .debug-status-error::before {
-    content: "❌ ";
+  content: '❌ ';
 }
 
 .debug-status-warning {
-    color: #ffb900;
-    font-weight: bold;
+  color: #ffb900;
+  font-weight: bold;
 }
 
 .debug-status-warning::before {
-    content: "⚠️ ";
+  content: '⚠️ ';
 }
 
 .debug-status-info {
-    color: #0073aa;
-    font-weight: bold;
+  color: #0073aa;
+  font-weight: bold;
 }
 
 .debug-status-info::before {
-    content: "ℹ️ ";
+  content: 'ℹ️ ';
 }
 
 /* =============================================================================
@@ -83,30 +83,30 @@
    ============================================================================= */
 
 .debug-section {
-    background: white;
-    border: 1px solid #ccd0d4;
-    border-radius: 6px;
-    margin: 20px 0;
-    padding: 20px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: white;
+  border: 1px solid #ccd0d4;
+  border-radius: 6px;
+  margin: 20px 0;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .debug-section-header {
-    background: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
-    margin: -20px -20px 20px -20px;
-    padding: 15px 20px;
-    border-radius: 6px 6px 0 0;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  margin: -20px -20px 20px -20px;
+  padding: 15px 20px;
+  border-radius: 6px 6px 0 0;
 }
 
 .debug-section-header h3 {
-    margin: 0;
-    color: #495057;
-    font-size: 16px;
+  margin: 0;
+  color: #495057;
+  font-size: 16px;
 }
 
 .debug-section-content {
-    line-height: 1.6;
+  line-height: 1.6;
 }
 
 /* =============================================================================
@@ -114,37 +114,37 @@
    ============================================================================= */
 
 .debug-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 15px 0;
-    background: white;
-    border: 1px solid #dee2e6;
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+  background: white;
+  border: 1px solid #dee2e6;
 }
 
 .debug-table th {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    padding: 12px;
-    text-align: left;
-    font-weight: 600;
-    color: #495057;
-    font-size: 13px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  font-size: 13px;
 }
 
 .debug-table td {
-    border: 1px solid #dee2e6;
-    padding: 10px 12px;
-    vertical-align: top;
-    font-size: 13px;
-    font-family: "Courier New", monospace;
+  border: 1px solid #dee2e6;
+  padding: 10px 12px;
+  vertical-align: top;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
 }
 
 .debug-table tr:nth-child(even) {
-    background: #f8f9fa;
+  background: #f8f9fa;
 }
 
 .debug-table tr:hover {
-    background: #e3f2fd;
+  background: #e3f2fd;
 }
 
 /* =============================================================================
@@ -152,35 +152,35 @@
    ============================================================================= */
 
 .debug-code {
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 4px;
-    padding: 15px;
-    margin: 10px 0;
-    font-family: "Courier New", Consolas, Monaco, monospace;
-    font-size: 12px;
-    line-height: 1.5;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 15px;
+  margin: 10px 0;
+  font-family: 'Courier New', Consolas, Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .debug-code.error {
-    background: #fff5f5;
-    border-color: #fed7d7;
-    color: #c53030;
+  background: #fff5f5;
+  border-color: #fed7d7;
+  color: #c53030;
 }
 
 .debug-code.success {
-    background: #f0fff4;
-    border-color: #c6f6d5;
-    color: #2d5016;
+  background: #f0fff4;
+  border-color: #c6f6d5;
+  color: #2d5016;
 }
 
 .debug-code.warning {
-    background: #fffbeb;
-    border-color: #fed7aa;
-    color: #92400e;
+  background: #fffbeb;
+  border-color: #fed7aa;
+  color: #92400e;
 }
 
 /* =============================================================================
@@ -188,41 +188,41 @@
    ============================================================================= */
 
 .debug-button {
-    background: #0073aa;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    margin: 5px;
-    transition: background-color 0.2s;
+  background: #0073aa;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin: 5px;
+  transition: background-color 0.2s;
 }
 
 .debug-button:hover {
-    background: #005a87;
+  background: #005a87;
 }
 
 .debug-button.secondary {
-    background: #6c757d;
+  background: #6c757d;
 }
 
 .debug-button.secondary:hover {
-    background: #545b62;
+  background: #545b62;
 }
 
 .debug-button.danger {
-    background: #dc3545;
+  background: #dc3545;
 }
 
 .debug-button.danger:hover {
-    background: #c82333;
+  background: #c82333;
 }
 
 .debug-button:disabled {
-    background: #6c757d;
-    cursor: not-allowed;
-    opacity: 0.6;
+  background: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /* =============================================================================
@@ -230,41 +230,41 @@
    ============================================================================= */
 
 .debug-form {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    padding: 20px;
-    margin: 15px 0;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 20px;
+  margin: 15px 0;
 }
 
 .debug-form-row {
-    margin: 15px 0;
+  margin: 15px 0;
 }
 
 .debug-form-row label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: 600;
-    color: #495057;
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 600;
+  color: #495057;
 }
 
 .debug-form-row input,
 .debug-form-row textarea,
 .debug-form-row select {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    font-size: 14px;
-    font-family: "Courier New", monospace;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
 }
 
 .debug-form-row input:focus,
 .debug-form-row textarea:focus,
 .debug-form-row select:focus {
-    outline: none;
-    border-color: #0073aa;
-    box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.2);
+  outline: none;
+  border-color: #0073aa;
+  box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.2);
 }
 
 /* =============================================================================
@@ -272,34 +272,34 @@
    ============================================================================= */
 
 .debug-alert {
-    padding: 15px;
-    margin: 15px 0;
-    border-radius: 6px;
-    border: 1px solid transparent;
+  padding: 15px;
+  margin: 15px 0;
+  border-radius: 6px;
+  border: 1px solid transparent;
 }
 
 .debug-alert.success {
-    background: #d1ecf1;
-    border-color: #bee5eb;
-    color: #0c5460;
+  background: #d1ecf1;
+  border-color: #bee5eb;
+  color: #0c5460;
 }
 
 .debug-alert.error {
-    background: #f8d7da;
-    border-color: #f5c6cb;
-    color: #721c24;
+  background: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
 }
 
 .debug-alert.warning {
-    background: #fff3cd;
-    border-color: #ffeaa7;
-    color: #856404;
+  background: #fff3cd;
+  border-color: #ffeaa7;
+  color: #856404;
 }
 
 .debug-alert.info {
-    background: #cce7ff;
-    border-color: #99d3ff;
-    color: #004085;
+  background: #cce7ff;
+  border-color: #99d3ff;
+  color: #004085;
 }
 
 /* =============================================================================
@@ -307,37 +307,41 @@
    ============================================================================= */
 
 .debug-loading {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #0073aa;
-    border-radius: 50%;
-    animation: debug-spin 1s linear infinite;
-    vertical-align: middle;
-    margin-right: 10px;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #0073aa;
+  border-radius: 50%;
+  animation: debug-spin 1s linear infinite;
+  vertical-align: middle;
+  margin-right: 10px;
 }
 
 @keyframes debug-spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .debug-processing {
-    opacity: 0.6;
-    pointer-events: none;
-    position: relative;
+  opacity: 0.6;
+  pointer-events: none;
+  position: relative;
 }
 
 .debug-processing::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 6px;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
 }
 
 /* =============================================================================
@@ -345,63 +349,63 @@
    ============================================================================= */
 
 .debug-log-container {
-    background: #1e1e1e;
-    color: #d4d4d4;
-    border-radius: 6px;
-    padding: 20px;
-    margin: 15px 0;
-    max-height: 400px;
-    overflow-y: auto;
-    font-family: "Courier New", Consolas, Monaco, monospace;
-    font-size: 12px;
-    line-height: 1.4;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border-radius: 6px;
+  padding: 20px;
+  margin: 15px 0;
+  max-height: 400px;
+  overflow-y: auto;
+  font-family: 'Courier New', Consolas, Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .debug-log-entry {
-    margin: 5px 0;
-    padding: 5px 0;
-    border-bottom: 1px solid #333;
+  margin: 5px 0;
+  padding: 5px 0;
+  border-bottom: 1px solid #333;
 }
 
 .debug-log-entry:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 .debug-log-timestamp {
-    color: #569cd6;
-    font-weight: bold;
+  color: #569cd6;
+  font-weight: bold;
 }
 
 .debug-log-level {
-    font-weight: bold;
-    padding: 2px 6px;
-    border-radius: 3px;
-    margin: 0 5px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin: 0 5px;
 }
 
 .debug-log-level.error {
-    background: #dc3545;
-    color: white;
+  background: #dc3545;
+  color: white;
 }
 
 .debug-log-level.warning {
-    background: #ffc107;
-    color: #212529;
+  background: #ffc107;
+  color: #212529;
 }
 
 .debug-log-level.info {
-    background: #17a2b8;
-    color: white;
+  background: #17a2b8;
+  color: white;
 }
 
 .debug-log-level.debug {
-    background: #6c757d;
-    color: white;
+  background: #6c757d;
+  color: white;
 }
 
 .debug-log-message {
-    color: #d4d4d4;
-    word-wrap: break-word;
+  color: #d4d4d4;
+  word-wrap: break-word;
 }
 
 /* =============================================================================
@@ -409,44 +413,44 @@
    ============================================================================= */
 
 .debug-expandable {
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    margin: 10px 0;
-    overflow: hidden;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  margin: 10px 0;
+  overflow: hidden;
 }
 
 .debug-expandable-header {
-    background: #f8f9fa;
-    padding: 12px 15px;
-    cursor: pointer;
-    user-select: none;
-    border-bottom: 1px solid #dee2e6;
-    transition: background-color 0.2s;
+  background: #f8f9fa;
+  padding: 12px 15px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid #dee2e6;
+  transition: background-color 0.2s;
 }
 
 .debug-expandable-header:hover {
-    background: #e9ecef;
+  background: #e9ecef;
 }
 
 .debug-expandable-header::before {
-    content: "▶";
-    display: inline-block;
-    margin-right: 10px;
-    transition: transform 0.2s;
+  content: '▶';
+  display: inline-block;
+  margin-right: 10px;
+  transition: transform 0.2s;
 }
 
 .debug-expandable.expanded .debug-expandable-header::before {
-    transform: rotate(90deg);
+  transform: rotate(90deg);
 }
 
 .debug-expandable-content {
-    display: none;
-    padding: 15px;
-    background: white;
+  display: none;
+  padding: 15px;
+  background: white;
 }
 
 .debug-expandable.expanded .debug-expandable-content {
-    display: block;
+  display: block;
 }
 
 /* =============================================================================
@@ -454,52 +458,52 @@
    ============================================================================= */
 
 .debug-tabs {
-    margin: 20px 0;
+  margin: 20px 0;
 }
 
 .debug-tab-headers {
-    display: flex;
-    border-bottom: 2px solid #dee2e6;
-    background: #f8f9fa;
-    border-radius: 6px 6px 0 0;
-    overflow: hidden;
+  display: flex;
+  border-bottom: 2px solid #dee2e6;
+  background: #f8f9fa;
+  border-radius: 6px 6px 0 0;
+  overflow: hidden;
 }
 
 .debug-tab-header {
-    padding: 12px 20px;
-    cursor: pointer;
-    background: #f8f9fa;
-    border: none;
-    border-right: 1px solid #dee2e6;
-    color: #495057;
-    font-weight: 500;
-    transition: background-color 0.2s;
+  padding: 12px 20px;
+  cursor: pointer;
+  background: #f8f9fa;
+  border: none;
+  border-right: 1px solid #dee2e6;
+  color: #495057;
+  font-weight: 500;
+  transition: background-color 0.2s;
 }
 
 .debug-tab-header:hover {
-    background: #e9ecef;
+  background: #e9ecef;
 }
 
 .debug-tab-header.active {
-    background: #0073aa;
-    color: white;
+  background: #0073aa;
+  color: white;
 }
 
 .debug-tab-header:last-child {
-    border-right: none;
+  border-right: none;
 }
 
 .debug-tab-content {
-    display: none;
-    padding: 20px;
-    background: white;
-    border: 1px solid #dee2e6;
-    border-top: none;
-    border-radius: 0 0 6px 6px;
+  display: none;
+  padding: 20px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
 }
 
 .debug-tab-content.active {
-    display: block;
+  display: block;
 }
 
 /* =============================================================================
@@ -507,65 +511,65 @@
    ============================================================================= */
 
 .debug-text-muted {
-    color: #6c757d;
-    font-size: 12px;
+  color: #6c757d;
+  font-size: 12px;
 }
 
 .debug-text-small {
-    font-size: 11px;
+  font-size: 11px;
 }
 
 .debug-text-monospace {
-    font-family: "Courier New", Consolas, Monaco, monospace;
+  font-family: 'Courier New', Consolas, Monaco, monospace;
 }
 
 .debug-badge {
-    display: inline-block;
-    padding: 3px 8px;
-    font-size: 11px;
-    font-weight: bold;
-    border-radius: 12px;
-    color: white;
-    margin: 0 3px;
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: bold;
+  border-radius: 12px;
+  color: white;
+  margin: 0 3px;
 }
 
 .debug-badge.primary {
-    background: #0073aa;
+  background: #0073aa;
 }
 
 .debug-badge.success {
-    background: #28a745;
+  background: #28a745;
 }
 
 .debug-badge.warning {
-    background: #ffc107;
-    color: #212529;
+  background: #ffc107;
+  color: #212529;
 }
 
 .debug-badge.error {
-    background: #dc3545;
+  background: #dc3545;
 }
 
 .debug-badge.info {
-    background: #17a2b8;
+  background: #17a2b8;
 }
 
 .debug-float-right {
-    float: right;
+  float: right;
 }
 
 .debug-clearfix::after {
-    content: "";
-    display: table;
-    clear: both;
+  content: '';
+  display: table;
+  clear: both;
 }
 
 .debug-hidden {
-    display: none;
+  display: none;
 }
 
 .debug-visible {
-    display: block;
+  display: block;
 }
 
 /* =============================================================================
@@ -573,41 +577,41 @@
    ============================================================================= */
 
 @media (max-width: 768px) {
-    .operaton-debug-page {
-        padding: 15px;
-        margin: 10px 0;
-    }
-    
-    .debug-section {
-        padding: 15px;
-    }
-    
-    .debug-table {
-        font-size: 11px;
-    }
-    
-    .debug-table th,
-    .debug-table td {
-        padding: 8px;
-    }
-    
-    .debug-tab-headers {
-        flex-direction: column;
-    }
-    
-    .debug-tab-header {
-        border-right: none;
-        border-bottom: 1px solid #dee2e6;
-    }
-    
-    .debug-tab-header:last-child {
-        border-bottom: none;
-    }
-    
-    .debug-log-container {
-        font-size: 10px;
-        padding: 15px;
-    }
+  .operaton-debug-page {
+    padding: 15px;
+    margin: 10px 0;
+  }
+
+  .debug-section {
+    padding: 15px;
+  }
+
+  .debug-table {
+    font-size: 11px;
+  }
+
+  .debug-table th,
+  .debug-table td {
+    padding: 8px;
+  }
+
+  .debug-tab-headers {
+    flex-direction: column;
+  }
+
+  .debug-tab-header {
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  .debug-tab-header:last-child {
+    border-bottom: none;
+  }
+
+  .debug-log-container {
+    font-size: 10px;
+    padding: 15px;
+  }
 }
 
 /* =============================================================================
@@ -615,28 +619,28 @@
    ============================================================================= */
 
 @media print {
-    .debug-button,
-    .debug-expandable-header,
-    .debug-tab-headers {
-        display: none;
-    }
-    
-    .debug-expandable-content,
-    .debug-tab-content {
-        display: block !important;
-    }
-    
-    .debug-section {
-        break-inside: avoid;
-        box-shadow: none;
-        border: 1px solid #000;
-    }
-    
-    .debug-log-container {
-        background: white;
-        color: black;
-        border: 1px solid #000;
-    }
+  .debug-button,
+  .debug-expandable-header,
+  .debug-tab-headers {
+    display: none;
+  }
+
+  .debug-expandable-content,
+  .debug-tab-content {
+    display: block !important;
+  }
+
+  .debug-section {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+
+  .debug-log-container {
+    background: white;
+    color: black;
+    border: 1px solid #000;
+  }
 }
 
 /* =============================================================================
@@ -644,41 +648,41 @@
    ============================================================================= */
 
 @media (prefers-color-scheme: dark) {
-    .operaton-debug-page {
-        background: #2d3748;
-        color: #e2e8f0;
-    }
-    
-    .debug-section {
-        background: #4a5568;
-        border-color: #718096;
-        color: #e2e8f0;
-    }
-    
-    .debug-section-header {
-        background: #2d3748;
-        border-color: #718096;
-    }
-    
-    .debug-table th {
-        background: #2d3748;
-        color: #e2e8f0;
-    }
-    
-    .debug-table tr:nth-child(even) {
-        background: #4a5568;
-    }
-    
-    .debug-form {
-        background: #2d3748;
-        border-color: #718096;
-    }
-    
-    .debug-form-row input,
-    .debug-form-row textarea,
-    .debug-form-row select {
-        background: #4a5568;
-        color: #e2e8f0;
-        border-color: #718096;
-    }
+  .operaton-debug-page {
+    background: #2d3748;
+    color: #e2e8f0;
+  }
+
+  .debug-section {
+    background: #4a5568;
+    border-color: #718096;
+    color: #e2e8f0;
+  }
+
+  .debug-section-header {
+    background: #2d3748;
+    border-color: #718096;
+  }
+
+  .debug-table th {
+    background: #2d3748;
+    color: #e2e8f0;
+  }
+
+  .debug-table tr:nth-child(even) {
+    background: #4a5568;
+  }
+
+  .debug-form {
+    background: #2d3748;
+    border-color: #718096;
+  }
+
+  .debug-form-row input,
+  .debug-form-row textarea,
+  .debug-form-row select {
+    background: #4a5568;
+    color: #e2e8f0;
+    border-color: #718096;
+  }
 }
