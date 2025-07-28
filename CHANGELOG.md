@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.0.0-beta.10] - 2025-07-25
+## [1.0.0-beta.10.1] - 2025-07-28
 
 ### ⚠️ IMPORTANT: Manual Installation Required
 
