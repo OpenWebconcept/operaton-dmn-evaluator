@@ -3,6 +3,22 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.0-beta.10] - 2025-07-25
 
+### ⚠️ IMPORTANT: Manual Installation Required
+
+This version includes a major architectural restructuring that requires manual installation:
+
+#### For Existing Users (One-Time Manual Upgrade):
+1. **Backup**: Export your form configurations (optional - they're preserved in database)
+2. **Deactivate**: Deactivate the Operaton DMN Evaluator plugin
+3. **Delete**: Remove the old plugin folder completely
+4. **Install**: Upload and activate the new v1.0.0-beta.10
+5. **Verify**: Check that your configurations are still present and working
+
+#### After Manual Installation:
+- ✅ Auto-updates will resume working normally with v1.0.0-beta.11+
+- ✅ All configurations preserved automatically
+- ✅ Immediate performance benefits (97% faster initialization)
+
 ### 🏗️ Major Architecture Refactoring: Plugin Performance & Code Organization
 
 #### Revolutionary Plugin Architecture Restructure

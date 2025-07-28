@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Update Checker Implementation - VERSION 11.5
+ * Plugin Update Checker Implementation - VERSION 11.6 (Fixed Error Handling)
  * COMPLETE WORDPRESS OVERRIDE STRATEGY - CLEAN BUILD
  * File: includes/plugin-updater.php
  */
@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * GitLab-based Auto-Update System for Operaton DMN Evaluator - V11.5
+ * GitLab-based Auto-Update System for Operaton DMN Evaluator - V11.6
  * NUCLEAR OPTION: Override ALL WordPress extraction methods
  */
 class OperatonDMNAutoUpdater {
@@ -41,30 +41,30 @@ class OperatonDMNAutoUpdater {
         add_filter('plugins_api', array($this, 'plugin_popup'), 10, 3);
         add_filter('upgrader_pre_download', array($this, 'download_package'), 10, 3);
         
-        // V11.5 DISCOVERY STRATEGY: Hook into the move operation after extraction
+        // V11.6 DISCOVERY STRATEGY: Hook into the move operation after extraction
         add_filter('upgrader_unpack_package', array($this, 'force_our_extraction'), 1, 4);
         add_filter('unzip_file', array($this, 'intercept_unzip'), 1, 4);
         
-        // V11.5: Hook into the move operation (this is where the real naming happens!)
+        // V11.6: Hook into the move operation (this is where the real naming happens!)
         add_filter('upgrader_install_package_result', array($this, 'fix_install_package_result'), 1, 2);
         add_action('upgrader_process_complete', array($this, 'verify_and_fix_extraction'), 10, 2);
         
-        // V11.5: Post-extraction directory fix (nuclear fallback)
+        // V11.6: Post-extraction directory fix (nuclear fallback)
         add_action('upgrader_process_complete', array($this, 'post_extraction_directory_fix'), 99, 2);
         
-        // V11.5: Force our extraction by hijacking the working directory
+        // V11.6: Force our extraction by hijacking the working directory
         add_action('upgrader_start', array($this, 'prepare_forced_extraction'));
         
-        error_log('Operaton DMN Auto-Updater V11.5 initialized (NUCLEAR OVERRIDE MODE)');
+        error_log('Operaton DMN Auto-Updater V11.6 initialized (NUCLEAR OVERRIDE MODE with Error Handling)');
     }
     
     /**
-     * V11.5: Prepare for forced extraction by monitoring WordPress
+     * V11.6: Prepare for forced extraction by monitoring WordPress
      */
     public function prepare_forced_extraction($hook_extra) {
         if (isset($hook_extra['plugin']) && $hook_extra['plugin'] === $this->plugin_slug) {
             $this->is_our_update = true;
-            error_log('=== OPERATON DMN V11.5 NUCLEAR MODE ACTIVATED ===');
+            error_log('=== OPERATON DMN V11.6 NUCLEAR MODE ACTIVATED ===');
             
             // Store the fact that we're updating
             set_transient('operaton_dmn_v11_nuclear_mode', array(
@@ -75,7 +75,7 @@ class OperatonDMNAutoUpdater {
     }
     
     /**
-     * V11.5: Intercept WordPress's unzip_file function
+     * V11.6: Intercept WordPress's unzip_file function
      */
     public function intercept_unzip($result, $file, $to, $needed_dirs) {
         // Only intercept our plugin updates
@@ -84,24 +84,24 @@ class OperatonDMNAutoUpdater {
             return $result; // Let WordPress handle other plugins normally
         }
         
-        error_log('=== OPERATON DMN V11.5 INTERCEPT UNZIP ===');
-        error_log('Operaton DMN V11.5: Intercepting unzip_file for: ' . $file);
-        error_log('Operaton DMN V11.5: Target directory: ' . $to);
+        error_log('=== OPERATON DMN V11.6 INTERCEPT UNZIP ===');
+        error_log('Operaton DMN V11.6: Intercepting unzip_file for: ' . $file);
+        error_log('Operaton DMN V11.6: Target directory: ' . $to);
         
         // Use our custom extraction instead
         $custom_result = $this->force_clean_extraction($file, $to);
         
         if (is_wp_error($custom_result)) {
-            error_log('Operaton DMN V11.5: Custom extraction failed: ' . $custom_result->get_error_message());
+            error_log('Operaton DMN V11.6: Custom extraction failed: ' . $custom_result->get_error_message());
             return $result; // Fall back to WordPress
         }
         
-        error_log('Operaton DMN V11.5: Custom extraction succeeded!');
+        error_log('Operaton DMN V11.6: Custom extraction succeeded!');
         return true; // Tell WordPress extraction was successful
     }
     
     /**
-     * V11.5: Force our extraction to override WordPress completely
+     * V11.6: Force our extraction to override WordPress completely
      */
     public function force_our_extraction($result, $package, $delete_package_after, $hook_extra) {
         // Only handle our plugin
@@ -109,54 +109,54 @@ class OperatonDMNAutoUpdater {
             return $result;
         }
         
-        error_log('=== OPERATON DMN V11.5 FORCE EXTRACTION ===');
-        error_log('Operaton DMN V11.5: Taking complete control of extraction process');
-        error_log('Operaton DMN V11.5: WordPress wants to extract to: ' . (is_string($result) ? $result : 'unknown'));
+        error_log('=== OPERATON DMN V11.6 FORCE EXTRACTION ===');
+        error_log('Operaton DMN V11.6: Taking complete control of extraction process');
+        error_log('Operaton DMN V11.6: WordPress wants to extract to: ' . (is_string($result) ? $result : 'unknown'));
         
-        // V11.5: COMPLETELY override WordPress extraction
-        $clean_extraction_result = $this->v11_5_complete_override($package);
+        // V11.6: COMPLETELY override WordPress extraction
+        $clean_extraction_result = $this->v11_6_complete_override($package);
         
         if (is_wp_error($clean_extraction_result)) {
-            error_log('Operaton DMN V11.5: Complete override failed: ' . $clean_extraction_result->get_error_message());
+            error_log('Operaton DMN V11.6: Complete override failed: ' . $clean_extraction_result->get_error_message());
             return $result; // Fall back to WordPress
         }
         
-        error_log('Operaton DMN V11.5: Complete override succeeded: ' . $clean_extraction_result);
+        error_log('Operaton DMN V11.6: Complete override succeeded: ' . $clean_extraction_result);
         return $clean_extraction_result; // Return our clean extraction path
     }
     
     /**
-     * V11.5: Complete extraction override that forces correct folder naming
+     * V11.6: Complete extraction override that forces correct folder naming
      */
-    private function v11_5_complete_override($package) {
+    private function v11_6_complete_override($package) {
         if (!class_exists('ZipArchive')) {
-            return new WP_Error('no_zip', 'ZipArchive not available for V11.5 override');
+            return new WP_Error('no_zip', 'ZipArchive not available for V11.6 override');
         }
         
-        // V11.5: Force the correct plugin directory location
+        // V11.6: Force the correct plugin directory location
         $correct_plugin_dir = WP_PLUGIN_DIR . '/operaton-dmn-evaluator';
         
-        error_log('Operaton DMN V11.5: Forcing extraction to correct location: ' . $correct_plugin_dir);
+        error_log('Operaton DMN V11.6: Forcing extraction to correct location: ' . $correct_plugin_dir);
         
         try {
             // Clean up any existing directory (wrong or right name)
             if (is_dir($correct_plugin_dir)) {
-                error_log('Operaton DMN V11.5: Removing existing plugin directory');
+                error_log('Operaton DMN V11.6: Removing existing plugin directory');
                 $this->delete_directory($correct_plugin_dir);
             }
             
             // Create the correct directory
             if (!wp_mkdir_p($correct_plugin_dir)) {
-                return new WP_Error('mkdir_failed', 'V11.5: Failed to create correct plugin directory');
+                return new WP_Error('mkdir_failed', 'V11.6: Failed to create correct plugin directory');
             }
             
             $zip = new ZipArchive();
             if ($zip->open($package) !== TRUE) {
                 $this->delete_directory($correct_plugin_dir);
-                return new WP_Error('zip_open_failed', 'V11.5: Failed to open package');
+                return new WP_Error('zip_open_failed', 'V11.6: Failed to open package');
             }
             
-            error_log('Operaton DMN V11.5: Extracting ' . $zip->numFiles . ' files with complete override');
+            error_log('Operaton DMN V11.6: Extracting ' . $zip->numFiles . ' files with complete override');
             
             $files_extracted = 0;
             for ($i = 0; $i < $zip->numFiles; $i++) {
@@ -165,7 +165,7 @@ class OperatonDMNAutoUpdater {
                 
                 $filename = $this->fix_filename_encoding($stat['name']);
                 
-                // V11.5: Enhanced GitLab folder prefix removal
+                // V11.6: Enhanced GitLab folder prefix removal
                 if (strpos($filename, 'operaton-dmn-evaluator-v') !== false) {
                     $clean_filename = preg_replace('/^operaton-dmn-evaluator-v[^\/]+\//', '', $filename);
                 } elseif (strpos($filename, 'operaton-dmn-evaluator') !== false && strpos($filename, '/') !== false) {
@@ -174,9 +174,9 @@ class OperatonDMNAutoUpdater {
                     $clean_filename = $filename;
                 }
                 
-                // V11.5: Skip unwanted files and folders
+                // V11.6: Skip unwanted files and folders
                 if ($this->should_skip_file($clean_filename)) {
-                    error_log('Operaton DMN V11.5: Skipping unwanted file: ' . $clean_filename);
+                    error_log('Operaton DMN V11.6: Skipping unwanted file: ' . $clean_filename);
                     continue;
                 }
                 
@@ -207,30 +207,30 @@ class OperatonDMNAutoUpdater {
             
             $zip->close();
             
-            error_log('Operaton DMN V11.5: Successfully extracted ' . $files_extracted . ' files to correct location');
+            error_log('Operaton DMN V11.6: Successfully extracted ' . $files_extracted . ' files to correct location');
             
             // Verify extraction
             if (!file_exists($correct_plugin_dir . '/operaton-dmn-plugin.php')) {
-                return new WP_Error('plugin_file_missing', 'V11.5: Main plugin file not found after extraction');
+                return new WP_Error('plugin_file_missing', 'V11.6: Main plugin file not found after extraction');
             }
             
             // Store clean extraction path for post-processing
             $this->clean_extraction_path = $correct_plugin_dir;
             set_transient('operaton_dmn_v11_clean_path', $correct_plugin_dir, 600);
             
-            error_log('Operaton DMN V11.5: Complete override extraction successful!');
+            error_log('Operaton DMN V11.6: Complete override extraction successful!');
             return $correct_plugin_dir;
             
         } catch (Exception $e) {
             if (is_dir($correct_plugin_dir)) {
                 $this->delete_directory($correct_plugin_dir);
             }
-            return new WP_Error('v11_5_override_failed', 'V11.5 complete override failed: ' . $e->getMessage());
+            return new WP_Error('v11_6_override_failed', 'V11.6 complete override failed: ' . $e->getMessage());
         }
     }
     
     /**
-     * V11.5: Intercept the install package result to fix directory naming
+     * V11.6: Intercept the install package result to fix directory naming (FIXED ERROR HANDLING)
      * This is where WordPress moves from /upgrade/ to /plugins/
      */
     public function fix_install_package_result($result, $hook_extra) {
@@ -239,39 +239,58 @@ class OperatonDMNAutoUpdater {
             return $result;
         }
         
-        error_log('=== OPERATON DMN V11.5 INSTALL PACKAGE RESULT INTERCEPT ===');
-        error_log('V11.5: WordPress install result: ' . print_r($result, true));
+        error_log('=== OPERATON DMN V11.6 INSTALL PACKAGE RESULT INTERCEPT ===');
+        error_log('V11.6: WordPress install result type: ' . gettype($result));
+        
+        // V11.6 FIX: Check if result is WP_Error first
+        if (is_wp_error($result)) {
+            error_log('V11.6: WordPress returned WP_Error: ' . $result->get_error_message());
+            error_log('V11.6: Attempting nuclear fallback despite error...');
+            
+            // Even if WordPress failed, try our nuclear fallback
+            $this->post_extraction_directory_fix_immediate();
+            
+            return $result; // Return the error as-is
+        }
+        
+        // V11.6 FIX: Ensure result is an array before accessing array elements
+        if (!is_array($result)) {
+            error_log('V11.6: Result is not an array, converting to array');
+            $result = array('destination' => $result);
+        }
+        
+        error_log('V11.6: WordPress install result: ' . print_r($result, true));
         
         if (isset($result['destination']) && is_string($result['destination'])) {
             $destination = $result['destination'];
-            error_log('V11.5: WordPress wants to install to: ' . $destination);
+            error_log('V11.6: WordPress wants to install to: ' . $destination);
             
             // Check if destination has wrong GitLab naming
             if (strpos($destination, 'operaton-dmn-evaluator-v') !== false) {
                 $correct_destination = WP_PLUGIN_DIR . '/operaton-dmn-evaluator';
-                error_log('V11.5: INTERCEPTING! Changing destination from: ' . basename($destination) . ' to: operaton-dmn-evaluator');
+                error_log('V11.6: INTERCEPTING! Changing destination from: ' . basename($destination) . ' to: operaton-dmn-evaluator');
                 
                 // If correct destination exists, remove it first
                 if (is_dir($correct_destination)) {
                     $this->delete_directory($correct_destination);
-                    error_log('V11.5: Removed existing correct directory');
+                    error_log('V11.6: Removed existing correct directory');
                 }
                 
                 // Move the wrongly named directory to correct location
                 if (is_dir($destination)) {
                     if (rename($destination, $correct_destination)) {
-                        error_log('V11.5: ✓ SUCCESSFUL RENAME: ' . basename($destination) . ' → operaton-dmn-evaluator');
+                        error_log('V11.6: ✓ SUCCESSFUL RENAME: ' . basename($destination) . ' → operaton-dmn-evaluator');
                         
                         // Clean up unwanted files
                         $this->cleanup_files_in_directory($correct_destination);
-                        error_log('V11.5: Cleaned up unwanted files');
+                        error_log('V11.6: Cleaned up unwanted files');
                         
                         // Update the result to reflect correct destination
                         $result['destination'] = $correct_destination;
                         $result['destination_name'] = 'operaton-dmn-evaluator';
                         
                     } else {
-                        error_log('V11.5: ✗ RENAME FAILED - will try copy method');
+                        error_log('V11.6: ✗ RENAME FAILED - will try copy method');
                         
                         // Fallback: copy method
                         wp_mkdir_p($correct_destination);
@@ -281,24 +300,24 @@ class OperatonDMNAutoUpdater {
                         
                         $result['destination'] = $correct_destination;
                         $result['destination_name'] = 'operaton-dmn-evaluator';
-                        error_log('V11.5: ✓ COPY METHOD SUCCESSFUL');
+                        error_log('V11.6: ✓ COPY METHOD SUCCESSFUL');
                     }
                 } else {
-                    error_log('V11.5: ✗ Source directory does not exist: ' . $destination);
+                    error_log('V11.6: ✗ Source directory does not exist: ' . $destination);
                 }
             } else {
-                error_log('V11.5: Destination already has correct naming: ' . basename($destination));
+                error_log('V11.6: Destination already has correct naming: ' . basename($destination));
             }
         } else {
-            error_log('V11.5: No destination found in result or result is not array');
+            error_log('V11.6: No destination found in result or result is not array');
         }
         
-        error_log('V11.5: Final result destination: ' . (isset($result['destination']) ? $result['destination'] : 'unknown'));
+        error_log('V11.6: Final result destination: ' . (isset($result['destination']) ? $result['destination'] : 'unknown'));
         return $result;
     }
     
     /**
-     * V11.5: Custom clean extraction that bypasses all WordPress methods and fixes folder naming
+     * V11.6: Custom clean extraction that bypasses all WordPress methods and fixes folder naming
      */
     private function force_clean_extraction($zip_file, $target_dir) {
         if (!class_exists('ZipArchive')) {
@@ -306,14 +325,14 @@ class OperatonDMNAutoUpdater {
         }
         
         try {
-            // V11.5: Check if target directory has wrong GitLab name and fix it
+            // V11.6: Check if target directory has wrong GitLab name and fix it
             $correct_plugin_dir = WP_PLUGIN_DIR . '/operaton-dmn-evaluator';
             $current_dir = $target_dir;
             
             // If WordPress created a directory with GitLab naming, we need to work around it
             if (strpos($target_dir, 'operaton-dmn-evaluator-v') !== false && $target_dir !== $correct_plugin_dir) {
-                error_log('V11.5: Detected WordPress created wrong folder: ' . $target_dir);
-                error_log('V11.5: Will extract to correct location: ' . $correct_plugin_dir);
+                error_log('V11.6: Detected WordPress created wrong folder: ' . $target_dir);
+                error_log('V11.6: Will extract to correct location: ' . $correct_plugin_dir);
                 
                 // Remove the wrong directory if it exists
                 if (is_dir($correct_plugin_dir)) {
@@ -338,7 +357,7 @@ class OperatonDMNAutoUpdater {
                 return new WP_Error('zip_open_failed', 'Failed to open ZIP for clean extraction');
             }
             
-            error_log('Operaton DMN V11.5: Clean extracting ' . $zip->numFiles . ' files to: ' . $target_dir);
+            error_log('Operaton DMN V11.6: Clean extracting ' . $zip->numFiles . ' files to: ' . $target_dir);
             
             $files_extracted = 0;
             for ($i = 0; $i < $zip->numFiles; $i++) {
@@ -347,7 +366,7 @@ class OperatonDMNAutoUpdater {
                 
                 $filename = $this->fix_filename_encoding($stat['name']);
                 
-                // V11.5: Enhanced GitLab folder prefix removal
+                // V11.6: Enhanced GitLab folder prefix removal
                 if (strpos($filename, 'operaton-dmn-evaluator-v') !== false) {
                     $clean_filename = preg_replace('/^operaton-dmn-evaluator-v[^\/]+\//', '', $filename);
                 } elseif (strpos($filename, 'operaton-dmn-evaluator') !== false && strpos($filename, '/') !== false) {
@@ -356,7 +375,7 @@ class OperatonDMNAutoUpdater {
                     $clean_filename = $filename;
                 }
                 
-                // V11.5: Skip unwanted files and folders
+                // V11.6: Skip unwanted files and folders
                 if ($this->should_skip_file($clean_filename)) {
                     continue;
                 }
@@ -388,11 +407,11 @@ class OperatonDMNAutoUpdater {
             
             $zip->close();
             
-            error_log('Operaton DMN V11.5: Successfully extracted ' . $files_extracted . ' files');
+            error_log('Operaton DMN V11.6: Successfully extracted ' . $files_extracted . ' files');
             
-            // V11.5: If we had to fix the directory location, clean up the wrong one
+            // V11.6: If we had to fix the directory location, clean up the wrong one
             if ($current_dir !== $target_dir && is_dir($current_dir)) {
-                error_log('V11.5: Cleaning up wrong directory: ' . $current_dir);
+                error_log('V11.6: Cleaning up wrong directory: ' . $current_dir);
                 $this->delete_directory($current_dir);
             }
             
@@ -401,7 +420,7 @@ class OperatonDMNAutoUpdater {
                 return new WP_Error('plugin_file_missing', 'Main plugin file not found after clean extraction');
             }
             
-            error_log('V11.5: Extraction completed successfully to: ' . $target_dir);
+            error_log('V11.6: Extraction completed successfully to: ' . $target_dir);
             return true;
             
         } catch (Exception $e) {
@@ -410,7 +429,7 @@ class OperatonDMNAutoUpdater {
     }
     
     /**
-     * V11.5: Verify extraction and fix any corruption + cleanup wrong directories
+     * V11.6: Verify extraction and fix any corruption + cleanup wrong directories
      */
     public function verify_and_fix_extraction($upgrader, $hook_extra) {
         if (!isset($hook_extra['plugin']) || $hook_extra['plugin'] !== $this->plugin_slug) {
@@ -422,19 +441,19 @@ class OperatonDMNAutoUpdater {
             return;
         }
         
-        error_log('=== OPERATON DMN V11.5 POST-EXTRACTION VERIFICATION ===');
+        error_log('=== OPERATON DMN V11.6 POST-EXTRACTION VERIFICATION ===');
         
         $correct_plugin_path = WP_PLUGIN_DIR . '/operaton-dmn-evaluator';
         $clean_path = get_transient('operaton_dmn_v11_clean_path');
         
-        // V11.5: Look for and remove any wrongly named directories
+        // V11.6: Look for and remove any wrongly named directories
         $this->cleanup_wrong_directories();
         
         if (is_dir($correct_plugin_path)) {
             $corruption_detected = $this->detect_corruption_in_path($correct_plugin_path);
             
             if ($corruption_detected && $clean_path && is_dir($clean_path) && $clean_path !== $correct_plugin_path) {
-                error_log('Operaton DMN V11.5: CORRUPTION DETECTED! Attempting emergency fix...');
+                error_log('Operaton DMN V11.6: CORRUPTION DETECTED! Attempting emergency fix...');
                 
                 // Emergency fix: Replace corrupted files with our clean extraction
                 $this->emergency_fix_corruption($correct_plugin_path, $clean_path);
@@ -442,17 +461,17 @@ class OperatonDMNAutoUpdater {
                 // Verify fix worked
                 $still_corrupted = $this->detect_corruption_in_path($correct_plugin_path);
                 if (!$still_corrupted) {
-                    error_log('Operaton DMN V11.5: ✓ EMERGENCY FIX SUCCESSFUL!');
+                    error_log('Operaton DMN V11.6: ✓ EMERGENCY FIX SUCCESSFUL!');
                 } else {
-                    error_log('Operaton DMN V11.5: ✗ Emergency fix failed - manual intervention required');
+                    error_log('Operaton DMN V11.6: ✗ Emergency fix failed - manual intervention required');
                 }
             } else if (!$corruption_detected) {
-                error_log('Operaton DMN V11.5: ✓ SUCCESS! No corruption detected - V11.5 worked!');
+                error_log('Operaton DMN V11.6: ✓ SUCCESS! No corruption detected - V11.6 worked!');
             } else {
-                error_log('Operaton DMN V11.5: ✗ Corruption detected but no clean backup available');
+                error_log('Operaton DMN V11.6: ✗ Corruption detected but no clean backup available');
             }
         } else {
-            error_log('Operaton DMN V11.5: ✗ Correct plugin directory not found!');
+            error_log('Operaton DMN V11.6: ✗ Correct plugin directory not found!');
         }
         
         // Cleanup
@@ -462,11 +481,11 @@ class OperatonDMNAutoUpdater {
         delete_transient('operaton_dmn_v11_nuclear_mode');
         delete_transient('operaton_dmn_v11_clean_path');
         
-        error_log('=== OPERATON DMN V11.5 VERIFICATION COMPLETE ===');
+        error_log('=== OPERATON DMN V11.6 VERIFICATION COMPLETE ===');
     }
     
     /**
-     * V11.5: Post-extraction directory fix - NUCLEAR FALLBACK
+     * V11.6: Post-extraction directory fix - NUCLEAR FALLBACK
      * This runs AFTER WordPress has done everything, as a final cleanup
      */
     public function post_extraction_directory_fix($upgrader, $hook_extra) {
@@ -474,37 +493,44 @@ class OperatonDMNAutoUpdater {
             return;
         }
         
-        error_log('=== OPERATON DMN V11.5 POST-EXTRACTION NUCLEAR FALLBACK ===');
+        $this->post_extraction_directory_fix_immediate();
+    }
+    
+    /**
+     * V11.6: Immediate nuclear fallback (can be called from error handler)
+     */
+    private function post_extraction_directory_fix_immediate() {
+        error_log('=== OPERATON DMN V11.6 POST-EXTRACTION NUCLEAR FALLBACK ===');
         
         $correct_plugin_path = WP_PLUGIN_DIR . '/operaton-dmn-evaluator';
         
-        // V11.5: Look for any wrongly named directories that WordPress created
+        // V11.6: Look for any wrongly named directories that WordPress created
         $wrong_dirs = glob(WP_PLUGIN_DIR . '/operaton-dmn-evaluator-v*');
         
         if (!empty($wrong_dirs)) {
             foreach ($wrong_dirs as $wrong_dir) {
                 if (is_dir($wrong_dir) && basename($wrong_dir) !== 'operaton-dmn-evaluator') {
-                    error_log('Operaton DMN V11.5: NUCLEAR FALLBACK - Found wrong directory: ' . basename($wrong_dir));
+                    error_log('Operaton DMN V11.6: NUCLEAR FALLBACK - Found wrong directory: ' . basename($wrong_dir));
                     
                     // Check if it contains our plugin files
                     if (file_exists($wrong_dir . '/operaton-dmn-plugin.php')) {
-                        error_log('Operaton DMN V11.5: Wrong directory contains plugin files - executing nuclear move');
+                        error_log('Operaton DMN V11.6: Wrong directory contains plugin files - executing nuclear move');
                         
                         // Remove correct directory if it exists
                         if (is_dir($correct_plugin_path)) {
-                            error_log('Operaton DMN V11.5: Removing existing correct directory');
+                            error_log('Operaton DMN V11.6: Removing existing correct directory');
                             $this->delete_directory($correct_plugin_path);
                         }
                         
                         // Move wrong directory to correct location
                         if (rename($wrong_dir, $correct_plugin_path)) {
-                            error_log('Operaton DMN V11.5: ✓ NUCLEAR MOVE SUCCESSFUL: ' . basename($wrong_dir) . ' → operaton-dmn-evaluator');
+                            error_log('Operaton DMN V11.6: ✓ NUCLEAR MOVE SUCCESSFUL: ' . basename($wrong_dir) . ' → operaton-dmn-evaluator');
                             
                             // Clean up files inside the moved directory
                             $this->cleanup_files_in_directory($correct_plugin_path);
                             
                         } else {
-                            error_log('Operaton DMN V11.5: ✗ NUCLEAR MOVE FAILED - attempting copy method');
+                            error_log('Operaton DMN V11.6: ✗ NUCLEAR MOVE FAILED - attempting copy method');
                             
                             // Fallback: copy instead of move
                             wp_mkdir_p($correct_plugin_path);
@@ -512,23 +538,23 @@ class OperatonDMNAutoUpdater {
                             $this->cleanup_files_in_directory($correct_plugin_path);
                             $this->delete_directory($wrong_dir);
                             
-                            error_log('Operaton DMN V11.5: ✓ NUCLEAR COPY COMPLETED');
+                            error_log('Operaton DMN V11.6: ✓ NUCLEAR COPY COMPLETED');
                         }
                     }
                 }
             }
         } else {
-            error_log('Operaton DMN V11.5: No wrong directories found - V11.5 extraction might have worked');
+            error_log('Operaton DMN V11.6: No wrong directories found - V11.6 extraction might have worked');
         }
         
         // Final verification
         if (is_dir($correct_plugin_path) && file_exists($correct_plugin_path . '/operaton-dmn-plugin.php')) {
-            error_log('Operaton DMN V11.5: ✓ FINAL SUCCESS - Plugin is in correct location');
+            error_log('Operaton DMN V11.6: ✓ FINAL SUCCESS - Plugin is in correct location');
         } else {
-            error_log('Operaton DMN V11.5: ✗ FINAL FAILURE - Plugin not found in correct location');
+            error_log('Operaton DMN V11.6: ✗ FINAL FAILURE - Plugin not found in correct location');
         }
         
-        error_log('=== OPERATON DMN V11.5 NUCLEAR FALLBACK COMPLETE ===');
+        error_log('=== OPERATON DMN V11.6 NUCLEAR FALLBACK COMPLETE ===');
     }
     
     /**
@@ -585,6 +611,18 @@ class OperatonDMNAutoUpdater {
             $new_version = ltrim($remote_version['tag_name'], 'v');
             
             if (version_compare($this->version, $new_version, '<')) {
+                // V11.6: Skip auto-update for major architectural restructure (beta.10)
+                if (version_compare($this->version, '1.0.0-beta.10', '<') && 
+                    version_compare($new_version, '1.0.0-beta.10', '>=') &&
+                    version_compare($new_version, '1.0.0-beta.11', '<')) {
+                    
+                    error_log('Operaton DMN V11.6: Skipping auto-update for beta.10 - requires manual installation');
+                    
+                    // Add admin notice instead of auto-update
+                    add_action('admin_notices', array($this, 'show_manual_update_notice'));
+                    return $transient;
+                }
+                
                 $transient->response[$this->plugin_slug] = (object) array(
                     'slug' => dirname($this->plugin_slug),
                     'plugin' => $this->plugin_slug,
@@ -597,6 +635,28 @@ class OperatonDMNAutoUpdater {
         }
         
         return $transient;
+    }
+    
+    /**
+     * V11.6: Show manual update notice for major architectural changes
+     */
+    public function show_manual_update_notice() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        
+        echo '<div class="notice notice-warning is-dismissible">';
+        echo '<h3>Operaton DMN Evaluator - Major Update Available</h3>';
+        echo '<p><strong>Version 1.0.0-beta.10</strong> includes major architectural improvements but requires manual installation:</p>';
+        echo '<ol>';
+        echo '<li>Deactivate the Operaton DMN Evaluator plugin</li>';
+        echo '<li>Delete the plugin folder completely</li>';
+        echo '<li>Download and install v1.0.0-beta.10 manually</li>';
+        echo '<li>Auto-updates will resume with v1.0.0-beta.11+</li>';
+        echo '</ol>';
+        echo '<p><a href="https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/releases" class="button button-primary" target="_blank">Download v1.0.0-beta.10</a></p>';
+        echo '<p><em>Your configurations will be preserved automatically.</em></p>';
+        echo '</div>';
     }
     
     /**
@@ -735,7 +795,7 @@ class OperatonDMNAutoUpdater {
     }
 
     /**
-     * V11.5: Download package - simplified since we're doing extraction differently
+     * V11.6: Download package - simplified since we're doing extraction differently
      */
     public function download_package($result, $package, $upgrader) {
         // Only handle our GitLab packages
@@ -743,8 +803,8 @@ class OperatonDMNAutoUpdater {
             return $result;
         }
         
-        error_log('=== OPERATON DMN V11.5 DOWNLOAD START ===');
-        error_log('Operaton DMN V11.5: Handling GitLab package: ' . $package);
+        error_log('=== OPERATON DMN V11.6 DOWNLOAD START ===');
+        error_log('Operaton DMN V11.6: Handling GitLab package: ' . $package);
         
         $this->is_our_update = true;
         
@@ -753,18 +813,18 @@ class OperatonDMNAutoUpdater {
         $temp_file = download_url($package, 300);
         
         if (is_wp_error($temp_file)) {
-            error_log('Operaton DMN V11.5: Download failed: ' . $temp_file->get_error_message());
+            error_log('Operaton DMN V11.6: Download failed: ' . $temp_file->get_error_message());
             return $temp_file;
         }
         
-        error_log('Operaton DMN V11.5: Downloaded: ' . $temp_file . ' (' . filesize($temp_file) . ' bytes)');
-        error_log('=== OPERATON DMN V11.5 DOWNLOAD END ===');
+        error_log('Operaton DMN V11.6: Downloaded: ' . $temp_file . ' (' . filesize($temp_file) . ' bytes)');
+        error_log('=== OPERATON DMN V11.6 DOWNLOAD END ===');
         
         return $temp_file;
     }
     
     /**
-     * V11.5: Check if file should be skipped during extraction
+     * V11.6: Check if file should be skipped during extraction
      */
     private function should_skip_file($filename) {
         $skip_patterns = array(
@@ -785,7 +845,7 @@ class OperatonDMNAutoUpdater {
     }
     
     /**
-     * V11.5: Detect corruption in extracted path
+     * V11.6: Detect corruption in extracted path
      */
     private function detect_corruption_in_path($path) {
         $corruption_indicators = array('hub', 'lates', 'or', 'pts', 'ts', 'udes', 'aton-dmn-plugin.php');
@@ -807,7 +867,7 @@ class OperatonDMNAutoUpdater {
     }
     
     /**
-     * V11.5: Fix filename encoding
+     * V11.6: Fix filename encoding
      */
     private function fix_filename_encoding($filename) {
         $clean = preg_replace('/[\x00-\x1F\x7F]/', '', $filename);
@@ -829,7 +889,7 @@ class OperatonDMNAutoUpdater {
     }
     
     /**
-     * V11.5: Clean directory contents without removing the directory itself
+     * V11.6: Clean directory contents without removing the directory itself
      */
     private function clean_directory_contents($dir) {
         if (!is_dir($dir)) return;
@@ -846,10 +906,10 @@ class OperatonDMNAutoUpdater {
     }
     
     /**
-     * V11.5: Emergency corruption fix
+     * V11.6: Emergency corruption fix
      */
     private function emergency_fix_corruption($corrupted_path, $clean_path) {
-        error_log('Operaton DMN V11.5: Starting emergency corruption fix...');
+        error_log('Operaton DMN V11.6: Starting emergency corruption fix...');
         
         try {
             // Remove all corrupted files
@@ -858,15 +918,15 @@ class OperatonDMNAutoUpdater {
             // Copy all clean files
             $this->copy_directory_contents($clean_path, $corrupted_path);
             
-            error_log('Operaton DMN V11.5: Emergency fix completed');
+            error_log('Operaton DMN V11.6: Emergency fix completed');
             
         } catch (Exception $e) {
-            error_log('Operaton DMN V11.5: Emergency fix failed: ' . $e->getMessage());
+            error_log('Operaton DMN V11.6: Emergency fix failed: ' . $e->getMessage());
         }
     }
     
     /**
-     * V11.5: Copy directory contents recursively
+     * V11.6: Copy directory contents recursively
      */
     private function copy_directory_contents($source, $target) {
         if (!is_dir($source) || !is_dir($target)) {
@@ -891,10 +951,10 @@ class OperatonDMNAutoUpdater {
     }
     
     /**
-     * V11.5: Clean up unwanted files in the final directory
+     * V11.6: Clean up unwanted files in the final directory
      */
     private function cleanup_files_in_directory($directory) {
-        error_log('Operaton DMN V11.5: Cleaning up unwanted files in: ' . $directory);
+        error_log('Operaton DMN V11.6: Cleaning up unwanted files in: ' . $directory);
         
         $unwanted_items = array(
             $directory . '/.github',
@@ -905,10 +965,10 @@ class OperatonDMNAutoUpdater {
         foreach ($unwanted_items as $item) {
             if (file_exists($item)) {
                 if (is_dir($item)) {
-                    error_log('Operaton DMN V11.5: Removing unwanted directory: ' . basename($item));
+                    error_log('Operaton DMN V11.6: Removing unwanted directory: ' . basename($item));
                     $this->delete_directory($item);
                 } else {
-                    error_log('Operaton DMN V11.5: Removing unwanted file: ' . basename($item));
+                    error_log('Operaton DMN V11.6: Removing unwanted file: ' . basename($item));
                     @unlink($item);
                 }
             }
@@ -916,7 +976,7 @@ class OperatonDMNAutoUpdater {
     }
     
     /**
-     * V11.5: Clean up any wrongly named plugin directories
+     * V11.6: Clean up any wrongly named plugin directories
      */
     private function cleanup_wrong_directories() {
         $plugins_dir = WP_PLUGIN_DIR;
@@ -927,8 +987,8 @@ class OperatonDMNAutoUpdater {
         
         foreach ($wrong_dirs as $wrong_dir) {
             if (basename($wrong_dir) !== $correct_name && is_dir($wrong_dir)) {
-                error_log('Operaton DMN V11.5: Found wrong directory: ' . basename($wrong_dir));
-                error_log('Operaton DMN V11.5: Removing wrong directory: ' . $wrong_dir);
+                error_log('Operaton DMN V11.6: Found wrong directory: ' . basename($wrong_dir));
+                error_log('Operaton DMN V11.6: Removing wrong directory: ' . $wrong_dir);
                 $this->delete_directory($wrong_dir);
             }
         }
