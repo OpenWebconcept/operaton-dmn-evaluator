@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.0.0-beta.10.4] - 2025-07-29
+
+## Issues
+- [Issue #15](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/15)
+
+### Fixed
+- Fatal error: Uncaught TypeError: Illegal offset type in unset while saving Gravity Form
+
 ## [1.0.0-beta.10.3] - 2025-07-29
 
 ### Architectural improvements
