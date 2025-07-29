@@ -7,34 +7,34 @@
  * @package OperatonDMN
  * @since 1.0.0
  */
+/**
+ * FIXED: Simplified Gravity Forms integration - assumes dependencies are loaded
+ */
 
 (function ($) {
-  'use strict';
+  ('use strict');
 
-  // CRITICAL FIX: Wait for required objects before initializing
+  // REMOVED: Complex waiting logic - assume operaton_ajax is available
   function initializeWhenReady() {
-    function debugAvailableObjects() {
-      console.log('=== OPERATON DEBUG INFO ===');
-      console.log('typeof operaton_ajax:', typeof operaton_ajax);
-      console.log('typeof operaton_gravity:', typeof operaton_gravity);
-      console.log('typeof operaton_config_9:', typeof window.operaton_config_9);
-      console.log('window.operaton_ajax:', window.operaton_ajax);
-      console.log(
-        'Available window objects:',
-        Object.keys(window).filter(key => key.includes('operaton'))
-      );
-      console.log('========================');
-    }
-
-    debugAvailableObjects();
-
-    // Check if required objects are available
     if (typeof operaton_ajax === 'undefined') {
-      console.log('Operaton DMN: operaton_ajax still not available, waiting...');
-      setTimeout(initializeWhenReady, 500);
+      console.error('❌ Operaton DMN CRITICAL: operaton_ajax not available');
+
+      // Single retry after short delay
+      setTimeout(function () {
+        if (typeof operaton_ajax !== 'undefined') {
+          console.log('✅ Operaton DMN: operaton_ajax found on retry');
+          continueInitialization();
+        } else {
+          console.error('❌ Operaton DMN FATAL: operaton_ajax still not available after retry');
+        }
+      }, 1000);
       return;
     }
 
+    continueInitialization();
+  }
+
+  function continueInitialization() {
     console.log('Operaton DMN: operaton_ajax found! Initializing Gravity Forms integration');
 
     if (typeof operaton_gravity === 'undefined') {
@@ -842,19 +842,8 @@
     },
   };
 
-  // Initialize when document is ready and operaton_ajax is available
+  // FIXED: Simple document ready initialization
   $(document).ready(function () {
-    // Start the initialization process with a small delay
-    setTimeout(initializeWhenReady, 100);
-  });
-
-  // Handle window load for additional initialization
-  $(window).on('load', function () {
-    // Re-detect forms in case any were loaded dynamically
-    setTimeout(function () {
-      if (typeof OperatonGravityForms !== 'undefined') {
-        OperatonGravityForms.detectForms();
-      }
-    }, 1000);
+    initializeWhenReady();
   });
 })(jQuery);
