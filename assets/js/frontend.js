@@ -1781,6 +1781,12 @@ function validateFieldType(value, expectedType) {
  * OPTIMIZED: Validate form with cached element access
  */
 function validateForm(formId) {
+  const $ = window.jQuery || window.$;
+  if (!$) {
+    console.warn('jQuery not available for validateForm');
+    return true; // Default to valid if jQuery not available
+  }
+
   if (typeof gform !== 'undefined' && gform.validators && gform.validators[formId]) {
     return gform.validators[formId]();
   }
