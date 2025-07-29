@@ -129,7 +129,7 @@ class Operaton_DMN_Gravity_Forms
     private function init_cache_cleanup()
     {
         // Clear caches on form updates
-        add_action('gform_after_save_form', array($this, 'clear_form_cache'));
+        add_action('gform_after_save_form', array($this, 'clear_form_cache_on_save'), 10, 2);
         add_action('gform_after_delete_form', array($this, 'clear_form_cache'));
 
         // Periodic cache cleanup
@@ -1318,6 +1318,23 @@ class Operaton_DMN_Gravity_Forms
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
                 error_log('Operaton DMN: ⚡ CLEARED cache for form ' . $form_id);
+            }
+        }
+    }
+
+    /**
+     * Handle form save with form array parameter
+     * The gform_after_save_form hook passes ($form, $is_new) not just form_id
+     */
+    public function clear_form_cache_on_save($form, $is_new)
+    {
+        if (isset($form['id']))
+        {
+            $this->clear_form_cache($form['id']);
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN: ⚡ CLEARED cache for saved form ' . $form['id']);
             }
         }
     }
