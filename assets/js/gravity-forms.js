@@ -89,9 +89,6 @@
       // Handle form rendering
       $(document).on('gform_post_render', this.handleFormRender);
 
-      // Handle decision flow refresh buttons
-      $(document).on('click', '.refresh-decision-flow-controlled', this.handleDecisionFlowRefresh);
-
       // Handle form validation events
       $(document).on('gform_post_validation', this.handleFormValidation);
     },
@@ -147,9 +144,14 @@
       // Set up button placement logic
       this.setupButtonPlacement(formId, config);
 
-      // Set up decision flow if enabled
+      // Set up decision flow if enabled (delegated to decision-flow.js)
       if (config.show_decision_flow && config.use_process) {
-        this.setupDecisionFlow(formId);
+        if (typeof window.initializeDecisionFlowForForm === 'function') {
+          console.log('Delegating decision flow setup to decision-flow.js for form:', formId);
+          window.initializeDecisionFlowForForm(formId, config);
+        } else {
+          console.warn('Decision flow manager not available for form:', formId);
+        }
       }
 
       // Add form validation enhancements
@@ -256,71 +258,6 @@
           console.log('Evaluate button shown for form:', formId);
         }
       }
-    },
-
-    /**
-     * Set up decision flow functionality
-     * Initializes decision flow display and refresh functionality
-     *
-     * @param {number} formId Form ID
-     */
-    setupDecisionFlow: function (formId) {
-      var self = this;
-
-      // Set up automatic loading on the summary page
-      $(document).on('gform_page_loaded', function (event, form_id, current_page) {
-        if (form_id == formId) {
-          var config = window['operaton_config_' + formId];
-          var targetPage = parseInt(config.evaluation_step) || 2;
-
-          // Show decision flow on the page after evaluation
-          if (current_page > targetPage) {
-            setTimeout(function () {
-              self.loadDecisionFlow(formId);
-            }, 500);
-          }
-        }
-      });
-    },
-
-    /**
-     * Load decision flow summary for a form
-     * Fetches and displays the decision flow summary
-     *
-     * @param {number} formId Form ID
-     */
-    loadDecisionFlow: function (formId) {
-      var $container = $('#decision-flow-summary-' + formId);
-
-      if (!$container.length || $container.hasClass('loading')) {
-        return;
-      }
-
-      console.log('Loading decision flow for form:', formId);
-
-      $container.addClass('loading');
-      $container.html('<div class="operaton-loading"><p>⏳ Loading decision flow summary...</p></div>');
-      $container.show();
-
-      $.ajax({
-        url: window.location.origin + '/wp-json/operaton-dmn/v1/decision-flow/' + formId + '?cache_bust=' + Date.now(),
-        type: 'GET',
-        cache: false,
-        success: function (response) {
-          if (response.success && response.html) {
-            $container.html(response.html);
-          } else {
-            $container.html('<div class="operaton-no-data"><p><em>No decision flow data available.</em></p></div>');
-          }
-        },
-        error: function (xhr, status, error) {
-          console.error('Decision flow error:', error);
-          $container.html('<div class="operaton-error"><p><em>Error loading decision flow summary.</em></p></div>');
-        },
-        complete: function () {
-          $container.removeClass('loading');
-        },
-      });
     },
 
     /**
@@ -637,6 +574,11 @@
       // Trigger custom event
       $(document).trigger('operaton_evaluation_success', [formId, results]);
 
+      // Clear decision flow cache since we have new results
+      if (typeof window.OperatonDecisionFlow !== 'undefined') {
+        window.OperatonDecisionFlow.clearCache();
+      }
+
       // REMOVED: Button state management - now handled by centralized manager
     },
 
@@ -750,6 +692,12 @@
       if (window['operaton_config_' + form_id]) {
         OperatonGravityForms.initializeForm(form_id);
       }
+
+      // Notify decision flow manager about page change
+      const config = window['operaton_config_' + form_id];
+      if (config && config.show_decision_flow && typeof window.OperatonDecisionFlow !== 'undefined') {
+        window.OperatonDecisionFlow.handlePageChange(form_id, current_page, config);
+      }
     },
 
     /**
@@ -767,29 +715,6 @@
         setTimeout(function () {
           OperatonGravityForms.initializeForm(form_id);
         }, 100);
-      }
-    },
-
-    /**
-     * Handle decision flow refresh button click
-     * Refreshes the decision flow summary
-     *
-     * @param {Event} e Click event
-     */
-    handleDecisionFlowRefresh: function (e) {
-      e.preventDefault();
-
-      var $button = $(this);
-      var formId = $button.data('form-id');
-
-      if (formId) {
-        console.log('Refreshing decision flow for form:', formId);
-
-        // Clear cache and reload
-        var $container = $('#decision-flow-summary-' + formId);
-        $container.removeClass('loading').empty();
-
-        OperatonGravityForms.loadDecisionFlow(formId);
       }
     },
 
@@ -819,6 +744,7 @@
         forms_detected: [],
         configurations: {},
         timestamp: new Date().toISOString(),
+        decision_flow_manager: typeof window.OperatonDecisionFlow !== 'undefined' ? 'available' : 'not available',
       };
 
       // Collect information about detected forms
@@ -837,6 +763,11 @@
           }
         }
       });
+
+      // ADD DECISION FLOW DEBUG INFO:
+      if (typeof window.OperatonDecisionFlow !== 'undefined') {
+        debugInfo.decision_flow_debug = window.OperatonDecisionFlow.getDebugInfo();
+      }
 
       return debugInfo;
     },

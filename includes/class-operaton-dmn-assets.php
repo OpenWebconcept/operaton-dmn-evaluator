@@ -370,16 +370,22 @@ class Operaton_DMN_Assets
         if (self::should_load_frontend_assets())
         {
             $this->enqueue_frontend_assets();
+
+            // ADD THIS: Load decision flow assets if needed
+            if ($this->should_load_decision_flow_assets())
+            {
+                $this->enqueue_decision_flow_assets();
+            }
         }
         else
         {
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
-                error_log('Operaton DMN Assets: 🚫 Smart loading determined assets not needed');
+                error_log('Operaton DMN Assets: Smart loading determined assets not needed');
             }
         }
     }
-
+    
     /**
      * PHASE 1 FIX: Atomic frontend asset loading with comprehensive duplicate prevention
      */
@@ -508,9 +514,22 @@ class Operaton_DMN_Assets
             );
         }
 
+        // Register decision flow script
+        if (!wp_script_is('operaton-dmn-decision-flow', 'registered'))
+        {
+            wp_register_script(
+                'operaton-dmn-decision-flow',
+                $this->plugin_url . 'assets/js/decision-flow.js',
+                array('jquery', 'operaton-dmn-frontend'), // Depends on frontend.js but not gravity-forms.js
+                $this->version,
+                true
+            );
+        }
+
         // Enqueue scripts
         wp_enqueue_script('operaton-dmn-frontend');
         wp_enqueue_script('operaton-dmn-gravity-integration');
+        wp_enqueue_script('operaton-dmn-decision-flow');
     }
 
     /**
@@ -1175,11 +1194,14 @@ class Operaton_DMN_Assets
             wp_register_script(
                 'operaton-dmn-decision-flow',
                 $this->plugin_url . 'assets/js/decision-flow.js',
-                array('jquery'),
+                array('jquery', 'operaton-dmn-frontend'),
                 $this->version,
                 true
             );
+        }
 
+        if (!wp_style_is('operaton-dmn-decision-flow', 'registered'))
+        {
             wp_register_style(
                 'operaton-dmn-decision-flow',
                 $this->plugin_url . 'assets/css/decision-flow.css',
@@ -1192,19 +1214,70 @@ class Operaton_DMN_Assets
         wp_enqueue_script('operaton-dmn-decision-flow');
         wp_enqueue_style('operaton-dmn-decision-flow');
 
-        // Localize script
-        wp_localize_script('operaton-dmn-decision-flow', 'operaton_decision_flow', array(
-            'ajax_url' => rest_url('operaton-dmn/v1/'),
-            'nonce' => wp_create_nonce('wp_rest'),
-            'strings' => array(
-                'loading' => __('Loading decision flow...', 'operaton-dmn'),
-                'refreshing' => __('Refreshing...', 'operaton-dmn'),
-                'error' => __('Error loading decision flow', 'operaton-dmn'),
-                'no_data' => __('No decision flow data available', 'operaton-dmn')
-            )
-        ));
-
         $this->loaded_assets['decision_flow'] = true;
+    }
+
+    public function should_load_decision_flow_assets()
+    {
+        // Check if any forms on the page have decision flow enabled
+        if (!$this->gravity_forms_manager)
+        {
+            return false;
+        }
+
+        // Use centralized detection
+        if (!self::should_load_frontend_assets())
+        {
+            return false;
+        }
+
+        // Check if current page has forms with decision flow enabled
+        global $post;
+        if (!$post)
+        {
+            return false;
+        }
+
+        // Extract form IDs from page content
+        $form_ids = array();
+
+        // Check shortcodes
+        if (has_shortcode($post->post_content, 'gravityform'))
+        {
+            preg_match_all('/\[gravityform[^\]]*id=["\'](\d+)["\'][^\]]*\]/', $post->post_content, $matches);
+            if (!empty($matches[1]))
+            {
+                $form_ids = array_merge($form_ids, array_map('intval', $matches[1]));
+            }
+        }
+
+        // Check blocks
+        if (has_block('gravityforms/form', $post))
+        {
+            $blocks = parse_blocks($post->post_content);
+            foreach ($blocks as $block)
+            {
+                if ($block['blockName'] === 'gravityforms/form' && isset($block['attrs']['formId']))
+                {
+                    $form_ids[] = intval($block['attrs']['formId']);
+                }
+            }
+        }
+
+        // Check if any forms have decision flow enabled
+        foreach ($form_ids as $form_id)
+        {
+            $config = $this->gravity_forms_manager->get_form_configuration($form_id);
+            if (
+                $config && isset($config->show_decision_flow) && $config->show_decision_flow &&
+                isset($config->use_process) && $config->use_process
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // =============================================================================
