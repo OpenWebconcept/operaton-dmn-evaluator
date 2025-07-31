@@ -40,6 +40,7 @@ window.operatonInitialized = window.operatonInitialized || {
  * OPTIMIZED: Debounced form initialization with stronger duplicate prevention
  */
 const formInitializationTimeouts = new Map();
+const formInitializationState = new Map();
 const initializationPromises = new Map();
 const formConfigCache = new Map();
 const domQueryCache = new Map();
@@ -90,28 +91,31 @@ window.showDecisionFlowSummary = function (formId) {
   }
 
   try {
-    // Try cached version first
+    // Hide evaluate button
     if (typeof getCachedElement === 'function') {
       const $button = getCachedElement(`#operaton-evaluate-${formId}`);
-      const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
-
-      console.log('📊 Showing decision flow summary for form', formId);
       $button.removeClass('operaton-show-button');
+    } else {
+      $(`#operaton-evaluate-${formId}`).removeClass('operaton-show-button');
+    }
+
+    // Show decision flow summary container
+    if (typeof getCachedElement === 'function') {
+      const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
       $summary.addClass('operaton-show-summary');
     } else {
-      // Fallback to direct jQuery
-      const $button = $(`#operaton-evaluate-${formId}`);
-      const $summary = $(`#decision-flow-summary-${formId}`);
+      $(`#decision-flow-summary-${formId}`).addClass('operaton-show-summary');
+    }
 
-      console.log('📊 Showing decision flow summary for form (fallback)', formId);
-      $button.removeClass('operaton-show-button');
-      $summary.addClass('operaton-show-summary');
+    // Delegate actual loading to decision-flow.js
+    if (typeof window.loadDecisionFlowSummary === 'function') {
+      console.log('📊 Delegating decision flow loading to decision-flow.js for form', formId);
+      window.loadDecisionFlowSummary(formId);
+    } else {
+      console.log('📊 Decision flow manager not available for form', formId);
     }
   } catch (error) {
     console.error('Error in showDecisionFlowSummary:', error);
-    // Final fallback
-    $(`#operaton-evaluate-${formId}`).removeClass('operaton-show-button');
-    $(`#decision-flow-summary-${formId}`).addClass('operaton-show-summary');
   }
 };
 
@@ -605,32 +609,46 @@ function smartFormDetection() {
 function initializeFormEvaluation(formId) {
   formId = parseInt(formId);
 
+  // CRITICAL FIX: Check if already initializing or initialized
+  if (formInitializationState.has(formId)) {
+    const state = formInitializationState.get(formId);
+    if (state === 'initializing' || state === 'complete') {
+      console.log('🔄 Form', formId, 'initialization already in progress/complete');
+      return;
+    }
+  }
+
+  // Mark as initializing immediately
+  formInitializationState.set(formId, 'initializing');
+
   // Check if already initialized (double-check)
   if (window.operatonInitialized.forms.has(formId)) {
     console.log('🔄 Form', formId, 'already initialized at evaluation level');
+    formInitializationState.set(formId, 'complete');
     return;
   }
 
   const config = getFormConfigCached(formId);
   if (!config) {
     console.log('❌ No configuration found for form:', formId);
+    formInitializationState.delete(formId);
     return;
   }
 
   console.log('=== OPTIMIZED INITIALIZING FORM', formId, '===');
 
-  // Mark as initializing immediately
-  window.operatonInitialized.forms.add(formId);
-
   try {
-    // Bind events with optimized selectors
+    // Mark as initializing in both systems
+    window.operatonInitialized.forms.add(formId);
+
+    // Your existing initialization code...
     bindEvaluationEventsOptimized(formId);
     bindNavigationEventsOptimized(formId);
     bindInputChangeListenersOptimized(formId);
 
-    // Initialize decision flow summary if enabled
-    if (config.show_decision_flow) {
-      initializeDecisionFlowSummary(formId);
+    // Initialize decision flow summary if enabled (delegated to decision-flow.js)
+    if (config.show_decision_flow && typeof window.initializeDecisionFlowForForm === 'function') {
+      window.initializeDecisionFlowForForm(formId, config);
     }
 
     // Clear any existing results when form initializes
@@ -638,11 +656,13 @@ function initializeFormEvaluation(formId) {
       clearResultFieldWithMessage(formId, 'Form initialized');
     }, 200);
 
+    formInitializationState.set(formId, 'complete');
     console.log('=== FORM', formId, 'INITIALIZATION COMPLETE ===');
   } catch (error) {
     console.error('❌ Error initializing form', formId, ':', error);
-    // Remove from initialized set if initialization failed
+    // Clean up on error
     window.operatonInitialized.forms.delete(formId);
+    formInitializationState.delete(formId);
   }
 }
 
@@ -884,120 +904,6 @@ function bindInputChangeListenersOptimized(formId) {
 }
 
 // =============================================================================
-// EXISTING FUNCTIONS (OPTIMIZED WHERE POSSIBLE)
-// =============================================================================
-
-/**
- * OPTIMIZED: Decision flow functions with caching
- */
-function initializeDecisionFlowSummary(formId) {
-  console.log('📊 Initializing decision flow summary for form:', formId);
-
-  const currentPage = getCurrentPageCached(formId);
-  const totalPages = getTotalPages(formId);
-
-  if (currentPage === totalPages) {
-    loadDecisionFlowSummary(formId);
-    bindDecisionFlowRefresh(formId);
-  }
-}
-
-function loadDecisionFlowSummary(formId) {
-  const $ = window.jQuery || window.$;
-  if (!$) {
-    console.warn('jQuery not available for loadDecisionFlowSummary');
-    return;
-  }
-
-  const $summaryContainer = getCachedElement(`#decision-flow-summary-${formId}`);
-
-  if ($summaryContainer.length === 0) {
-    console.log('❌ No decision flow summary container found for form:', formId);
-    return;
-  }
-
-  const processInstanceId = getStoredProcessInstanceId(formId);
-
-  if (!processInstanceId) {
-    $summaryContainer.html(
-      '<div class="decision-flow-placeholder">' +
-        '<h3>🔍 Decision Flow Results</h3>' +
-        '<p><em>Complete the evaluation on the previous step to see the detailed decision flow summary here.</em></p>' +
-        '</div>'
-    );
-    return;
-  }
-
-  $summaryContainer.html(
-    '<div class="decision-flow-loading">' +
-      '<h3>🔍 Decision Flow Results</h3>' +
-      '<p>⏳ Loading decision flow summary...</p>' +
-      '</div>'
-  );
-
-  $.ajax({
-    url: window.operaton_ajax.url.replace('/evaluate', `/decision-flow/${formId}`),
-    type: 'GET',
-    headers: {
-      'X-WP-Nonce': window.operaton_ajax.nonce,
-    },
-    success: function (response) {
-      if (response.success && response.html) {
-        $summaryContainer.html(response.html);
-
-        $summaryContainer.append(
-          '<div style="margin-top: 15px;">' +
-            `<button type="button" class="button refresh-decision-flow" data-form-id="${formId}">` +
-            '🔄 Refresh Decision Flow' +
-            '</button>' +
-            '</div>'
-        );
-
-        $('html, body').animate(
-          {
-            scrollTop: $summaryContainer.offset().top - 100,
-          },
-          500
-        );
-      } else {
-        $summaryContainer.html(
-          '<div class="decision-flow-error">' +
-            '<h3>🔍 Decision Flow Results</h3>' +
-            '<p><em>Could not load decision flow summary.</em></p>' +
-            '</div>'
-        );
-      }
-    },
-    error: function (xhr, status, error) {
-      console.error('❌ Decision flow error:', error);
-      $summaryContainer.html(
-        '<div class="decision-flow-error">' +
-          '<h3>🔍 Decision Flow Results</h3>' +
-          `<p><em>Error loading decision flow: ${error}</em></p>` +
-          '</div>'
-      );
-    },
-  });
-}
-
-function bindDecisionFlowRefresh(formId) {
-  $(document).off(`click.decision-flow-${formId}`, `.refresh-decision-flow[data-form-id="${formId}"]`);
-  $(document).on(`click.decision-flow-${formId}`, `.refresh-decision-flow[data-form-id="${formId}"]`, function (e) {
-    e.preventDefault();
-    console.log('🔄 Refreshing decision flow for form:', formId);
-
-    const $button = $(this);
-    const originalText = $button.text();
-    $button.text('🔄 Refreshing...').prop('disabled', true);
-
-    setTimeout(() => {
-      loadDecisionFlowSummary(formId);
-      $button.text(originalText).prop('disabled', false);
-    }, 500);
-  });
-}
-
-// =============================================================================
 // OPTIMIZED FORM EVALUATION FUNCTIONS
 // =============================================================================
 
@@ -1187,6 +1093,11 @@ function handleEvaluateClick($button) {
 
             if (response.process_instance_id && config.show_decision_flow) {
               message += '\n\n📋 Complete the form to see the detailed decision flow summary on the final page.';
+
+              // Notify decision flow manager about new process instance
+              if (typeof window.OperatonDecisionFlow !== 'undefined') {
+                window.OperatonDecisionFlow.clearCache();
+              }
             }
 
             showSuccessNotification(message);
@@ -1310,6 +1221,10 @@ function clearResultFieldWithMessage(formId, reason) {
 
   clearStoredResults(formId);
   clearDOMCache(formId);
+  // Clear decision flow cache when results are cleared
+  if (typeof window.OperatonDecisionFlow !== 'undefined') {
+    window.OperatonDecisionFlow.clearCache();
+  }
 }
 
 /**
