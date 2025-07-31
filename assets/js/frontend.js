@@ -40,6 +40,7 @@ window.operatonInitialized = window.operatonInitialized || {
  * OPTIMIZED: Debounced form initialization with stronger duplicate prevention
  */
 const formInitializationTimeouts = new Map();
+const formInitializationState = new Map();
 const initializationPromises = new Map();
 const formConfigCache = new Map();
 const domQueryCache = new Map();
@@ -608,25 +609,39 @@ function smartFormDetection() {
 function initializeFormEvaluation(formId) {
   formId = parseInt(formId);
 
+  // CRITICAL FIX: Check if already initializing or initialized
+  if (formInitializationState.has(formId)) {
+    const state = formInitializationState.get(formId);
+    if (state === 'initializing' || state === 'complete') {
+      console.log('🔄 Form', formId, 'initialization already in progress/complete');
+      return;
+    }
+  }
+
+  // Mark as initializing immediately
+  formInitializationState.set(formId, 'initializing');
+
   // Check if already initialized (double-check)
   if (window.operatonInitialized.forms.has(formId)) {
     console.log('🔄 Form', formId, 'already initialized at evaluation level');
+    formInitializationState.set(formId, 'complete');
     return;
   }
 
   const config = getFormConfigCached(formId);
   if (!config) {
     console.log('❌ No configuration found for form:', formId);
+    formInitializationState.delete(formId);
     return;
   }
 
   console.log('=== OPTIMIZED INITIALIZING FORM', formId, '===');
 
-  // Mark as initializing immediately
-  window.operatonInitialized.forms.add(formId);
-
   try {
-    // Bind events with optimized selectors
+    // Mark as initializing in both systems
+    window.operatonInitialized.forms.add(formId);
+
+    // Your existing initialization code...
     bindEvaluationEventsOptimized(formId);
     bindNavigationEventsOptimized(formId);
     bindInputChangeListenersOptimized(formId);
@@ -641,11 +656,13 @@ function initializeFormEvaluation(formId) {
       clearResultFieldWithMessage(formId, 'Form initialized');
     }, 200);
 
+    formInitializationState.set(formId, 'complete');
     console.log('=== FORM', formId, 'INITIALIZATION COMPLETE ===');
   } catch (error) {
     console.error('❌ Error initializing form', formId, ':', error);
-    // Remove from initialized set if initialization failed
+    // Clean up on error
     window.operatonInitialized.forms.delete(formId);
+    formInitializationState.delete(formId);
   }
 }
 

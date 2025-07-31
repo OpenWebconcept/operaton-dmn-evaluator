@@ -102,15 +102,24 @@
         summaryPage
       );
 
+      // CRITICAL FIX: Clear any existing timeout to prevent conflicts
+      if (this.loadTimeout) {
+        clearTimeout(this.loadTimeout);
+        this.loadTimeout = null;
+      }
+
       if (currentPage === summaryPage) {
-        // We're on the summary page - load decision flow with delay
-        this.loadWithDelay(formId);
+        // CRITICAL FIX: Only load if not already loading/loaded
+        if (!this.loadingFlows.has(formId)) {
+          this.loadWithDelay(formId);
+        }
       } else {
-        // We're not on summary page - hide decision flow
+        // We're not on summary page - hide decision flow and clear loading state
         this.hideDecisionFlow(formId);
+        this.loadingFlows.delete(formId); // Clear loading state
       }
     },
-
+    
     /**
      * Check current page and load decision flow if appropriate
      *
@@ -132,7 +141,12 @@
       );
 
       if (currentPage === summaryPage) {
-        this.loadWithDelay(formId);
+        // CRITICAL FIX: Check if already loading or loaded
+        if (!this.loadingFlows.has(formId) && !this.loadedFlows.has(formId)) {
+          this.loadWithDelay(formId);
+        } else {
+          console.log('📊 Decision Flow: Already loading/loaded for form', formId);
+        }
       }
     },
 
@@ -587,12 +601,17 @@
    */
   window.loadDecisionFlowSummary = function (formId, forceReload = false) {
     if (typeof window.OperatonDecisionFlow !== 'undefined') {
+      // CRITICAL FIX: Prevent duplicate loading
+      if (window.OperatonDecisionFlow.loadingFlows.has(formId) && !forceReload) {
+        console.log('📊 Decision Flow: Already loading for form', formId, '- skipping duplicate');
+        return;
+      }
+
       window.OperatonDecisionFlow.loadDecisionFlow(formId, forceReload);
     } else {
       console.error('📊 Decision Flow: Manager not available');
     }
   };
-
   /**
    * Global function to hide decision flow
    * Called from frontend.js during page transitions

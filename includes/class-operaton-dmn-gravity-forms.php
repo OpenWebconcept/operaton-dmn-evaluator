@@ -1080,6 +1080,10 @@ class Operaton_DMN_Gravity_Forms
      * OPTIMIZED: Generate JavaScript with aggressive caching
      * CRITICAL FIX: Integrate with existing frontend.js button management system
      */
+    /**
+     * OPTIMIZED: Generate JavaScript with aggressive caching
+     * CRITICAL FIX: Integrate with existing frontend.js button management system
+     */
     private function generate_optimized_form_control_script($form_id, $target_page, $show_decision_flow, $use_process, $config)
     {
         return sprintf(
@@ -1111,75 +1115,104 @@ class Operaton_DMN_Gravity_Forms
     }
 
     function integratedButtonPlacement() {
-        var currentPage = getCurrentPage();
+        // CRITICAL FIX: Prevent duplicate execution
+        var lockKey = "operatonButtonPlacement_" + formId;
+        if (window[lockKey]) {
+            console.log("⏸️ INTEGRATED: Button placement already running for form " + formId);
+            return;
+        }
 
-        console.log("🔧 INTEGRATED: Form " + formId + " - Current page:", currentPage, "Target:", targetPage);
+        window[lockKey] = true;
 
-        // CRITICAL FIX: Use frontend.js functions if available, fallback to direct manipulation
-        if (currentPage === targetPage) {
-            console.log("✅ INTEGRATED: Showing evaluate button for form " + formId);
+        try {
+            var currentPage = getCurrentPage();
 
-            // Use frontend.js function if available
-            if (typeof window.showEvaluateButton === "function") {
-                window.showEvaluateButton(formId);
+            console.log("🔧 INTEGRATED: Form " + formId + " - Current page:", currentPage, "Target:", targetPage);
+
+            // CRITICAL FIX: Use frontend.js functions if available, fallback to direct manipulation
+            if (currentPage === targetPage) {
+                console.log("✅ INTEGRATED: Showing evaluate button for form " + formId);
+
+                // Use frontend.js function if available
+                if (typeof window.showEvaluateButton === "function") {
+                    window.showEvaluateButton(formId);
+                } else {
+                    // Fallback: direct button show
+                    var $button = $("#operaton-evaluate-" + formId);
+                    var $form = $("#gform_" + formId);
+                    var $target = $form.find(".gform_body, .gform_footer").first();
+
+                    if ($target.length && $button.length) {
+                        $button.detach().appendTo($target);
+                        $button.addClass("operaton-show-button").show();
+                    }
+                }
+
+                // Hide decision flow if showing button
+                if (typeof window.hideAllElements === "function") {
+                    // Don\'t call hideAllElements as it might hide the button we just showed
+                    var $summary = $("#decision-flow-summary-" + formId);
+                    $summary.removeClass("operaton-show-summary").hide();
+                } else {
+                    // Fallback: direct manipulation
+                    var $summary = $("#decision-flow-summary-" + formId);
+                    $summary.removeClass("operaton-show-summary").hide();
+                }
+
+            } else if (currentPage === (targetPage + 1) && showDecisionFlow && useProcess) {
+                console.log("📊 INTEGRATED: Showing decision flow for form " + formId);
+
+                // Use frontend.js function if available
+                if (typeof window.showDecisionFlowSummary === "function") {
+                    window.showDecisionFlowSummary(formId);
+                } else {
+                    // Fallback: direct manipulation
+                    var $button = $("#operaton-evaluate-" + formId);
+                    var $summary = $("#decision-flow-summary-" + formId);
+                    $button.removeClass("operaton-show-button").hide();
+                    $summary.addClass("operaton-show-summary").show();
+
+                    // Load decision flow manually if frontend.js not available
+                    loadDecisionFlowSummaryFallback();
+                }
+
             } else {
-                // Fallback: direct button show
-                var $button = $("#operaton-evaluate-" + formId);
-                var $form = $("#gform_" + formId);
-                var $target = $form.find(".gform_body, .gform_footer").first();
+                console.log("❌ INTEGRATED: Hiding elements for form " + formId);
 
-                if ($target.length && $button.length) {
-                    $button.detach().appendTo($target);
-                    $button.addClass("operaton-show-button").show();
+                // Use frontend.js function if available
+                if (typeof window.hideAllElements === "function") {
+                    window.hideAllElements(formId);
+                } else {
+                    // Fallback: direct manipulation
+                    var $button = $("#operaton-evaluate-" + formId);
+                    var $summary = $("#decision-flow-summary-" + formId);
+                    $button.removeClass("operaton-show-button").hide();
+                    $summary.removeClass("operaton-show-summary").hide();
                 }
             }
 
-            // Hide decision flow if showing button
-            if (typeof window.hideAllElements === "function") {
-                // Don\'t call hideAllElements as it might hide the button we just showed
-                var $summary = $("#decision-flow-summary-" + formId);
-                $summary.removeClass("operaton-show-summary").hide();
-            }
-
-        } else if (currentPage === (targetPage + 1) && showDecisionFlow && useProcess) {
-            console.log("📊 INTEGRATED: Showing decision flow for form " + formId);
-
-            // Use frontend.js function if available
-            if (typeof window.showDecisionFlowSummary === "function") {
-                window.showDecisionFlowSummary(formId);
-            } else {
-                // Fallback: direct manipulation
-                var $button = $("#operaton-evaluate-" + formId);
-                var $summary = $("#decision-flow-summary-" + formId);
-                $button.removeClass("operaton-show-button").hide();
-                $summary.addClass("operaton-show-summary").show();
-            }
-
-            loadDecisionFlowSummaryOptimized();
-
-        } else {
-            console.log("❌ INTEGRATED: Hiding elements for form " + formId);
-
-            // Use frontend.js function if available
-            if (typeof window.hideAllElements === "function") {
-                window.hideAllElements(formId);
-            } else {
-                // Fallback: direct manipulation
-                var $button = $("#operaton-evaluate-" + formId);
-                var $summary = $("#decision-flow-summary-" + formId);
-                $button.removeClass("operaton-show-button").hide();
-                $summary.removeClass("operaton-show-summary").hide();
-            }
+        } finally {
+            // Always clear the flag after a short delay
+            setTimeout(function() {
+                window[lockKey] = false;
+            }, 100);
         }
     }
 
-    function loadDecisionFlowSummaryOptimized() {
-        var container = $("#decision-flow-summary-" + formId);
+    function loadDecisionFlowSummaryFallback() {
+        // CRITICAL FIX: Prevent duplicate loading
+        var loadKey = "operatonDecisionFlowLoading_" + formId;
+        if (window[loadKey]) {
+            console.log("⏸️ INTEGRATED: Decision flow already loading for form " + formId);
+            return;
+        }
 
+        var container = $("#decision-flow-summary-" + formId);
         if (container.hasClass("loading") || container.hasClass("loaded")) {
             return;
         }
 
+        window[loadKey] = true;
         container.addClass("loading");
         container.html("<div style=\"padding: 20px; text-align: center;\"><p>⏳ Loading decision flow...</p></div>");
 
@@ -1196,15 +1229,16 @@ class Operaton_DMN_Gravity_Forms
                 }
             },
             error: function(xhr, status, error) {
-                container.html("<div style=\"padding: 20px;\"><p><em>Error loading decision flow.</em></p></div>");
+                container.html("<div style=\"padding: 20px;\"><p><em>Error loading decision flow: " + error + "</em></p></div>");
             },
             complete: function() {
                 container.removeClass("loading");
+                window[loadKey] = false;
             }
         });
     }
 
-    // CRITICAL FIX: Wait for frontend.js to be available
+    // CRITICAL FIX: Wait for frontend.js to be available with timeout
     function waitForFrontendJS() {
         var attempts = 0;
         var maxAttempts = 20;
@@ -1222,34 +1256,49 @@ class Operaton_DMN_Gravity_Forms
                 // Initialize with integration
                 integratedButtonPlacement();
 
-                // Set up event handlers
-                $(document).on("gform_page_loaded", function(event, form_id, current_page) {
-                    if (form_id == formId) {
-                        console.log("📄 INTEGRATED: Page loaded event - Form:", form_id, "Page:", current_page);
-                        setTimeout(integratedButtonPlacement, 200);
-                    }
-                });
+                // Set up event handlers with duplicate prevention
+                var eventHandlersSet = "operatonEventHandlers_" + formId;
+                if (!window[eventHandlersSet]) {
+                    window[eventHandlersSet] = true;
 
-                // URL change detection
-                var currentUrl = window.location.href;
-                setInterval(function() {
-                    if (window.location.href !== currentUrl) {
-                        currentUrl = window.location.href;
-                        console.log("🔄 INTEGRATED: URL changed, re-evaluating button placement");
-                        setTimeout(integratedButtonPlacement, 300);
-                    }
-                }, 500);
+                    $(document).on("gform_page_loaded", function(event, form_id, current_page) {
+                        if (form_id == formId) {
+                            console.log("📄 INTEGRATED: Page loaded event - Form:", form_id, "Page:", current_page);
+                            setTimeout(integratedButtonPlacement, 200);
+                        }
+                    });
 
-                // Final fallback check
-                setTimeout(function() {
-                    var currentPage = getCurrentPage();
-                    var $button = $("#operaton-evaluate-" + formId);
+                    // URL change detection with throttling
+                    var currentUrl = window.location.href;
+                    var urlCheckInterval = setInterval(function() {
+                        if (window.location.href !== currentUrl) {
+                            currentUrl = window.location.href;
+                            console.log("🔄 INTEGRATED: URL changed, re-evaluating button placement");
+                            setTimeout(integratedButtonPlacement, 300);
+                        }
+                    }, 500);
 
-                    if (currentPage === targetPage && !$button.is(":visible")) {
-                        console.log("🔧 INTEGRATED: Fallback - Button should be visible but isn\'t");
-                        integratedButtonPlacement();
-                    }
-                }, 2000);
+                    // Clear interval after 30 seconds to prevent memory leaks
+                    setTimeout(function() {
+                        clearInterval(urlCheckInterval);
+                    }, 30000);
+                }
+
+                // Final fallback check with duplicate prevention
+                var fallbackCheckDone = "operatonFallbackCheck_" + formId;
+                if (!window[fallbackCheckDone]) {
+                    window[fallbackCheckDone] = true;
+
+                    setTimeout(function() {
+                        var currentPage = getCurrentPage();
+                        var $button = $("#operaton-evaluate-" + formId);
+
+                        if (currentPage === targetPage && !$button.is(":visible")) {
+                            console.log("🔧 INTEGRATED: Fallback - Button should be visible but isn\'t");
+                            integratedButtonPlacement();
+                        }
+                    }, 2000);
+                }
 
             } else {
                 setTimeout(checkFrontend, 250);
@@ -1259,27 +1308,32 @@ class Operaton_DMN_Gravity_Forms
         checkFrontend();
     }
 
-    // Initialize when DOM is ready
-    $(document).ready(function() {
-        console.log("🚀 INTEGRATED: Starting integrated button placement for form " + formId);
-        waitForFrontendJS();
-    });
+    // Initialize when DOM is ready with duplicate prevention
+    var domReadyHandlerSet = "operatonDomReady_" + formId;
+    if (!window[domReadyHandlerSet]) {
+        window[domReadyHandlerSet] = true;
 
-    // Additional initialization when window loads
-    $(window).on("load", function() {
-        setTimeout(function() {
-            console.log("🔄 INTEGRATED: Window loaded - checking integrated button placement");
-            integratedButtonPlacement();
-        }, 500);
-    });
+        $(document).ready(function() {
+            console.log("🚀 INTEGRATED: Starting integrated button placement for form " + formId);
+            waitForFrontendJS();
+        });
+
+        // Additional initialization when window loads
+        $(window).on("load", function() {
+            setTimeout(function() {
+                console.log("🔄 INTEGRATED: Window loaded - checking integrated button placement");
+                integratedButtonPlacement();
+            }, 500);
+        });
+    }
 
 })(jQuery);',
-            $form_id,
-            $form_id,
-            $target_page,
-            $show_decision_flow ? 'true' : 'false',
-            $use_process ? 'true' : 'false',
-            home_url()
+            $form_id,                                    // First %d
+            $form_id,                                    // Second %d
+            $target_page,                               // Third %d
+            $show_decision_flow ? 'true' : 'false',     // First %s
+            $use_process ? 'true' : 'false',            // Second %s
+            home_url()                                  // Third %s
         );
     }
 
