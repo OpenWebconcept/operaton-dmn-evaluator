@@ -41,13 +41,29 @@ This plugin is part of the [OpenWebconcept](https://github.com/OpenWebconcept) e
 
 All notable changes to this project are documented in the [CHANGELOG.md](./CHANGELOG.md).
 
-## 🚀 Key Features (v1.0.0-beta.12) ✨ NEW
+## What's New in v1.0.0-beta.12  ✨
 
-With this latest version, work was done to improve code quality and a thorough test infrastructure was established.
+### **1. Complete Test Coverage Implementation**
+- ✅ **29 comprehensive unit tests** covering all critical functionality
+- ✅ **117 assertions** ensuring robust validation across all scenarios
+- ✅ **Sub-second execution** (33ms locally, 12s in CI/CD)
+- ✅ **100% test success rate** with automated quality gates
 
-- **Complete Test Coverage Implementation**
-- **Professional CI/CD Pipeline**
-- **Comprehensive Test Categories**
+### **2. Professional CI/CD Pipeline**
+- ✅ **GitLab CI/CD integration** with automated testing on every commit
+- ✅ **Multi-stage pipeline** (build, test, quality, security)
+- ✅ **JUnit XML reporting** for GitLab test result visualization
+- ✅ **Automated security scanning** with vulnerability detection
+- ✅ **Code quality enforcement** with PSR12 standards (1,216 auto-fixes applied)
+
+### **3. Comprehensive Test Categories**
+- ✅ **Unit Tests**: Individual component testing (API, Database, Performance)
+- ✅ **Integration Tests**: Multi-component workflow validation
+- ✅ **E2E Tests (Cypress)**: Live environment browser testing (6 tests, 3s execution)
+- ✅ **E2E Tests (Playwright)**: Cross-browser testing (10 tests, 2 browsers, 14.6s execution)
+- ✅ **Security Tests**: XSS prevention, SQL injection protection, input sanitization
+- ✅ **Performance Tests**: Throughput benchmarking, memory usage monitoring
+- ✅ **Error Handling Tests**: Graceful degradation and failure recovery
 
 You will find a comprehensive description in the [TESTS](./TESTS.md) readme.
 
@@ -651,27 +667,3 @@ All API calls are automatically monitored:
 - **Operaton Engine Compatibility**: 7.x+
 
 ---
-
-## What's New in v1.0.0-beta.12  ✨
-
-### **1. Complete Test Coverage Implementation**
-- ✅ **29 comprehensive unit tests** covering all critical functionality
-- ✅ **117 assertions** ensuring robust validation across all scenarios
-- ✅ **Sub-second execution** (33ms locally, 12s in CI/CD)
-- ✅ **100% test success rate** with automated quality gates
-
-### **2. Professional CI/CD Pipeline**
-- ✅ **GitLab CI/CD integration** with automated testing on every commit
-- ✅ **Multi-stage pipeline** (build, test, quality, security)
-- ✅ **JUnit XML reporting** for GitLab test result visualization
-- ✅ **Automated security scanning** with vulnerability detection
-- ✅ **Code quality enforcement** with PSR12 standards (1,216 auto-fixes applied)
-
-### **3. Comprehensive Test Categories**
-- ✅ **Unit Tests**: Individual component testing (API, Database, Performance)
-- ✅ **Integration Tests**: Multi-component workflow validation
-- ✅ **E2E Tests (Cypress)**: Live environment browser testing (6 tests, 3s execution)
-- ✅ **E2E Tests (Playwright)**: Cross-browser testing (10 tests, 2 browsers, 14.6s execution)
-- ✅ **Security Tests**: XSS prevention, SQL injection protection, input sanitization
-- ✅ **Performance Tests**: Throughput benchmarking, memory usage monitoring
-- ✅ **Error Handling Tests**: Graceful degradation and failure recovery
