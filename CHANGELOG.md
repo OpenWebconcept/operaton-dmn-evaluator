@@ -1,5 +1,88 @@
 # Changelog
 All notable changes to this project will be documented in this file.
+
+## [1.0.0-beta.12] - 2025-08-01
+
+## Issues
+- [Issue #17](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/17)
+
+### 🏆 **What Has Been Achieved: Testing Infrastructure**
+
+#### **1. Complete Test Coverage Implementation**
+- ✅ **29 comprehensive unit tests** covering all critical functionality
+- ✅ **117 assertions** ensuring robust validation across all scenarios
+- ✅ **Sub-second execution** (33ms locally, 12s in CI/CD)
+- ✅ **100% test success rate** with automated quality gates
+
+#### **2. Professional CI/CD Pipeline**
+- ✅ **GitLab CI/CD integration** with automated testing on every commit
+- ✅ **Multi-stage pipeline** (build, test, quality, security)
+- ✅ **JUnit XML reporting** for GitLab test result visualization
+- ✅ **Automated security scanning** with vulnerability detection
+- ✅ **Code quality enforcement** with PSR12 standards (1,216 auto-fixes applied)
+
+#### **3. Comprehensive Test Categories**
+- ✅ **Unit Tests**: Individual component testing (API, Database, Performance)
+- ✅ **Integration Tests**: Multi-component workflow validation
+- ✅ **E2E Tests (Cypress)**: Live environment browser testing (6 tests, 3s execution)
+- ✅ **E2E Tests (Playwright)**: Cross-browser testing (10 tests, 2 browsers, 14.6s execution)
+- ✅ **Security Tests**: XSS prevention, SQL injection protection, input sanitization
+- ✅ **Performance Tests**: Throughput benchmarking, memory usage monitoring
+- ✅ **Error Handling Tests**: Graceful degradation and failure recovery
+
+### Recommended Development Workflow
+
+#### Daily Development:
+```bash
+# Quick check (tests + security)
+composer run ci
+# ✅ Tests: 29 passed, Security: clean
+
+# Full quality check (includes linting summary)
+composer run quality
+# ✅ Tests + linting summary + security
+
+# Run E2E tests against live environment
+npm run cypress:run
+# ✅ 6 tests passing (3s)
+
+npm run playwright:test
+# ✅ 10 tests passing, 2 browsers (14.6s)
+```
+
+#### Before Commits:
+```bash
+# Format and check
+composer run format
+# ✅ Auto-fixes issues + shows summary
+
+# Full verification including E2E
+composer run check
+npm run test:e2e:all
+# ✅ Tests + quality gates + cross-browser validation
+
+# Full verification
+composer run check
+# ✅ Tests + quality gates
+```
+
+#### E2E Testing Commands:
+```bash
+# Cypress E2E Tests
+npm run cypress:open          # Open Cypress GUI
+npm run cypress:run           # Run headless
+npm run test:e2e             # Alias for cypress:run
+
+# Playwright E2E Tests
+npm run playwright:test       # Run cross-browser tests
+npm run playwright:ui         # Open Playwright UI
+npm run playwright:headed     # Run with visible browser
+npm run test:e2e:playwright   # Alias for playwright:test
+
+# Run All E2E Tests
+npm run test:e2e:all         # Both Cypress and Playwright
+```
+
 ## [1.0.0-beta.11] - 2025-07-31
 
 ### 🎯 Critical Bug Fixes
