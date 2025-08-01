@@ -67,6 +67,8 @@ All notable changes to this project are documented in the [CHANGELOG.md](./CHANG
 
 You will find a comprehensive description in the [TESTS](./TESTS.md) readme.
 
+## Plugin Architecture (v1.0.0-beta.11)
+
 ### Enterprise-Grade Architecture
 - **Manager-Based Design**: Modular architecture with specialized managers for different functionality
 - **Performance Monitoring**: Real-time performance tracking with sub-millisecond precision
@@ -94,10 +96,6 @@ You will find a comprehensive description in the [TESTS](./TESTS.md) readme.
 - **Clean State Management**: Intelligent clearing of results when form inputs change
 - **Visual Feedback**: Enhanced notifications and professional result presentation
 - **Comprehensive Debug Support**: Advanced logging and decision flow analysis
-
----
-
-## Plugin Architecture (v1.0.0-beta.11)
 
 ### Manager-Based Design ✨ NEW
 
