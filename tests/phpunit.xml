@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<phpunit bootstrap="tests/bootstrap.php" colors="true">
+    <testsuites>
+        <testsuite name="default">
+            <directory>tests/unit</directory>
+            <directory>tests/integration</directory>
+        </testsuite>
+        <testsuite name="unit">
+            <directory>tests/unit</directory>
+        </testsuite>
+        <testsuite name="integration">
+            <directory>tests/integration</directory>
+        </testsuite>
+    </testsuites>
+
+    <coverage processUncoveredFiles="true">
+        <include>
+            <directory suffix=".php">./includes/</directory>
+            <file>./operaton-dmn-plugin.php</file>
+        </include>
+        <exclude>
+            <directory>./tests/</directory>
+            <directory>./vendor/</directory>
+        </exclude>
+    </coverage>
+
+    <logging>
+        <log type="coverage-html" target="coverage"/>
+        <log type="junit" target="junit.xml"/>
+    </logging>
+</phpunit>

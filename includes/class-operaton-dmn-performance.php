@@ -10,14 +10,12 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH'))
-{
+if (!defined('ABSPATH')) {
     exit;
 }
 
 class Operaton_DMN_Performance_Monitor
 {
-
     /**
      * Singleton instance
      */
@@ -53,8 +51,7 @@ class Operaton_DMN_Performance_Monitor
      */
     public static function get_instance()
     {
-        if (null === self::$instance)
-        {
+        if (null === self::$instance) {
             self::$instance = new self();
         }
         return self::$instance;
@@ -114,8 +111,7 @@ class Operaton_DMN_Performance_Monitor
         $this->milestones[$name] = $milestone;
 
         // Log immediately if debug enabled
-        if ($this->debug_enabled)
-        {
+        if ($this->debug_enabled) {
             $this->log_milestone($milestone);
         }
 
@@ -128,8 +124,7 @@ class Operaton_DMN_Performance_Monitor
     private function log_milestone($milestone)
     {
         $context_str = '';
-        if (!empty($milestone['context']))
-        {
+        if (!empty($milestone['context'])) {
             $context_str = ' | Context: ' . wp_json_encode($milestone['context']);
         }
 
@@ -168,10 +163,8 @@ class Operaton_DMN_Performance_Monitor
         $start_key = $timer_id . '_start';
         $end_key = $timer_id . '_end';
 
-        if (!isset($this->milestones[$start_key]))
-        {
-            if ($this->debug_enabled)
-            {
+        if (!isset($this->milestones[$start_key])) {
+            if ($this->debug_enabled) {
                 error_log('⚠️ Operaton Performance: Timer not found: ' . $timer_id);
             }
             return;
@@ -185,8 +178,7 @@ class Operaton_DMN_Performance_Monitor
         $duration = $end_time - $start_time;
 
         // Log duration
-        if ($this->debug_enabled)
-        {
+        if ($this->debug_enabled) {
             error_log(sprintf(
                 '⏳ Operaton Performance: %s took %sms%s',
                 str_replace('_' . explode('_', $timer_id)[1], '', $timer_id),
@@ -227,15 +219,12 @@ class Operaton_DMN_Performance_Monitor
     {
         $operations = array();
 
-        foreach ($this->milestones as $name => $milestone)
-        {
-            if (strpos($name, '_start') !== false)
-            {
+        foreach ($this->milestones as $name => $milestone) {
+            if (strpos($name, '_start') !== false) {
                 $base_name = str_replace('_start', '', $name);
                 $end_name = $base_name . '_end';
 
-                if (isset($this->milestones[$end_name]))
-                {
+                if (isset($this->milestones[$end_name])) {
                     $duration = $this->milestones[$end_name]['time_ms'] - $milestone['time_ms'];
                     $operations[] = array(
                         'name' => $base_name,
@@ -246,8 +235,7 @@ class Operaton_DMN_Performance_Monitor
         }
 
         // Sort by duration descending
-        usort($operations, function ($a, $b)
-        {
+        usort($operations, function ($a, $b) {
             return $b['duration_ms'] <=> $a['duration_ms'];
         });
 
@@ -262,8 +250,7 @@ class Operaton_DMN_Performance_Monitor
         $operations = $this->milestones;
 
         // Sort by peak memory descending
-        uasort($operations, function ($a, $b)
-        {
+        uasort($operations, function ($a, $b) {
             return $b['memory_peak'] <=> $a['memory_peak'];
         });
 
@@ -275,8 +262,7 @@ class Operaton_DMN_Performance_Monitor
      */
     public function log_final_summary()
     {
-        if (!$this->debug_enabled)
-        {
+        if (!$this->debug_enabled) {
             return;
         }
 
@@ -288,20 +274,16 @@ class Operaton_DMN_Performance_Monitor
         error_log('Peak Memory: ' . $summary['peak_memory_formatted']);
         error_log('Milestones: ' . $summary['milestone_count']);
 
-        if (!empty($summary['slowest_operations']))
-        {
+        if (!empty($summary['slowest_operations'])) {
             error_log('Slowest Operations:');
-            foreach ($summary['slowest_operations'] as $op)
-            {
+            foreach ($summary['slowest_operations'] as $op) {
                 error_log('  ' . $op['name'] . ': ' . $op['duration_ms'] . 'ms');
             }
         }
 
         error_log('Key Milestones:');
-        foreach ($this->milestones as $name => $milestone)
-        {
-            if (!strpos($name, '_start') && !strpos($name, '_end'))
-            {
+        foreach ($this->milestones as $name => $milestone) {
+            if (!strpos($name, '_start') && !strpos($name, '_end')) {
                 error_log('  ' . $name . ': ' . $milestone['time_ms'] . 'ms');
             }
         }
@@ -334,8 +316,7 @@ class Operaton_DMN_Performance_Monitor
     {
         $stats = get_transient('operaton_performance_stats');
 
-        if (!$stats)
-        {
+        if (!$stats) {
             $stats = array(
                 'requests_today' => 0,
                 'avg_response_time' => 0,
@@ -372,18 +353,15 @@ class Operaton_DMN_Performance_Monitor
     {
         $recommendations = array();
 
-        if ($summary['total_time_ms'] > 2000)
-        {
+        if ($summary['total_time_ms'] > 2000) {
             $recommendations[] = 'Request took longer than 2 seconds. Consider optimization.';
         }
 
-        if ($summary['peak_memory'] > 64 * 1024 * 1024)
-        { // 64MB
+        if ($summary['peak_memory'] > 64 * 1024 * 1024) { // 64MB
             $recommendations[] = 'High memory usage detected. Review memory-intensive operations.';
         }
 
-        if ($summary['milestone_count'] > 50)
-        {
+        if ($summary['milestone_count'] > 50) {
             $recommendations[] = 'Many performance milestones. Consider reducing monitoring in production.';
         }
 
@@ -397,8 +375,7 @@ class Operaton_DMN_Performance_Monitor
     {
         $units = array('B', 'KB', 'MB', 'GB', 'TB');
 
-        for ($i = 0; $size > 1024 && $i < count($units) - 1; $i++)
-        {
+        for ($i = 0; $size > 1024 && $i < count($units) - 1; $i++) {
             $size /= 1024;
         }
 

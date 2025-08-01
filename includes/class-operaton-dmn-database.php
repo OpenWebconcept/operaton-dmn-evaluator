@@ -12,14 +12,12 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH'))
-{
+if (!defined('ABSPATH')) {
     exit;
 }
 
 class Operaton_DMN_Database
 {
-
     /**
      * Database table name for configurations
      * WordPress prefixed table name for plugin configurations
@@ -80,8 +78,7 @@ class Operaton_DMN_Database
         $this->plugin_version = $plugin_version;
         $this->table_name = $this->wpdb->prefix . 'operaton_dmn_configs';
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Manager initialized with version ' . $plugin_version);
         }
 
@@ -119,14 +116,12 @@ class Operaton_DMN_Database
      */
     public function create_database_tables()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Creating/updating database tables');
         }
 
         // Check if table already exists and handle column additions
-        if ($this->wpdb->get_var("SHOW TABLES LIKE '{$this->table_name}'") === $this->table_name)
-        {
+        if ($this->wpdb->get_var("SHOW TABLES LIKE '{$this->table_name}'") === $this->table_name) {
             return $this->add_missing_columns();
         }
 
@@ -158,13 +153,11 @@ class Operaton_DMN_Database
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         $result = dbDelta($sql);
 
-        if ($result)
-        {
+        if ($result) {
             // Update database version
             update_option($this->db_version_option, $this->current_db_version);
 
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Operaton DMN Database: Table created successfully');
             }
         }
@@ -195,22 +188,16 @@ class Operaton_DMN_Database
             'updated_at' => "ADD COLUMN updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
         );
 
-        foreach ($required_columns as $column_name => $sql_definition)
-        {
-            if (!in_array($column_name, $columns))
-            {
+        foreach ($required_columns as $column_name => $sql_definition) {
+            if (!in_array($column_name, $columns)) {
                 $result = $this->wpdb->query("ALTER TABLE {$this->table_name} {$sql_definition}");
 
-                if ($result !== false)
-                {
+                if ($result !== false) {
                     $added_columns++;
-                    if (defined('WP_DEBUG') && WP_DEBUG)
-                    {
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
                         error_log("Operaton DMN Database: Added column '{$column_name}'");
                     }
-                }
-                else
-                {
+                } else {
                     error_log("Operaton DMN Database: Failed to add column '{$column_name}': " . $this->wpdb->last_error);
                 }
             }
@@ -219,8 +206,7 @@ class Operaton_DMN_Database
         // Add indexes if they don't exist
         $this->add_missing_indexes();
 
-        if ($added_columns > 0)
-        {
+        if ($added_columns > 0) {
             update_option($this->db_version_option, $this->current_db_version);
         }
 
@@ -240,8 +226,7 @@ class Operaton_DMN_Database
             'idx_process_key' => "CREATE INDEX idx_process_key ON {$this->table_name} (process_key)"
         );
 
-        foreach ($indexes as $index_name => $sql)
-        {
+        foreach ($indexes as $index_name => $sql) {
             // Check if index exists
             $index_exists = $this->wpdb->get_var(
                 $this->wpdb->prepare(
@@ -253,8 +238,7 @@ class Operaton_DMN_Database
                 )
             );
 
-            if (!$index_exists)
-            {
+            if (!$index_exists) {
                 $this->wpdb->query($sql);
             }
         }
@@ -271,22 +255,18 @@ class Operaton_DMN_Database
     {
         $installed_db_version = get_option($this->db_version_option, 0);
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log("Operaton DMN Database: Checking database version - installed: {$installed_db_version}, current: {$this->current_db_version}");
         }
 
         // Check if table exists at all
-        if ($this->wpdb->get_var("SHOW TABLES LIKE '{$this->table_name}'") !== $this->table_name)
-        {
+        if ($this->wpdb->get_var("SHOW TABLES LIKE '{$this->table_name}'") !== $this->table_name) {
             return $this->create_database_tables();
         }
 
         // Check if migration is needed
-        if (version_compare($installed_db_version, $this->current_db_version, '<'))
-        {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
+        if (version_compare($installed_db_version, $this->current_db_version, '<')) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log("Operaton DMN Database: Migration needed from version {$installed_db_version} to {$this->current_db_version}");
             }
 
@@ -308,32 +288,25 @@ class Operaton_DMN_Database
     {
         $success = true;
 
-        try
-        {
+        try {
             // Version 1 to 2: Add result_mappings and evaluation_step
-            if ($from_version < 2)
-            {
+            if ($from_version < 2) {
                 $success &= $this->migrate_to_version_2();
             }
 
             // Version 2 to 3: Add process execution support
-            if ($from_version < 3)
-            {
+            if ($from_version < 3) {
                 $success &= $this->migrate_to_version_3();
             }
 
-            if ($success)
-            {
+            if ($success) {
                 update_option($this->db_version_option, $this->current_db_version);
 
-                if (defined('WP_DEBUG') && WP_DEBUG)
-                {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
                     error_log("Operaton DMN Database: Migration completed successfully to version {$this->current_db_version}");
                 }
             }
-        }
-        catch (Exception $e)
-        {
+        } catch (Exception $e) {
             error_log('Operaton DMN Database: Migration failed: ' . $e->getMessage());
             $success = false;
         }
@@ -352,20 +325,16 @@ class Operaton_DMN_Database
     {
         $columns = $this->wpdb->get_col("SHOW COLUMNS FROM {$this->table_name}");
 
-        if (!in_array('result_mappings', $columns))
-        {
+        if (!in_array('result_mappings', $columns)) {
             $result = $this->wpdb->query("ALTER TABLE {$this->table_name} ADD COLUMN result_mappings longtext NOT NULL DEFAULT '{}'");
-            if ($result === false)
-            {
+            if ($result === false) {
                 return false;
             }
         }
 
-        if (!in_array('evaluation_step', $columns))
-        {
+        if (!in_array('evaluation_step', $columns)) {
             $result = $this->wpdb->query("ALTER TABLE {$this->table_name} ADD COLUMN evaluation_step varchar(10) DEFAULT 'auto'");
-            if ($result === false)
-            {
+            if ($result === false) {
                 return false;
             }
         }
@@ -389,13 +358,10 @@ class Operaton_DMN_Database
             'show_decision_flow' => "ADD COLUMN show_decision_flow boolean DEFAULT false"
         );
 
-        foreach ($process_columns as $column => $sql)
-        {
-            if (!in_array($column, $columns))
-            {
+        foreach ($process_columns as $column => $sql) {
+            if (!in_array($column, $columns)) {
                 $result = $this->wpdb->query("ALTER TABLE {$this->table_name} {$sql}");
-                if ($result === false)
-                {
+                if ($result === false) {
                     return false;
                 }
             }
@@ -418,8 +384,7 @@ class Operaton_DMN_Database
      */
     public function get_all_configurations($args = array())
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Retrieving all configurations');
         }
 
@@ -438,19 +403,16 @@ class Operaton_DMN_Database
 
         // Add ORDER BY
         $allowed_orderby = array('id', 'name', 'form_id', 'created_at', 'updated_at');
-        if (in_array($args['orderby'], $allowed_orderby))
-        {
+        if (in_array($args['orderby'], $allowed_orderby)) {
             $order = strtoupper($args['order']) === 'ASC' ? 'ASC' : 'DESC';
             $sql .= " ORDER BY {$args['orderby']} {$order}";
         }
 
         // Add LIMIT
-        if ($args['limit'])
-        {
+        if ($args['limit']) {
             $sql .= $this->wpdb->prepare(" LIMIT %d", $args['limit']);
 
-            if ($args['offset'])
-            {
+            if ($args['offset']) {
                 $sql .= $this->wpdb->prepare(" OFFSET %d", $args['offset']);
             }
         }
@@ -469,19 +431,16 @@ class Operaton_DMN_Database
      */
     public function get_configuration($id, $use_cache = true)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Retrieving configuration with ID: ' . $id);
         }
 
         $cache_key = "operaton_dmn_config_{$id}";
 
         // Try cache first
-        if ($use_cache)
-        {
+        if ($use_cache) {
             $cached = wp_cache_get($cache_key, 'operaton_dmn');
-            if ($cached !== false)
-            {
+            if ($cached !== false) {
                 return $cached;
             }
         }
@@ -491,8 +450,7 @@ class Operaton_DMN_Database
         );
 
         // Cache the result
-        if ($use_cache && $config)
-        {
+        if ($use_cache && $config) {
             wp_cache_set($cache_key, $config, 'operaton_dmn', 3600); // Cache for 1 hour
         }
 
@@ -512,17 +470,14 @@ class Operaton_DMN_Database
     {
         static $cache = array();
 
-        if ($use_cache && isset($cache[$form_id]))
-        {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
+        if ($use_cache && isset($cache[$form_id])) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Operaton DMN Database: Using cached config for form: ' . $form_id);
             }
             return $cache[$form_id];
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Loading config from database for form: ' . $form_id);
         }
 
@@ -530,8 +485,7 @@ class Operaton_DMN_Database
             $this->wpdb->prepare("SELECT * FROM {$this->table_name} WHERE form_id = %d", $form_id)
         );
 
-        if ($use_cache)
-        {
+        if ($use_cache) {
             $cache[$form_id] = $config;
         }
 
@@ -548,15 +502,13 @@ class Operaton_DMN_Database
      */
     public function save_configuration($data)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Saving configuration');
         }
 
         // Validate data first
         $validation_result = $this->validate_configuration_data($data);
-        if (is_wp_error($validation_result))
-        {
+        if (is_wp_error($validation_result)) {
             return $validation_result;
         }
 
@@ -565,19 +517,15 @@ class Operaton_DMN_Database
 
         $config_id = isset($data['config_id']) ? intval($data['config_id']) : 0;
 
-        if ($config_id > 0)
-        {
+        if ($config_id > 0) {
             // Update existing configuration
             $result = $this->update_configuration($config_id, $config_data);
-        }
-        else
-        {
+        } else {
             // Create new configuration
             $result = $this->create_configuration($config_data);
         }
 
-        if ($result && !is_wp_error($result))
-        {
+        if ($result && !is_wp_error($result)) {
             // Clear caches
             $this->clear_configuration_cache();
 
@@ -608,8 +556,7 @@ class Operaton_DMN_Database
             )
         );
 
-        if ($existing)
-        {
+        if ($existing) {
             return new WP_Error(
                 'duplicate_form_id',
                 __('A configuration for this form already exists.', 'operaton-dmn')
@@ -622,8 +569,7 @@ class Operaton_DMN_Database
             array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%d')
         );
 
-        if ($result === false)
-        {
+        if ($result === false) {
             return new WP_Error(
                 'database_error',
                 sprintf(__('Database error: %s', 'operaton-dmn'), $this->wpdb->last_error)
@@ -646,8 +592,7 @@ class Operaton_DMN_Database
     {
         // Check if configuration exists
         $existing = $this->get_configuration($config_id, false);
-        if (!$existing)
-        {
+        if (!$existing) {
             return new WP_Error(
                 'config_not_found',
                 __('Configuration not found.', 'operaton-dmn')
@@ -663,8 +608,7 @@ class Operaton_DMN_Database
             )
         );
 
-        if ($duplicate)
-        {
+        if ($duplicate) {
             return new WP_Error(
                 'duplicate_form_id',
                 __('Another configuration for this form already exists.', 'operaton-dmn')
@@ -679,8 +623,7 @@ class Operaton_DMN_Database
             array('%d')
         );
 
-        if ($result === false)
-        {
+        if ($result === false) {
             return new WP_Error(
                 'database_error',
                 sprintf(__('Database error: %s', 'operaton-dmn'), $this->wpdb->last_error)
@@ -700,22 +643,19 @@ class Operaton_DMN_Database
      */
     public function delete_config($id)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Deleting configuration with ID: ' . $id);
         }
 
         // Validate ID
         $id = intval($id);
-        if ($id <= 0)
-        {
+        if ($id <= 0) {
             return new WP_Error('invalid_id', __('Invalid configuration ID.', 'operaton-dmn'));
         }
 
         // Check if configuration exists
         $config = $this->get_configuration($id, false);
-        if (!$config)
-        {
+        if (!$config) {
             return new WP_Error('config_not_found', __('Configuration not found.', 'operaton-dmn'));
         }
 
@@ -726,16 +666,14 @@ class Operaton_DMN_Database
             array('%d')
         );
 
-        if ($result === false)
-        {
+        if ($result === false) {
             return new WP_Error(
                 'database_error',
                 sprintf(__('Database error: %s', 'operaton-dmn'), $this->wpdb->last_error)
             );
         }
 
-        if ($result === 0)
-        {
+        if ($result === 0) {
             return new WP_Error('config_not_found', __('Configuration not found.', 'operaton-dmn'));
         }
 
@@ -764,14 +702,12 @@ class Operaton_DMN_Database
      */
     public function store_process_instance_id($form_id, $process_instance_id)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log("Operaton DMN Database: Storing process instance ID: {$process_instance_id} for form: {$form_id}");
         }
 
         // Validate inputs
-        if (empty($form_id) || empty($process_instance_id))
-        {
+        if (empty($form_id) || empty($process_instance_id)) {
             return false;
         }
 
@@ -779,23 +715,20 @@ class Operaton_DMN_Database
         $process_instance_id = sanitize_text_field($process_instance_id);
 
         // Store in session if available
-        if (session_status() === PHP_SESSION_NONE)
-        {
+        if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
         $_SESSION["operaton_process_{$form_id}"] = $process_instance_id;
 
         // Store in user meta if user is logged in
-        if (is_user_logged_in())
-        {
+        if (is_user_logged_in()) {
             $result = update_user_meta(
                 get_current_user_id(),
                 "operaton_process_{$form_id}",
                 $process_instance_id
             );
 
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log("Operaton DMN Database: User meta storage result: " . ($result ? 'success' : 'failed'));
             }
         }
@@ -817,40 +750,32 @@ class Operaton_DMN_Database
      */
     public function get_process_instance_id($form_id)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Retrieving process instance ID for form: ' . $form_id);
         }
 
         $form_id = intval($form_id);
-        if ($form_id <= 0)
-        {
+        if ($form_id <= 0) {
             return null;
         }
 
         // Try session first
-        if (session_status() === PHP_SESSION_NONE)
-        {
+        if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
 
-        if (isset($_SESSION["operaton_process_{$form_id}"]))
-        {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
+        if (isset($_SESSION["operaton_process_{$form_id}"])) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Operaton DMN Database: Found process ID in session');
             }
             return sanitize_text_field($_SESSION["operaton_process_{$form_id}"]);
         }
 
         // Try user meta if logged in
-        if (is_user_logged_in())
-        {
+        if (is_user_logged_in()) {
             $process_id = get_user_meta(get_current_user_id(), "operaton_process_{$form_id}", true);
-            if ($process_id)
-            {
-                if (defined('WP_DEBUG') && WP_DEBUG)
-                {
+            if ($process_id) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
                     error_log('Operaton DMN Database: Found process ID in user meta');
                 }
                 return sanitize_text_field($process_id);
@@ -861,10 +786,8 @@ class Operaton_DMN_Database
         $transient_key = "operaton_process_{$form_id}_" . (is_user_logged_in() ? get_current_user_id() : session_id());
         $process_id = get_transient($transient_key);
 
-        if ($process_id)
-        {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
+        if ($process_id) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Operaton DMN Database: Found process ID in transients');
             }
             return sanitize_text_field($process_id);
@@ -885,27 +808,22 @@ class Operaton_DMN_Database
      */
     public function ajax_manual_database_update()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Manual database update requested');
         }
 
         // Verify nonce and permissions
-        if (!wp_verify_nonce($_GET['_wpnonce'], 'operaton_manual_db_update') || !current_user_can('manage_options'))
-        {
+        if (!wp_verify_nonce($_GET['_wpnonce'], 'operaton_manual_db_update') || !current_user_can('manage_options')) {
             wp_die(__('Security check failed', 'operaton-dmn'));
         }
 
         // Perform database update
         $result = $this->check_and_update_database();
 
-        if ($result)
-        {
+        if ($result) {
             $message = __('Database updated successfully!', 'operaton-dmn');
             $notice_type = 'success';
-        }
-        else
-        {
+        } else {
             $message = __('Database update failed. Please check the error log.', 'operaton-dmn');
             $notice_type = 'error';
         }
@@ -936,8 +854,7 @@ class Operaton_DMN_Database
     {
         $errors = array();
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Validating configuration data');
         }
 
@@ -948,10 +865,8 @@ class Operaton_DMN_Database
             'dmn_endpoint' => __('DMN Base Endpoint URL', 'operaton-dmn'),
         );
 
-        foreach ($required_fields as $field => $label)
-        {
-            if (empty($data[$field]))
-            {
+        foreach ($required_fields as $field => $label) {
+            if (empty($data[$field])) {
                 $errors[] = sprintf(__('%s is required.', 'operaton-dmn'), $label);
             }
         }
@@ -959,51 +874,38 @@ class Operaton_DMN_Database
         // Decision key OR process key is required
         $use_process = isset($data['use_process']) && $data['use_process'];
 
-        if ($use_process)
-        {
-            if (empty($data['process_key']))
-            {
+        if ($use_process) {
+            if (empty($data['process_key'])) {
                 $errors[] = __('Process Key is required when using process execution.', 'operaton-dmn');
             }
-        }
-        else
-        {
-            if (empty($data['decision_key']))
-            {
+        } else {
+            if (empty($data['decision_key'])) {
                 $errors[] = __('Decision Key is required when using direct decision evaluation.', 'operaton-dmn');
             }
         }
 
         // URL validation
-        if (!empty($data['dmn_endpoint']) && !filter_var($data['dmn_endpoint'], FILTER_VALIDATE_URL))
-        {
+        if (!empty($data['dmn_endpoint']) && !filter_var($data['dmn_endpoint'], FILTER_VALIDATE_URL)) {
             $errors[] = __('DMN Base Endpoint URL is not valid.', 'operaton-dmn');
         }
 
         // Key validation
         $key_to_validate = $use_process ? ($data['process_key'] ?? '') : ($data['decision_key'] ?? '');
-        if (!empty($key_to_validate))
-        {
-            if (!preg_match('/^[a-zA-Z0-9_-]+$/', trim($key_to_validate)))
-            {
+        if (!empty($key_to_validate)) {
+            if (!preg_match('/^[a-zA-Z0-9_-]+$/', trim($key_to_validate))) {
                 $key_type = $use_process ? 'Process key' : 'Decision key';
                 $errors[] = sprintf(__('%s should only contain letters, numbers, hyphens, and underscores.', 'operaton-dmn'), $key_type);
             }
         }
 
         // Form ID validation
-        if (!empty($data['form_id']))
-        {
+        if (!empty($data['form_id'])) {
             $form_id = intval($data['form_id']);
-            if ($form_id <= 0)
-            {
+            if ($form_id <= 0) {
                 $errors[] = __('Invalid form ID.', 'operaton-dmn');
-            }
-            elseif (class_exists('GFAPI'))
-            {
+            } elseif (class_exists('GFAPI')) {
                 $form = GFAPI::get_form($form_id);
-                if (!$form)
-                {
+                if (!$form) {
                     $errors[] = __('Selected Gravity Form does not exist.', 'operaton-dmn');
                 }
             }
@@ -1011,20 +913,17 @@ class Operaton_DMN_Database
 
         // Field mappings validation
         $has_input_mappings = $this->validate_field_mappings($data, $errors);
-        if (!$has_input_mappings)
-        {
+        if (!$has_input_mappings) {
             $errors[] = __('At least one input field mapping is required.', 'operaton-dmn');
         }
 
         // Result mappings validation
         $has_result_mappings = $this->validate_result_mappings($data, $errors);
-        if (!$has_result_mappings)
-        {
+        if (!$has_result_mappings) {
             $errors[] = __('At least one result field mapping is required.', 'operaton-dmn');
         }
 
-        if (!empty($errors))
-        {
+        if (!empty($errors)) {
             return new WP_Error('validation_failed', implode(' ', $errors), $errors);
         }
 
@@ -1044,28 +943,23 @@ class Operaton_DMN_Database
     {
         $has_mappings = false;
 
-        if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable']))
-        {
+        if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
             $dmn_variables = $data['field_mappings_dmn_variable'];
             $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
 
-            for ($i = 0; $i < count($dmn_variables); $i++)
-            {
+            for ($i = 0; $i < count($dmn_variables); $i++) {
                 $dmn_var = trim($dmn_variables[$i]);
                 $field_id = isset($field_ids[$i]) ? trim($field_ids[$i]) : '';
 
-                if (!empty($dmn_var) && !empty($field_id))
-                {
+                if (!empty($dmn_var) && !empty($field_id)) {
                     $has_mappings = true;
 
-                    if (!is_numeric($field_id))
-                    {
+                    if (!is_numeric($field_id)) {
                         $errors[] = sprintf(__('Field ID "%s" must be numeric.', 'operaton-dmn'), $field_id);
                     }
 
                     // Validate field exists in form
-                    if (class_exists('GFAPI') && !empty($data['form_id']))
-                    {
+                    if (class_exists('GFAPI') && !empty($data['form_id'])) {
                         $this->validate_field_exists_in_form($data['form_id'], $field_id, $errors, 'Input');
                     }
                 }
@@ -1088,28 +982,23 @@ class Operaton_DMN_Database
     {
         $has_mappings = false;
 
-        if (isset($data['result_mappings_dmn_result']) && is_array($data['result_mappings_dmn_result']))
-        {
+        if (isset($data['result_mappings_dmn_result']) && is_array($data['result_mappings_dmn_result'])) {
             $dmn_results = $data['result_mappings_dmn_result'];
             $result_field_ids = isset($data['result_mappings_field_id']) ? $data['result_mappings_field_id'] : array();
 
-            for ($i = 0; $i < count($dmn_results); $i++)
-            {
+            for ($i = 0; $i < count($dmn_results); $i++) {
                 $dmn_result = trim($dmn_results[$i]);
                 $field_id = isset($result_field_ids[$i]) ? trim($result_field_ids[$i]) : '';
 
-                if (!empty($dmn_result) && !empty($field_id))
-                {
+                if (!empty($dmn_result) && !empty($field_id)) {
                     $has_mappings = true;
 
-                    if (!is_numeric($field_id))
-                    {
+                    if (!is_numeric($field_id)) {
                         $errors[] = sprintf(__('Result field ID "%s" must be numeric.', 'operaton-dmn'), $field_id);
                     }
 
                     // Validate field exists in form
-                    if (class_exists('GFAPI') && !empty($data['form_id']))
-                    {
+                    if (class_exists('GFAPI') && !empty($data['form_id'])) {
                         $this->validate_field_exists_in_form($data['form_id'], $field_id, $errors, 'Result');
                     }
                 }
@@ -1132,19 +1021,15 @@ class Operaton_DMN_Database
     private function validate_field_exists_in_form($form_id, $field_id, &$errors, $field_type = 'Field')
     {
         $form = GFAPI::get_form($form_id);
-        if ($form)
-        {
+        if ($form) {
             $field_exists = false;
-            foreach ($form['fields'] as $form_field)
-            {
-                if ($form_field->id == $field_id)
-                {
+            foreach ($form['fields'] as $form_field) {
+                if ($form_field->id == $field_id) {
                     $field_exists = true;
                     break;
                 }
             }
-            if (!$field_exists)
-            {
+            if (!$field_exists) {
                 $errors[] = sprintf(__('%s field ID "%s" does not exist in the selected form.', 'operaton-dmn'), $field_type, $field_id);
             }
         }
@@ -1163,22 +1048,19 @@ class Operaton_DMN_Database
         // Process field mappings
         $field_mappings = array();
 
-        if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable']))
-        {
+        if (isset($data['field_mappings_dmn_variable']) && is_array($data['field_mappings_dmn_variable'])) {
             $dmn_variables = $data['field_mappings_dmn_variable'];
             $field_ids = isset($data['field_mappings_field_id']) ? $data['field_mappings_field_id'] : array();
             $types = isset($data['field_mappings_type']) ? $data['field_mappings_type'] : array();
             $radio_names = isset($data['field_mappings_radio_name']) ? $data['field_mappings_radio_name'] : array();
 
-            for ($i = 0; $i < count($dmn_variables); $i++)
-            {
+            for ($i = 0; $i < count($dmn_variables); $i++) {
                 $dmn_var = sanitize_text_field(trim($dmn_variables[$i]));
                 $field_id = isset($field_ids[$i]) ? sanitize_text_field(trim($field_ids[$i])) : '';
                 $type = isset($types[$i]) ? sanitize_text_field($types[$i]) : 'String';
                 $radio_name = isset($radio_names[$i]) ? sanitize_text_field(trim($radio_names[$i])) : '';
 
-                if (!empty($dmn_var) && !empty($field_id))
-                {
+                if (!empty($dmn_var) && !empty($field_id)) {
                     $field_mappings[$dmn_var] = array(
                         'field_id' => $field_id,
                         'type' => $type,
@@ -1191,18 +1073,15 @@ class Operaton_DMN_Database
         // Process result mappings
         $result_mappings = array();
 
-        if (isset($data['result_mappings_dmn_result']) && is_array($data['result_mappings_dmn_result']))
-        {
+        if (isset($data['result_mappings_dmn_result']) && is_array($data['result_mappings_dmn_result'])) {
             $dmn_results = $data['result_mappings_dmn_result'];
             $result_field_ids = isset($data['result_mappings_field_id']) ? $data['result_mappings_field_id'] : array();
 
-            for ($i = 0; $i < count($dmn_results); $i++)
-            {
+            for ($i = 0; $i < count($dmn_results); $i++) {
                 $dmn_result = sanitize_text_field(trim($dmn_results[$i]));
                 $field_id = isset($result_field_ids[$i]) ? sanitize_text_field(trim($result_field_ids[$i])) : '';
 
-                if (!empty($dmn_result) && !empty($field_id))
-                {
+                if (!empty($dmn_result) && !empty($field_id)) {
                     $result_mappings[$dmn_result] = array(
                         'field_id' => $field_id
                     );
@@ -1237,8 +1116,7 @@ class Operaton_DMN_Database
      */
     public function clear_configuration_cache()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Clearing configuration cache');
         }
 
@@ -1259,14 +1137,12 @@ class Operaton_DMN_Database
      */
     public function cleanup_old_data()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Database: Running cleanup task');
         }
 
         // Clean up old process instance data (older than 7 days)
-        if (is_user_logged_in())
-        {
+        if (is_user_logged_in()) {
             global $wpdb;
 
             // Clean old user meta entries
@@ -1310,15 +1186,13 @@ class Operaton_DMN_Database
         );
 
         // Delete expired transients and their timeout options
-        foreach ($expired_transients as $timeout_option)
-        {
+        foreach ($expired_transients as $timeout_option) {
             $transient_option = str_replace('_timeout_', '_', $timeout_option);
             delete_option($timeout_option);
             delete_option($transient_option);
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG && !empty($expired_transients))
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG && !empty($expired_transients)) {
             error_log('Operaton DMN Database: Cleaned up ' . count($expired_transients) . ' expired transients');
         }
     }
@@ -1364,8 +1238,7 @@ class Operaton_DMN_Database
             )
         );
 
-        if ($table_status)
-        {
+        if ($table_status) {
             $stats['table_size'] = $table_status->size_bytes;
         }
 
@@ -1374,8 +1247,7 @@ class Operaton_DMN_Database
             "SELECT MAX(updated_at) FROM {$this->table_name}"
         );
 
-        if ($last_updated)
-        {
+        if ($last_updated) {
             $stats['last_updated'] = $last_updated;
         }
 
@@ -1403,8 +1275,7 @@ class Operaton_DMN_Database
         $table_exists = $this->wpdb->get_var("SHOW TABLES LIKE '{$this->table_name}'") === $this->table_name;
         $health['table_exists'] = $table_exists;
 
-        if (!$table_exists)
-        {
+        if (!$table_exists) {
             $health['issues'][] = __('Main configuration table does not exist.', 'operaton-dmn');
             return $health;
         }
@@ -1431,8 +1302,7 @@ class Operaton_DMN_Database
         $missing_columns = array_diff($required_columns, $columns);
         $health['all_columns_exist'] = empty($missing_columns);
 
-        if (!empty($missing_columns))
-        {
+        if (!empty($missing_columns)) {
             $health['issues'][] = sprintf(
                 __('Missing columns: %s', 'operaton-dmn'),
                 implode(', ', $missing_columns)
@@ -1443,8 +1313,7 @@ class Operaton_DMN_Database
         $can_read = $this->wpdb->get_var("SELECT COUNT(*) FROM {$this->table_name}") !== null;
         $health['permissions_ok'] = $can_read;
 
-        if (!$can_read)
-        {
+        if (!$can_read) {
             $health['issues'][] = __('Cannot read from configuration table.', 'operaton-dmn');
         }
 

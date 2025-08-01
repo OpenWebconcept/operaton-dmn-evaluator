@@ -6,14 +6,12 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH'))
-{
+if (!defined('ABSPATH')) {
     exit;
 }
 
 // Only load in admin and for authorized users
-if (!is_admin())
-{
+if (!is_admin()) {
     return;
 }
 
@@ -22,7 +20,6 @@ if (!is_admin())
  */
 class OperatonDMNUpdateDebugger
 {
-
     private $gitlab_url = 'https://git.open-regels.nl';
     private $project_id = '39';
 
@@ -46,8 +43,7 @@ class OperatonDMNUpdateDebugger
 
     public function monitor_upgrader_start($hook_extra)
     {
-        if (isset($hook_extra['plugin']) && strpos($hook_extra['plugin'], 'operaton-dmn') !== false)
-        {
+        if (isset($hook_extra['plugin']) && strpos($hook_extra['plugin'], 'operaton-dmn') !== false) {
             error_log('=== V11.5 MONITOR: UPGRADER START ===');
             error_log('V11.5 Monitor: Plugin: ' . $hook_extra['plugin']);
         }
@@ -56,8 +52,7 @@ class OperatonDMNUpdateDebugger
 
     public function monitor_pre_download($result, $package, $upgrader)
     {
-        if (strpos($package, 'operaton') !== false || strpos($package, 'dmn') !== false)
-        {
+        if (strpos($package, 'operaton') !== false || strpos($package, 'dmn') !== false) {
             error_log('=== V11.5 MONITOR: PRE DOWNLOAD ===');
             error_log('V11.5 Monitor: Package: ' . $package);
         }
@@ -66,8 +61,7 @@ class OperatonDMNUpdateDebugger
 
     public function monitor_unpack_package($result, $package, $delete_package_after, $hook_extra)
     {
-        if ((isset($hook_extra['plugin']) && strpos($hook_extra['plugin'], 'operaton-dmn') !== false))
-        {
+        if ((isset($hook_extra['plugin']) && strpos($hook_extra['plugin'], 'operaton-dmn') !== false)) {
             error_log('=== V11.5 MONITOR: UNPACK PACKAGE ===');
             error_log('V11.5 Monitor: Package: ' . (is_string($package) ? $package : gettype($package)));
         }
@@ -76,8 +70,7 @@ class OperatonDMNUpdateDebugger
 
     public function monitor_unzip_file($result, $file, $to, $needed_dirs)
     {
-        if (strpos($file, 'operaton') !== false || strpos($file, 'dmn') !== false)
-        {
+        if (strpos($file, 'operaton') !== false || strpos($file, 'dmn') !== false) {
             error_log('=== V11.5 MONITOR: UNZIP FILE ===');
             error_log('V11.5 Monitor: Source file: ' . $file);
             error_log('V11.5 Monitor: Target directory: ' . $to);
@@ -87,20 +80,15 @@ class OperatonDMNUpdateDebugger
 
     public function monitor_install_package_result($result, $hook_extra)
     {
-        if ((isset($hook_extra['plugin']) && strpos($hook_extra['plugin'], 'operaton-dmn') !== false))
-        {
+        if ((isset($hook_extra['plugin']) && strpos($hook_extra['plugin'], 'operaton-dmn') !== false)) {
             error_log('=== V11.5 MONITOR: INSTALL PACKAGE RESULT ===');
             error_log('V11.5 Monitor: Result: ' . print_r($result, true));
 
-            if (isset($result['destination']))
-            {
+            if (isset($result['destination'])) {
                 error_log('V11.5 Monitor: Final destination: ' . $result['destination']);
-                if (strpos($result['destination'], 'operaton-dmn-evaluator-v') !== false)
-                {
+                if (strpos($result['destination'], 'operaton-dmn-evaluator-v') !== false) {
                     error_log('V11.5 Monitor: ⚠️ WRONG DESTINATION DETECTED: ' . basename($result['destination']));
-                }
-                else
-                {
+                } else {
                     error_log('V11.5 Monitor: ✓ Correct destination: ' . basename($result['destination']));
                 }
             }
@@ -110,14 +98,12 @@ class OperatonDMNUpdateDebugger
 
     public function monitor_process_complete($upgrader, $hook_extra)
     {
-        if (isset($hook_extra['plugin']) && strpos($hook_extra['plugin'], 'operaton-dmn') !== false)
-        {
+        if (isset($hook_extra['plugin']) && strpos($hook_extra['plugin'], 'operaton-dmn') !== false) {
             error_log('=== V11.5 MONITOR: PROCESS COMPLETE ===');
             error_log('V11.5 Monitor: Plugin: ' . $hook_extra['plugin']);
 
             $plugin_path = WP_PLUGIN_DIR . '/operaton-dmn-evaluator';
-            if (is_dir($plugin_path))
-            {
+            if (is_dir($plugin_path)) {
                 $files = glob($plugin_path . '/*');
                 error_log('V11.5 Monitor: Final plugin files: ' . implode(', ', array_map('basename', $files)));
             }
@@ -126,8 +112,7 @@ class OperatonDMNUpdateDebugger
 
     public function monitor_filesystem_init($wp_filesystem)
     {
-        if ($wp_filesystem)
-        {
+        if ($wp_filesystem) {
             error_log('V11.5 Monitor: Filesystem initialized - Type: ' . get_class($wp_filesystem));
         }
     }
@@ -136,8 +121,7 @@ class OperatonDMNUpdateDebugger
     {
         error_log('Operaton DMN: init_debug_tools called');
 
-        if (!current_user_can('manage_options'))
-        {
+        if (!current_user_can('manage_options')) {
             return;
         }
 
@@ -171,7 +155,7 @@ class OperatonDMNUpdateDebugger
 
     public function debug_page()
     {
-?>
+        ?>
         <div class="wrap">
             <h1>🚀 Operaton DMN V11.5 Debug Dashboard</h1>
 
@@ -200,7 +184,7 @@ class OperatonDMNUpdateDebugger
                         <td><?php
                             $nuclear_mode = get_transient('operaton_dmn_v11_nuclear_mode');
                             echo $nuclear_mode ? '🔥 CURRENTLY ACTIVE' : '💤 Standby';
-                            ?></td>
+                        ?></td>
                     </tr>
                 </table>
             </div>
@@ -640,7 +624,7 @@ class OperatonDMNUpdateDebugger
                 });
             });
         </script>
-<?php
+        <?php
     }
 
     private function show_current_plugin_state()
@@ -649,8 +633,7 @@ class OperatonDMNUpdateDebugger
 
         echo '<h4>Directory Analysis</h4>';
 
-        if (is_dir($plugin_path))
-        {
+        if (is_dir($plugin_path)) {
             $files = glob($plugin_path . '/*');
             $corruption_indicators = array('hub', 'lates', 'or', 'pts', 'ts', 'udes', 'aton-dmn-plugin.php');
             $corrupted_files = array();
@@ -658,12 +641,10 @@ class OperatonDMNUpdateDebugger
             echo '<div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">';
             echo '<p><strong>Files found:</strong></p><ul style="columns: 2; margin: 0;">';
 
-            foreach ($files as $file)
-            {
+            foreach ($files as $file) {
                 $basename = basename($file);
                 $is_corrupted = in_array($basename, $corruption_indicators);
-                if ($is_corrupted)
-                {
+                if ($is_corrupted) {
                     $corrupted_files[] = $basename;
                 }
 
@@ -673,43 +654,32 @@ class OperatonDMNUpdateDebugger
             }
             echo '</ul>';
 
-            if (!empty($corrupted_files))
-            {
+            if (!empty($corrupted_files)) {
                 echo '<div style="background: #f8d7da; color: #721c24; padding: 10px; margin: 10px 0; border-radius: 3px;">';
                 echo '<strong>⚠️ Corruption detected!</strong> Files: ' . implode(', ', $corrupted_files);
                 echo '</div>';
-            }
-            else
-            {
+            } else {
                 echo '<div style="background: #d1eddd; color: #155724; padding: 10px; margin: 10px 0; border-radius: 3px;">';
                 echo '<strong>🎉 Perfect! No corruption detected!</strong>';
                 echo '</div>';
             }
 
             // Check main plugin file
-            if (file_exists($plugin_path . '/operaton-dmn-plugin.php'))
-            {
+            if (file_exists($plugin_path . '/operaton-dmn-plugin.php')) {
                 echo '<div style="color: green;">✅ Main plugin file: operaton-dmn-plugin.php</div>';
-            }
-            else
-            {
+            } else {
                 echo '<div style="color: red;">❌ Main plugin file missing!</div>';
             }
 
             // Check folder name
-            if (basename($plugin_path) === 'operaton-dmn-evaluator')
-            {
+            if (basename($plugin_path) === 'operaton-dmn-evaluator') {
                 echo '<div style="color: green;">✅ Perfect folder name: operaton-dmn-evaluator</div>';
-            }
-            else
-            {
+            } else {
                 echo '<div style="color: red;">❌ Wrong folder name: ' . basename($plugin_path) . '</div>';
             }
 
             echo '</div>';
-        }
-        else
-        {
+        } else {
             echo '<div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 3px;">⚠️ Plugin directory not found</div>';
         }
     }
@@ -717,8 +687,7 @@ class OperatonDMNUpdateDebugger
     // AJAX Handlers
     public function ajax_test_update_hooks()
     {
-        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug'))
-        {
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
             wp_send_json_error(array('message' => 'Security check failed'));
         }
 
@@ -731,19 +700,15 @@ class OperatonDMNUpdateDebugger
         $install_hook = 'Not found';
 
         // Check upgrader_pre_download hook
-        if (isset($wp_filter['upgrader_pre_download']))
-        {
-            foreach ($wp_filter['upgrader_pre_download']->callbacks as $priority => $callbacks)
-            {
-                foreach ($callbacks as $callback)
-                {
+        if (isset($wp_filter['upgrader_pre_download'])) {
+            foreach ($wp_filter['upgrader_pre_download']->callbacks as $priority => $callbacks) {
+                foreach ($callbacks as $callback) {
                     if (
                         is_array($callback['function']) &&
                         is_object($callback['function'][0]) &&
                         get_class($callback['function'][0]) === 'OperatonDMNAutoUpdater' &&
                         $callback['function'][1] === 'download_package'
-                    )
-                    {
+                    ) {
                         $download_hook = '✓ Registered (priority ' . $priority . ')';
                         break 2;
                     }
@@ -752,18 +717,14 @@ class OperatonDMNUpdateDebugger
         }
 
         // Check upgrader_unpack_package hook
-        if (isset($wp_filter['upgrader_unpack_package']))
-        {
-            foreach ($wp_filter['upgrader_unpack_package']->callbacks as $priority => $callbacks)
-            {
-                foreach ($callbacks as $callback)
-                {
+        if (isset($wp_filter['upgrader_unpack_package'])) {
+            foreach ($wp_filter['upgrader_unpack_package']->callbacks as $priority => $callbacks) {
+                foreach ($callbacks as $callback) {
                     if (
                         is_array($callback['function']) &&
                         is_object($callback['function'][0]) &&
                         get_class($callback['function'][0]) === 'OperatonDMNAutoUpdater'
-                    )
-                    {
+                    ) {
                         $unpack_hook = '✓ Registered (priority ' . $priority . ')';
                         break 2;
                     }
@@ -772,19 +733,15 @@ class OperatonDMNUpdateDebugger
         }
 
         // Check unzip_file hook
-        if (isset($wp_filter['unzip_file']))
-        {
-            foreach ($wp_filter['unzip_file']->callbacks as $priority => $callbacks)
-            {
-                foreach ($callbacks as $callback)
-                {
+        if (isset($wp_filter['unzip_file'])) {
+            foreach ($wp_filter['unzip_file']->callbacks as $priority => $callbacks) {
+                foreach ($callbacks as $callback) {
                     if (
                         is_array($callback['function']) &&
                         is_object($callback['function'][0]) &&
                         get_class($callback['function'][0]) === 'OperatonDMNAutoUpdater' &&
                         $callback['function'][1] === 'intercept_unzip'
-                    )
-                    {
+                    ) {
                         $unzip_hook = '✓ Registered (priority ' . $priority . ')';
                         break 2;
                     }
@@ -793,19 +750,15 @@ class OperatonDMNUpdateDebugger
         }
 
         // Check upgrader_install_package_result hook (V11.5 KEY HOOK!)
-        if (isset($wp_filter['upgrader_install_package_result']))
-        {
-            foreach ($wp_filter['upgrader_install_package_result']->callbacks as $priority => $callbacks)
-            {
-                foreach ($callbacks as $callback)
-                {
+        if (isset($wp_filter['upgrader_install_package_result'])) {
+            foreach ($wp_filter['upgrader_install_package_result']->callbacks as $priority => $callbacks) {
+                foreach ($callbacks as $callback) {
                     if (
                         is_array($callback['function']) &&
                         is_object($callback['function'][0]) &&
                         get_class($callback['function'][0]) === 'OperatonDMNAutoUpdater' &&
                         $callback['function'][1] === 'fix_install_package_result'
-                    )
-                    {
+                    ) {
                         $install_hook = '✓ Registered (priority ' . $priority . ') - V11.5 NUCLEAR!';
                         break 2;
                     }
@@ -814,20 +767,13 @@ class OperatonDMNUpdateDebugger
         }
 
         $v11_status = 'Unknown';
-        if ($install_hook !== 'Not found')
-        {
+        if ($install_hook !== 'Not found') {
             $v11_status = '🔥 V11.5 NUCLEAR MODE ACTIVE - Install package interception enabled!';
-        }
-        elseif ($unzip_hook !== 'Not found')
-        {
+        } elseif ($unzip_hook !== 'Not found') {
             $v11_status = '⚡ UNZIP INTERCEPTION ACTIVE';
-        }
-        elseif ($unpack_hook !== 'Not found')
-        {
+        } elseif ($unpack_hook !== 'Not found') {
             $v11_status = '📦 UNPACK OVERRIDE ACTIVE';
-        }
-        else
-        {
+        } else {
             $v11_status = '💤 NO V11.5 HOOKS DETECTED';
         }
 
@@ -844,8 +790,7 @@ class OperatonDMNUpdateDebugger
 
     public function ajax_v11_monitor_test()
     {
-        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug'))
-        {
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
             wp_send_json_error(array('message' => 'Security check failed'));
         }
 
@@ -862,22 +807,17 @@ class OperatonDMNUpdateDebugger
 
         $hook_status = array();
 
-        foreach ($monitoring_hooks as $hook => $method)
-        {
+        foreach ($monitoring_hooks as $hook => $method) {
             $found = false;
-            if (isset($wp_filter[$hook]))
-            {
-                foreach ($wp_filter[$hook]->callbacks as $priority => $callbacks)
-                {
-                    foreach ($callbacks as $callback)
-                    {
+            if (isset($wp_filter[$hook])) {
+                foreach ($wp_filter[$hook]->callbacks as $priority => $callbacks) {
+                    foreach ($callbacks as $callback) {
                         if (
                             is_array($callback['function']) &&
                             is_object($callback['function'][0]) &&
                             get_class($callback['function'][0]) === 'OperatonDMNUpdateDebugger' &&
                             $callback['function'][1] === $method
-                        )
-                        {
+                        ) {
                             $found = true;
                             $hook_status[$hook] = '✓ Active (priority ' . $priority . ')';
                             break 2;
@@ -885,20 +825,17 @@ class OperatonDMNUpdateDebugger
                     }
                 }
             }
-            if (!$found)
-            {
+            if (!$found) {
                 $hook_status[$hook] = '✗ Not found';
             }
         }
 
         wp_send_json_success(array(
             'monitoring_hooks' => $hook_status,
-            'total_hooks_active' => count(array_filter($hook_status, function ($status)
-            {
+            'total_hooks_active' => count(array_filter($hook_status, function ($status) {
                 return strpos($status, '✓') === 0;
             })),
-            'v11_monitoring_status' => count(array_filter($hook_status, function ($status)
-            {
+            'v11_monitoring_status' => count(array_filter($hook_status, function ($status) {
                 return strpos($status, '✓') === 0;
             })) >= 5 ? 'FULLY ACTIVE' : 'PARTIALLY ACTIVE',
             'monitoring_active' => true
@@ -907,13 +844,11 @@ class OperatonDMNUpdateDebugger
 
     public function ajax_v11_force_clean_extraction()
     {
-        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug'))
-        {
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
             wp_send_json_error(array('message' => 'Security check failed'));
         }
 
-        if (!class_exists('OperatonDMNAutoUpdater'))
-        {
+        if (!class_exists('OperatonDMNAutoUpdater')) {
             wp_send_json_error(array('message' => 'OperatonDMNAutoUpdater class not found'));
         }
 
@@ -935,8 +870,7 @@ class OperatonDMNUpdateDebugger
 
     public function ajax_test_update_api()
     {
-        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug'))
-        {
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
             wp_send_json_error(array('message' => 'Security check failed'));
         }
 
@@ -950,22 +884,18 @@ class OperatonDMNUpdateDebugger
 
         $results = array();
 
-        foreach ($endpoints_to_test as $name => $url)
-        {
+        foreach ($endpoints_to_test as $name => $url) {
             $response = wp_remote_get($url, array(
                 'timeout' => 10,
                 'headers' => array('Accept' => 'application/json')
             ));
 
-            if (is_wp_error($response))
-            {
+            if (is_wp_error($response)) {
                 $results[$name] = array(
                     'error' => $response->get_error_message(),
                     'url' => $url
                 );
-            }
-            else
-            {
+            } else {
                 $code = wp_remote_retrieve_response_code($response);
                 $body = wp_remote_retrieve_body($response);
 
@@ -986,8 +916,7 @@ class OperatonDMNUpdateDebugger
 
     public function ajax_v11_manual_fix()
     {
-        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug'))
-        {
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
             wp_send_json_error(array('message' => 'Security check failed'));
         }
 
@@ -995,15 +924,11 @@ class OperatonDMNUpdateDebugger
         $wrong_dirs = glob(WP_PLUGIN_DIR . '/operaton-dmn-evaluator-v*');
         $actions_taken = array();
 
-        if (!empty($wrong_dirs))
-        {
-            foreach ($wrong_dirs as $wrong_dir)
-            {
-                if (file_exists($wrong_dir . '/operaton-dmn-plugin.php'))
-                {
+        if (!empty($wrong_dirs)) {
+            foreach ($wrong_dirs as $wrong_dir) {
+                if (file_exists($wrong_dir . '/operaton-dmn-plugin.php')) {
                     $correct_path = WP_PLUGIN_DIR . '/operaton-dmn-evaluator';
-                    if (rename($wrong_dir, $correct_path))
-                    {
+                    if (rename($wrong_dir, $correct_path)) {
                         $actions_taken[] = 'Renamed ' . basename($wrong_dir) . ' to operaton-dmn-evaluator';
                         wp_send_json_success(array(
                             'final_status' => 'success',
@@ -1011,9 +936,7 @@ class OperatonDMNUpdateDebugger
                             'actions_taken' => $actions_taken
                         ));
                         return;
-                    }
-                    else
-                    {
+                    } else {
                         $actions_taken[] = 'Failed to rename ' . basename($wrong_dir);
                     }
                 }
@@ -1023,9 +946,7 @@ class OperatonDMNUpdateDebugger
                 'wrong_directories_found' => array_map('basename', $wrong_dirs),
                 'actions_taken' => $actions_taken
             ));
-        }
-        else
-        {
+        } else {
             wp_send_json_success(array(
                 'final_status' => 'success',
                 'wrong_directories_found' => array(),
@@ -1036,8 +957,7 @@ class OperatonDMNUpdateDebugger
 
     public function ajax_force_update_check()
     {
-        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug'))
-        {
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_update_debug')) {
             wp_send_json_error(array('message' => 'Security check failed'));
         }
 
@@ -1049,12 +969,9 @@ class OperatonDMNUpdateDebugger
         $update_plugins = get_site_transient('update_plugins');
         $our_plugin = null;
 
-        if (isset($update_plugins->response))
-        {
-            foreach ($update_plugins->response as $plugin => $data)
-            {
-                if (strpos($plugin, 'operaton-dmn') !== false)
-                {
+        if (isset($update_plugins->response)) {
+            foreach ($update_plugins->response as $plugin => $data) {
+                if (strpos($plugin, 'operaton-dmn') !== false) {
                     $our_plugin = $data;
                     break;
                 }

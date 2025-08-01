@@ -10,14 +10,12 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH'))
-{
+if (!defined('ABSPATH')) {
     exit;
 }
 
 class Operaton_DMN_Quirks_Fix
 {
-
     /**
      * Initialize quirks mode fixes
      */
@@ -54,8 +52,7 @@ class Operaton_DMN_Quirks_Fix
      */
     public function ensure_html5_doctype()
     {
-        if (!is_admin() && !headers_sent())
-        {
+        if (!is_admin() && !headers_sent()) {
             $this->prepare_doctype_fix();
         }
     }
@@ -65,8 +62,7 @@ class Operaton_DMN_Quirks_Fix
      */
     private function prepare_doctype_fix()
     {
-        if (!defined('OPERATON_DOCTYPE_CHECK'))
-        {
+        if (!defined('OPERATON_DOCTYPE_CHECK')) {
             define('OPERATON_DOCTYPE_CHECK', true);
         }
     }
@@ -77,20 +73,17 @@ class Operaton_DMN_Quirks_Fix
     public function conditional_start_output_buffer()
     {
         // Skip output buffering for admin pages
-        if (is_admin())
-        {
+        if (is_admin()) {
             return;
         }
 
         // CRITICAL FIX: Skip output buffering for AJAX and REST API calls
-        if ($this->is_ajax_or_rest_request())
-        {
+        if ($this->is_ajax_or_rest_request()) {
             return;
         }
 
         // Skip if headers already sent
-        if (headers_sent())
-        {
+        if (headers_sent()) {
             return;
         }
 
@@ -104,26 +97,22 @@ class Operaton_DMN_Quirks_Fix
     private function is_ajax_or_rest_request()
     {
         // Check for WordPress AJAX
-        if (defined('DOING_AJAX') && DOING_AJAX)
-        {
+        if (defined('DOING_AJAX') && DOING_AJAX) {
             return true;
         }
 
         // Check for REST API requests
-        if (defined('REST_REQUEST') && REST_REQUEST)
-        {
+        if (defined('REST_REQUEST') && REST_REQUEST) {
             return true;
         }
 
         // Check for wp-json in the URL
-        if (strpos($_SERVER['REQUEST_URI'], '/wp-json/') !== false)
-        {
+        if (strpos($_SERVER['REQUEST_URI'], '/wp-json/') !== false) {
             return true;
         }
 
         // Check for admin-ajax.php
-        if (strpos($_SERVER['REQUEST_URI'], '/wp-admin/admin-ajax.php') !== false)
-        {
+        if (strpos($_SERVER['REQUEST_URI'], '/wp-admin/admin-ajax.php') !== false) {
             return true;
         }
 
@@ -131,15 +120,13 @@ class Operaton_DMN_Quirks_Fix
         if (
             !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
             strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest'
-        )
-        {
+        ) {
             return true;
         }
 
         // Check for JSON content type in request
         $content_type = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : '';
-        if (strpos($content_type, 'application/json') !== false)
-        {
+        if (strpos($content_type, 'application/json') !== false) {
             return true;
         }
 
@@ -148,8 +135,7 @@ class Operaton_DMN_Quirks_Fix
         if (
             strpos($accept_header, 'application/json') !== false &&
             strpos($accept_header, 'text/html') === false
-        )
-        {
+        ) {
             return true;
         }
 
@@ -162,8 +148,7 @@ class Operaton_DMN_Quirks_Fix
     public function fix_doctype_in_output($content)
     {
         // Only process non-empty content
-        if (empty($content))
-        {
+        if (empty($content)) {
             return $content;
         }
 
@@ -171,14 +156,12 @@ class Operaton_DMN_Quirks_Fix
         $trimmed_content = ltrim($content);
 
         // Don't modify JSON responses
-        if (substr($trimmed_content, 0, 1) === '{' || substr($trimmed_content, 0, 1) === '[')
-        {
+        if (substr($trimmed_content, 0, 1) === '{' || substr($trimmed_content, 0, 1) === '[') {
             return $content;
         }
 
         // Don't modify XML responses
-        if (substr($trimmed_content, 0, 5) === '<?xml')
-        {
+        if (substr($trimmed_content, 0, 5) === '<?xml') {
             return $content;
         }
 
@@ -186,14 +169,11 @@ class Operaton_DMN_Quirks_Fix
         if (
             !preg_match('/^\s*<!DOCTYPE\s+html/i', $trimmed_content) &&
             (strpos($trimmed_content, '<html') !== false || strpos($trimmed_content, '<body') !== false)
-        )
-        {
-
+        ) {
             // Add proper DOCTYPE at the beginning
             $content = "<!DOCTYPE html>\n" . $content;
 
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Operaton DMN: Added missing DOCTYPE to page output');
             }
         }
@@ -206,8 +186,7 @@ class Operaton_DMN_Quirks_Fix
      */
     public function add_meta_tags()
     {
-        if (!is_admin() && !$this->is_ajax_or_rest_request())
-        {
+        if (!is_admin() && !$this->is_ajax_or_rest_request()) {
             echo '<meta http-equiv="X-UA-Compatible" content="IE=edge">' . "\n";
             echo '<meta charset="' . get_bloginfo('charset') . '">' . "\n";
             echo '<meta name="viewport" content="width=device-width, initial-scale=1">' . "\n";
@@ -220,12 +199,11 @@ class Operaton_DMN_Quirks_Fix
      */
     public function add_jquery_compatibility_fix()
     {
-        if (is_admin() || $this->is_ajax_or_rest_request())
-        {
+        if (is_admin() || $this->is_ajax_or_rest_request()) {
             return;
         }
 
-?>
+        ?>
         <script type="text/javascript">
             /* Operaton DMN: jQuery Compatibility Fix */
             (function() {
@@ -336,7 +314,7 @@ class Operaton_DMN_Quirks_Fix
                 }
             })();
         </script>
-    <?php
+        <?php
     }
 
     /**
@@ -344,12 +322,11 @@ class Operaton_DMN_Quirks_Fix
      */
     public function add_quirks_mode_javascript_fix()
     {
-        if (is_admin() || $this->is_ajax_or_rest_request())
-        {
+        if (is_admin() || $this->is_ajax_or_rest_request()) {
             return;
         }
 
-    ?>
+        ?>
         <script type="text/javascript">
             /* Operaton DMN: Enhanced Quirks Mode Compatibility Fix */
             (function() {
@@ -408,7 +385,7 @@ class Operaton_DMN_Quirks_Fix
                 }
             })();
         </script>
-    <?php
+        <?php
     }
 
     /**
@@ -416,12 +393,11 @@ class Operaton_DMN_Quirks_Fix
      */
     public function add_quirks_mode_css_fix()
     {
-        if (is_admin() || $this->is_ajax_or_rest_request())
-        {
+        if (is_admin() || $this->is_ajax_or_rest_request()) {
             return;
         }
 
-    ?>
+        ?>
         <style type="text/css">
             /* Operaton DMN: Comprehensive Quirks Mode CSS Fixes */
 
@@ -522,7 +498,8 @@ class Operaton_DMN_Quirks_Fix
             }
 
             /* Debug indicator for quirks mode */
-            <?php if (defined('WP_DEBUG') && WP_DEBUG): ?>.operaton-quirks-mode-fix::before {
+            <?php if (defined('WP_DEBUG') && WP_DEBUG) :
+                ?>.operaton-quirks-mode-fix::before {
                 content: "⚠️ Quirks Mode Detected - Operaton DMN compatibility fixes active";
                 display: block;
                 background: #fff3cd;
@@ -536,13 +513,14 @@ class Operaton_DMN_Quirks_Fix
                 text-align: center;
             }
 
-            <?php else: ?>.operaton-quirks-mode-fix::before {
+            <?php else :
+                ?>.operaton-quirks-mode-fix::before {
                 display: none !important;
             }
 
             <?php endif; ?>
         </style>
-    <?php
+        <?php
     }
 
     /**
@@ -550,25 +528,22 @@ class Operaton_DMN_Quirks_Fix
      */
     public function quirks_mode_admin_notice()
     {
-        if (!current_user_can('manage_options'))
-        {
+        if (!current_user_can('manage_options')) {
             return;
         }
 
         // Check if notice has been dismissed
-        if (get_option('operaton_dmn_quirks_notice_dismissed'))
-        {
+        if (get_option('operaton_dmn_quirks_notice_dismissed')) {
             return;
         }
 
         // Only show on plugin pages or pages with forms
         $screen = get_current_screen();
-        if (!$screen || (strpos($screen->id, 'operaton-dmn') === false && !class_exists('GFForms')))
-        {
+        if (!$screen || (strpos($screen->id, 'operaton-dmn') === false && !class_exists('GFForms'))) {
             return;
         }
 
-    ?>
+        ?>
         <div class="notice notice-info is-dismissible" id="operaton-quirks-notice">
             <h3><?php _e('Operaton DMN: DOCTYPE Protection Active', 'operaton-dmn'); ?></h3>
             <p><?php _e('The plugin is automatically protecting your AJAX/REST API calls from DOCTYPE interference.', 'operaton-dmn'); ?></p>
@@ -603,7 +578,7 @@ class Operaton_DMN_Quirks_Fix
                 }
             </script>
         </div>
-    <?php
+        <?php
     }
 
     /**
@@ -611,25 +586,20 @@ class Operaton_DMN_Quirks_Fix
      */
     public function dismiss_quirks_notice()
     {
-        if (!wp_verify_nonce($_POST['nonce'], 'operaton_quirks_nonce'))
-        {
+        if (!wp_verify_nonce($_POST['nonce'], 'operaton_quirks_nonce')) {
             wp_send_json_error('Security check failed');
         }
 
-        if (!current_user_can('manage_options'))
-        {
+        if (!current_user_can('manage_options')) {
             wp_send_json_error('Insufficient permissions');
         }
 
         $temporary = $_POST['temporary'] === 'true';
 
-        if ($temporary)
-        {
+        if ($temporary) {
             // Dismiss for 24 hours
             set_transient('operaton_dmn_quirks_notice_dismissed', true, DAY_IN_SECONDS);
-        }
-        else
-        {
+        } else {
             // Dismiss permanently
             update_option('operaton_dmn_quirks_notice_dismissed', true);
         }
@@ -642,19 +612,17 @@ class Operaton_DMN_Quirks_Fix
      */
     public function check_doctype_status()
     {
-        if (!current_user_can('manage_options'))
-        {
+        if (!current_user_can('manage_options')) {
             return;
         }
 
         // Only output on plugin pages
         $screen = get_current_screen();
-        if (!$screen || strpos($screen->id, 'operaton-dmn') === false)
-        {
+        if (!$screen || strpos($screen->id, 'operaton-dmn') === false) {
             return;
         }
 
-    ?>
+        ?>
         <script>
             console.group('Operaton DMN DOCTYPE & API Protection Check');
             console.log('Document compatibility mode:', document.compatMode);
@@ -685,7 +653,7 @@ class Operaton_DMN_Quirks_Fix
 
             console.groupEnd();
         </script>
-<?php
+        <?php
     }
 
     /**
@@ -729,12 +697,9 @@ class Operaton_DMN_Quirks_Fix
             'recommendations' => array()
         );
 
-        if ($info['is_ajax_request'])
-        {
+        if ($info['is_ajax_request']) {
             $info['recommendations'][] = 'AJAX/REST request detected - DOCTYPE injection disabled';
-        }
-        else
-        {
+        } else {
             $info['recommendations'][] = 'Regular page load - DOCTYPE injection enabled if needed';
         }
 
