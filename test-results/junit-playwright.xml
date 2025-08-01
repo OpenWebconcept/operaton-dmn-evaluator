@@ -1,0 +1,136 @@
+<testsuites id="" name="" tests="10" failures="0" skipped="0" errors="0" time="14.740411">
+<testsuite name="dmn-workflow.spec.js" timestamp="2025-08-01T16:07:13.809Z" hostname="chromium" tests="5" failures="0" skipped="0" time="8.261" errors="0">
+<testcase name="DMN Plugin Basic Tests › should connect to live environment" classname="dmn-workflow.spec.js" time="4.283">
+<system-out>
+<![CDATA[✅ Connected to live environment
+]]>
+</system-out>
+</testcase>
+<testcase name="DMN Plugin Basic Tests › should test DMN API test endpoint" classname="dmn-workflow.spec.js" time="1.145">
+<system-out>
+<![CDATA[Test endpoint status: 200
+✅ DMN Test endpoint response: {
+  status: [32m'Plugin REST API is working!'[39m,
+  version: [32m'1.0.0-beta.11'[39m,
+  timestamp: [32m'2025-08-01 18:07:14'[39m
+}
+]]>
+</system-out>
+</testcase>
+<testcase name="DMN Plugin Basic Tests › should test DMN evaluation with correct format" classname="dmn-workflow.spec.js" time="0.88">
+<system-out>
+<![CDATA[DMN evaluation status: 500
+⚠️ DMN evaluation error (expected): {"code":"no_results","message":"No valid results found in API response","data":{"status":500}}
+]]>
+</system-out>
+</testcase>
+<testcase name="DMN Plugin Basic Tests › should test WordPress REST API namespace discovery" classname="dmn-workflow.spec.js" time="1.109">
+<system-out>
+<![CDATA[REST API response structure: [
+  [32m'name'[39m,           [32m'description'[39m,
+  [32m'url'[39m,            [32m'home'[39m,
+  [32m'gmt_offset'[39m,     [32m'timezone_string'[39m,
+  [32m'page_for_posts'[39m, [32m'page_on_front'[39m,
+  [32m'show_on_front'[39m,  [32m'namespaces'[39m,
+  [32m'authentication'[39m, [32m'routes'[39m,
+  [32m'site_logo'[39m,      [32m'site_icon'[39m,
+  [32m'site_icon_url'[39m,  [32m'_links'[39m
+]
+Available namespaces/routes: [
+  [32m'0'[39m,  [32m'1'[39m,  [32m'2'[39m,  [32m'3'[39m,
+  [32m'4'[39m,  [32m'5'[39m,  [32m'6'[39m,  [32m'7'[39m,
+  [32m'8'[39m,  [32m'9'[39m,  [32m'10'[39m, [32m'11'[39m,
+  [32m'12'[39m, [32m'13'[39m, [32m'14'[39m
+]
+❌ Operaton DMN namespace not found in available routes
+✅ Direct test confirms plugin is active
+]]>
+</system-out>
+</testcase>
+<testcase name="DMN Plugin Basic Tests › should check available DMN endpoints" classname="dmn-workflow.spec.js" time="0.844">
+<system-out>
+<![CDATA[Namespace status: 200
+
+🔍 Testing Test endpoint: /wp-json/operaton-dmn/v1/test
+  Status: 200
+  ✅ Endpoint is working
+
+🔍 Testing Evaluation endpoint: /wp-json/operaton-dmn/v1/evaluate
+  Status: 400
+  ⚠️ Endpoint exists but validation failed (expected for evaluation)
+
+🔍 Testing Decision flow endpoint: /wp-json/operaton-dmn/v1/decision-flow/1
+  Status: 200
+  ✅ Endpoint is working
+]]>
+</system-out>
+</testcase>
+</testsuite>
+<testsuite name="dmn-workflow.spec.js" timestamp="2025-08-01T16:07:13.809Z" hostname="firefox" tests="5" failures="0" skipped="0" time="15.094" errors="0">
+<testcase name="DMN Plugin Basic Tests › should connect to live environment" classname="dmn-workflow.spec.js" time="4.658">
+<system-out>
+<![CDATA[✅ Connected to live environment
+]]>
+</system-out>
+</testcase>
+<testcase name="DMN Plugin Basic Tests › should test DMN API test endpoint" classname="dmn-workflow.spec.js" time="2.856">
+<system-out>
+<![CDATA[Test endpoint status: 200
+✅ DMN Test endpoint response: {
+  status: [32m'Plugin REST API is working!'[39m,
+  version: [32m'1.0.0-beta.11'[39m,
+  timestamp: [32m'2025-08-01 18:07:18'[39m
+}
+]]>
+</system-out>
+</testcase>
+<testcase name="DMN Plugin Basic Tests › should test DMN evaluation with correct format" classname="dmn-workflow.spec.js" time="3.425">
+<system-out>
+<![CDATA[DMN evaluation status: 500
+⚠️ DMN evaluation error (expected): {"code":"no_results","message":"No valid results found in API response","data":{"status":500}}
+]]>
+</system-out>
+</testcase>
+<testcase name="DMN Plugin Basic Tests › should test WordPress REST API namespace discovery" classname="dmn-workflow.spec.js" time="2.405">
+<system-out>
+<![CDATA[REST API response structure: [
+  [32m'name'[39m,           [32m'description'[39m,
+  [32m'url'[39m,            [32m'home'[39m,
+  [32m'gmt_offset'[39m,     [32m'timezone_string'[39m,
+  [32m'page_for_posts'[39m, [32m'page_on_front'[39m,
+  [32m'show_on_front'[39m,  [32m'namespaces'[39m,
+  [32m'authentication'[39m, [32m'routes'[39m,
+  [32m'site_logo'[39m,      [32m'site_icon'[39m,
+  [32m'site_icon_url'[39m,  [32m'_links'[39m
+]
+Available namespaces/routes: [
+  [32m'0'[39m,  [32m'1'[39m,  [32m'2'[39m,  [32m'3'[39m,
+  [32m'4'[39m,  [32m'5'[39m,  [32m'6'[39m,  [32m'7'[39m,
+  [32m'8'[39m,  [32m'9'[39m,  [32m'10'[39m, [32m'11'[39m,
+  [32m'12'[39m, [32m'13'[39m, [32m'14'[39m
+]
+❌ Operaton DMN namespace not found in available routes
+✅ Direct test confirms plugin is active
+]]>
+</system-out>
+</testcase>
+<testcase name="DMN Plugin Basic Tests › should check available DMN endpoints" classname="dmn-workflow.spec.js" time="1.75">
+<system-out>
+<![CDATA[Namespace status: 200
+
+🔍 Testing Test endpoint: /wp-json/operaton-dmn/v1/test
+  Status: 200
+  ✅ Endpoint is working
+
+🔍 Testing Evaluation endpoint: /wp-json/operaton-dmn/v1/evaluate
+  Status: 400
+  ⚠️ Endpoint exists but validation failed (expected for evaluation)
+
+🔍 Testing Decision flow endpoint: /wp-json/operaton-dmn/v1/decision-flow/1
+  Status: 200
+  ✅ Endpoint is working
+]]>
+</system-out>
+</testcase>
+</testsuite>
+</testsuites>

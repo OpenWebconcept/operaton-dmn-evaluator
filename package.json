@@ -1,0 +1,19 @@
+{
+  "devDependencies": {
+    "@cypress/webpack-preprocessor": "^6.0.4",
+    "@playwright/test": "^1.54.2",
+    "cypress": "^14.5.3"
+  },
+  "scripts": {
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
+    "cypress:run:live": "cypress run --config baseUrl=https://owc-gemeente.test.open-regels.nl",
+    "test:e2e:live": "npm run cypress:run:live",
+    "test:e2e:open:live": "cypress open --config baseUrl=https://owc-gemeente.test.open-regels.nl",
+    "playwright:test": "playwright test --config=tests/e2e/playwright/playwright.config.js",
+    "playwright:ui": "playwright test --config=tests/e2e/playwright/playwright.config.js --ui",
+    "playwright:headed": "playwright test --config=tests/e2e/playwright/playwright.config.js --headed",
+    "test:e2e:playwright": "npm run playwright:test",
+    "test:e2e:all": "npm run cypress:run && npm run playwright:test"
+  }
+}
