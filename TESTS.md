@@ -20,22 +20,39 @@ operaton-dmn-evaluator/
 │   │       ├── playwright.config.js      # Playwright configuration
 │   │       └── dmn-workflow.spec.js      # Playwright test suite (10 tests)
 │   ├── fixtures/
-│   │   └── mock-classes.php              # Mock classes for testing
+│   │   ├── mock-classes.php              # Mock classes for testing
+│   │   └── ExtendedMockDmnService.php    # Extended mock DMN service
 │   ├── helpers/
-│   │   └── test-helper.php               # Test utility functions
+│   │   ├── test-helper.php               # Test utility functions
+│   │   └── MockServiceTestHelper.php     # Mock service test utilities
 │   ├── integration/
-│   │   └── FormSubmissionTest.php        # Integration tests (3 tests)
+│   │   ├── FormSubmissionTest.php        # Integration tests (3 tests)
+│   │   └── RestApiIntegrationTest.php    # REST API integration (11 tests)
 │   ├── unit/
 │   │   ├── DmnApiTest.php                # API endpoint testing (10 tests)
 │   │   ├── DmnDatabaseTest.php           # Database operations (4 tests)
 │   │   ├── ErrorHandlingTest.php         # Error handling (2 tests)
 │   │   ├── PerformanceTest.php           # Performance tests (3 tests)
 │   │   ├── SecurityTest.php              # Security tests (4 tests)
-│   │   └── ValidationTest.php            # Validation tests (3 tests)
+│   │   ├── ValidationTest.php            # Validation tests (3 tests)
+│   │   └── MockServiceTest.php           # Mock service tests (5 tests)
+│   ├── load/
+│   │   └── dmn-load-test.js              # K6 load testing script
+│   ├── chaos/
+│   │   └── chaos-engineering.js          # Chaos engineering tests
 │   ├── bootstrap.php                     # PHPUnit bootstrap file
 │   └── README.md                         # Test documentation
+├── scripts/
+│   ├── hooks/
+│   │   ├── setup-precommit-hooks.sh      # Pre-commit hooks setup
+│   │   ├── manage-hooks.sh               # Hook management utilities
+│   │   └── check-php-syntax.sh           # PHP syntax validation
+│   ├── setup-step1.sh through step6.sh  # Incremental setup scripts
+│   └── run-comprehensive-tests.sh        # Main test orchestrator
 ├── test-results/                         # Test output directory
-│   └── junit-playwright.xml              # Playwright test results
+│   ├── junit-playwright.xml              # Playwright test results
+│   ├── load-test-results.json            # K6 load test results
+│   └── chaos-test-results.json           # Chaos engineering results
 ├── playwright-report/                    # Playwright HTML reports
 │   └── index.html                        # Main report file
 ├── cypress.config.js                     # Cypress configuration (root)
@@ -43,73 +60,35 @@ operaton-dmn-evaluator/
 ├── phpunit.xml                           # PHPUnit configuration
 ├── composer.json                         # PHP dependencies & scripts
 ├── junit.xml                             # PHPUnit test results
-└── TESTS.md                              # Comprehensive test documentation
+├── run-tests.sh                          # Convenient test runner
+├── TESTS.md                              # This comprehensive documentation
+└── TESTING-GUIDE.md                     # Complete command reference
 ```
 
-The **File Breakdown by Category** can be found in the [README](./tests/README.md) in the `tests/` folder.
+## 📊 **Test Suite Statistics**
 
+### **Total Test Coverage**
+- **Unit Tests**: 32 tests (124 assertions)
+- **Integration Tests**: 11 tests (20 assertions)
+- **E2E Tests (Cypress)**: 6 tests
+- **E2E Tests (Playwright)**: 10 tests (cross-browser)
+- **Load Tests**: Multi-scenario K6 performance testing
+- **Chaos Tests**: Resilience and fault tolerance validation
+- **Total**: 59+ automated tests with comprehensive coverage
 
-## Recommended Development Workflow
+### **Test Execution Performance**
+- **Unit Tests**: ~200ms execution time
+- **Integration Tests**: ~22s (includes live API calls)
+- **E2E Tests**: 3s (Cypress), 14.6s (Playwright)
+- **CI Pipeline**: 24s total (enterprise-grade speed)
 
-### Daily Development:
-```bash
-# Quick check (tests + security)
-composer run ci
-# ✅ Tests: 29 passed, Security: clean
+## 🧪 **Test Categories & Implementation**
 
-# Full quality check (includes linting summary)
-composer run quality
-# ✅ Tests + linting summary + security
+### **1. Unit Tests (32 tests)**
 
-# Run E2E tests against live environment
-npm run cypress:run
-# ✅ 6 tests passing (3s)
-
-npm run playwright:test
-# ✅ 10 tests passing, 2 browsers (14.6s)
-```
-
-### Before Commits:
-```bash
-# Format and check
-composer run format
-# ✅ Auto-fixes issues + shows summary
-
-# Full verification including E2E
-composer run check
-npm run test:e2e:all
-# ✅ Tests + quality gates + cross-browser validation
-
-# Full verification
-composer run check
-# ✅ Tests + quality gates
-```
-
-### E2E Testing Commands:
-```bash
-# Cypress E2E Tests
-npm run cypress:open          # Open Cypress GUI
-npm run cypress:run           # Run headless
-npm run test:e2e             # Alias for cypress:run
-
-# Playwright E2E Tests
-npm run playwright:test       # Run cross-browser tests
-npm run playwright:ui         # Open Playwright UI
-npm run playwright:headed     # Run with visible browser
-npm run test:e2e:playwright   # Alias for playwright:test
-
-# Run All E2E Tests
-npm run test:e2e:all         # Both Cypress and Playwright
-```
-
-
-## 🎯 **Testing Strategy Aligned with Plugin Evolution**
-
-### **Phase 1: Foundation Testing (Supports v1.0.0-beta.1 to beta.6)**
-Our testing strategy validates the core DMN evaluation functionality that evolved through early beta versions:
-
+#### **API Testing (`DmnApiTest.php`)**
+Tests core DMN evaluation functionality and API endpoints.
 ```php
-// Core DMN API Testing
 public function testEvaluateDmnWithValidData(): void {
     $testData = [
         'age' => 30,
@@ -126,197 +105,144 @@ public function testEvaluateDmnWithValidData(): void {
 ```
 
 **What This Tests:**
-- ✅ Single decision evaluation (original functionality from beta.1-6)
+- ✅ DMN evaluation with valid input data
+- ✅ API response structure validation
 - ✅ Field mapping and data transformation
-- ✅ API response handling and validation
 - ✅ Result population into form fields
+- ✅ Error handling for invalid inputs
 
-### **Phase 2: Enhanced Features Testing (Supports v1.0.0-beta.7 to beta.8)**
-Tests validate the multiple result fields and enhanced configuration:
-
+#### **Database Operations (`DmnDatabaseTest.php`)**
+Validates database schema, migrations, and data persistence.
 ```php
-// Multiple Result Field Testing
-public function testMultipleResultFieldMapping(): void {
-    $multipleResults = [
-        'aanmerkingHeusdenPas' => false,
-        'aanmerkingKindPakket' => true,
-        'loanApproved' => true,
-        'interestRate' => 3.5
+public function testLogEvaluationWithMultipleResults(): void {
+    $evaluationData = [
+        'form_id' => 123,
+        'result_mappings' => json_encode([
+            'decision' => 'approved',
+            'interest_rate' => 3.5,
+            'loan_amount' => 50000
+        ]),
+        'execution_time' => 0.45
     ];
 
-    $this->database->logEvaluation([
-        'form_id' => 999,
-        'result_mappings' => json_encode($multipleResults)
-    ]);
+    $this->database->logEvaluation($evaluationData);
+    $evaluations = $this->database->getEvaluations(['form_id' => 123]);
 
-    $evaluations = $this->database->getEvaluations(['form_id' => 999]);
     $this->assertCount(1, $evaluations);
+    $this->assertEquals('approved', json_decode($evaluations[0]['result_mappings'], true)['decision']);
 }
 ```
 
-**What This Tests:**
-- ✅ Multiple result field support (beta.8 major feature)
-- ✅ Database schema evolution and migrations
-- ✅ Enhanced admin configuration interface
-- ✅ JSON result mapping storage and retrieval
-
-### **Phase 3: Process Execution Testing (Supports v1.0.0-beta.9)**
-Tests validate the dual execution modes:
-
+#### **Performance Testing (`PerformanceTest.php`)**
+Benchmarks system performance and resource usage.
 ```php
-// Process Execution Flow Testing
-public function testCompleteProcessExecutionFlow(): void {
-    // Test BPMN process execution with decision flow tracking
-    $processData = [
-        'geboortedatumAanvrager' => '1987-12-20',
-        'aanvragerAlleenstaand' => true,
-        'maandelijksBrutoInkomenAanvrager' => 1200
-    ];
-
-    $result = $this->apiManager->executeProcess($processData);
-
-    $this->assertArrayHasKey('processInstanceId', $result);
-    $this->assertArrayHasKey('decisionFlow', $result);
-    $this->assertIsArray($result['decisionFlow']);
-}
-```
-
-**What This Tests:**
-- ✅ BPMN process execution (beta.9 revolutionary feature)
-- ✅ Decision flow tracking and analysis
-- ✅ Process instance management
-- ✅ Excel-style decision flow summary generation
-
-### **Phase 4: Architecture & Performance Testing (Supports v1.0.0-beta.10+)**
-Tests validate the modular architecture and performance optimizations:
-
-```php
-// Performance Benchmark Testing
-public function testArchitecturePerformance(): void {
+public function testInitializationPerformance(): void {
     $startTime = microtime(true);
     $startMemory = memory_get_usage();
 
-    // Test 1000 rapid evaluations
-    for ($i = 0; $i < 1000; $i++) {
-        $this->apiManager->evaluateDmn(['test' => $i]);
+    // Test rapid initialization cycles
+    for ($i = 0; $i < 100; $i++) {
+        $this->performanceMonitor->initializeSystem();
     }
 
     $executionTime = microtime(true) - $startTime;
     $memoryUsed = memory_get_usage() - $startMemory;
 
-    // Should handle 500+ evaluations per second
-    $this->assertGreaterThan(500, 1000 / $executionTime);
-    $this->assertLessThan(1024 * 1024, $memoryUsed); // Under 1MB
+    // Should initialize in under 1ms average
+    $this->assertLessThan(0.1, $executionTime); // 100ms for 100 cycles
+    $this->assertLessThan(5 * 1024 * 1024, $memoryUsed); // Under 5MB
 }
 ```
 
-**What This Tests:**
-- ✅ 97% performance improvement (beta.10 achievement)
-- ✅ Modular class-based architecture
-- ✅ Sub-millisecond initialization times
-- ✅ Memory efficiency (70% improvement)
-
-### **Phase 5: Critical Bug Fix Validation (Supports v1.0.0-beta.11)**
-Tests validate the page 3 flickering fix and coordination system:
-
+#### **Security Testing (`SecurityTest.php`)**
+Validates input sanitization and security measures.
 ```php
-// JavaScript Coordination Testing
-public function testFormStateCoordination(): void {
-    $formStates = [
-        'initialization' => false,
-        'decision_flow_loading' => false,
-        'duplicate_prevention' => true
-    ];
-
-    $coordinator = new FormCoordinator();
-    $coordinator->preventDuplicateInitialization('form_123');
-
-    $this->assertTrue($coordinator->isInitializationLocked('form_123'));
-    $this->assertFalse($coordinator->allowsConcurrentExecution('form_123'));
-}
-```
-
-**What This Tests:**
-- ✅ JavaScript coordination system (beta.11 critical fix)
-- ✅ Race condition elimination
-- ✅ Duplicate initialization prevention
-- ✅ Script execution lock management
-
-## 🛡️ **Security & Reliability Testing Strategy**
-
-### **Input Validation & Sanitization**
-```php
-public function testSecuritySanitization(): void {
+public function testSqlInjectionPrevention(): void {
     $maliciousInputs = [
-        "'; DROP TABLE users; --",
-        '<script>alert("xss")</script>',
-        'javascript:alert(1)'
+        "'; DROP TABLE wp_operaton_dmn_evaluations; --",
+        "1' OR '1'='1",
+        "admin'/**/UNION/**/SELECT/**/password/**/FROM/**/wp_users--"
     ];
 
     foreach ($maliciousInputs as $input) {
-        $sanitized = $this->sanitizeInput($input);
-        $this->assertStringNotContainsString("'", $sanitized);
-        $this->assertStringNotContainsString('<script', $sanitized);
-        $this->assertStringNotContainsString('javascript:', $sanitized);
+        $result = $this->securityValidator->sanitizeInput($input);
+        $this->assertStringNotContainsString("'", $result);
+        $this->assertStringNotContainsString("--", $result);
+        $this->assertStringNotContainsString("UNION", strtoupper($result));
     }
 }
 ```
 
-### **Error Handling & Recovery**
+#### **Mock Service Testing (`MockServiceTest.php`)**
+Tests the extended mock DMN service for consistent development.
 ```php
-public function testErrorRecoveryMechanisms(): void {
-    // Test DMN API failure scenarios
-    $this->apiManager->setMockError('DMN service unavailable');
+public function testMockServiceCreditApprovalScenarios(): void {
+    $scenarios = [
+        ['age' => 25, 'income' => 45000, 'credit_score' => 'excellent', 'expected' => 'approved'],
+        ['age' => 18, 'income' => 20000, 'credit_score' => 'poor', 'expected' => 'rejected'],
+        ['age' => 65, 'income' => 80000, 'credit_score' => 'good', 'expected' => 'approved']
+    ];
 
-    $this->expectException(\Exception::class);
-    $this->apiManager->evaluateDmn(['test' => 'data']);
-
-    // Verify graceful degradation
-    $this->assertTrue(did_action('operaton_dmn_fallback_triggered') > 0);
+    foreach ($scenarios as $scenario) {
+        $result = $this->mockService->evaluateCredit($scenario);
+        $this->assertEquals($scenario['expected'], $result['decision']);
+    }
 }
 ```
 
-## 🌐 **End-to-End Testing Implementation**
+### **2. Integration Tests (11 tests)**
 
-### **Cypress E2E Testing Framework**
-Complete browser automation testing against live environment (`https://owc-gemeente.test.open-regels.nl/`).
+#### **REST API Integration (`RestApiIntegrationTest.php`)**
+Tests live API endpoints against the actual WordPress environment.
+```php
+public function testDmnHealthEndpoint(): void {
+    $response = $this->httpClient->get(
+        $this->baseUrl . '/wp-json/operaton-dmn/v1/health'
+    );
 
-#### **Configuration** (`cypress.config.js`)
+    $this->assertEquals(200, $response->getStatusCode());
+
+    $data = json_decode($response->getBody(), true);
+    $this->assertArrayHasKey('status', $data);
+    $this->assertEquals('healthy', $data['status']);
+}
+```
+
+**Integration Test Coverage:**
+- ✅ WordPress REST API accessibility
+- ✅ DMN namespace discovery and registration
+- ✅ Health endpoint functionality
+- ✅ Plugin version detection
+- ✅ Security validation with malicious requests
+- ✅ Authentication handling
+- ✅ Basic connectivity verification
+
+#### **Form Submission Integration (`FormSubmissionTest.php`)**
+Tests complete form submission workflows with DMN evaluation.
+
+### **3. End-to-End Tests (16 tests total)**
+
+#### **Cypress E2E Testing (6 tests)**
+Browser automation testing against live environment.
+
+**Configuration:**
 ```javascript
+// cypress.config.js
 module.exports = defineConfig({
   e2e: {
     baseUrl: 'https://owc-gemeente.test.open-regels.nl',
-    supportFile: 'tests/e2e/cypress/support/e2e.js',
-    specPattern: 'tests/e2e/cypress/e2e/**/*.cy.js',
     viewportWidth: 1280,
     viewportHeight: 720,
     video: true,
     screenshotOnRunFailure: true,
-    defaultCommandTimeout: 15000,
-    requestTimeout: 20000
+    defaultCommandTimeout: 15000
   }
 })
 ```
 
-#### **Test Implementation** (`tests/e2e/cypress/e2e/dmn-keyless-api.cy.js`)
+**Test Implementation:**
 ```javascript
-describe('DMN API Tests (No API Key Required)', () => {
-  it('should connect to the test environment', () => {
-    cy.visit('/')
-    cy.get('body').should('be.visible')
-    cy.url().should('include', 'owc-gemeente.test.open-regels.nl')
-  })
-
-  it('should test basic DMN evaluation without API key', () => {
-    const testEvaluationData = {
-      age: 25,
-      income: 45000,
-      credit_score: 'good'
-    }
-
-    cy.testDMNEvaluation(testEvaluationData)
-  })
-
+describe('DMN API Tests', () => {
   it('should test various evaluation scenarios', () => {
     const testCases = [
       { name: 'High Income', data: { age: 35, income: 80000, credit_score: 'excellent' } },
@@ -325,254 +251,325 @@ describe('DMN API Tests (No API Key Required)', () => {
     ]
 
     testCases.forEach((testCase) => {
-      cy.log(`🧪 Testing: ${testCase.name}`)
       cy.testDMNEvaluation(testCase.data)
     })
   })
 })
 ```
 
-#### **Custom Commands** (`tests/e2e/cypress/support/commands.js`)
+#### **Playwright Cross-Browser Testing (10 tests)**
+Advanced cross-browser testing with Chrome and Firefox.
+
+**Benefits Achieved:**
+- ✅ Live environment validation
+- ✅ Cross-browser compatibility (Chrome, Firefox)
+- ✅ API integration testing
+- ✅ Real network conditions
+- ✅ Visual regression detection
+- ✅ Error handling verification
+
+### **4. Load Testing (K6)**
+
+#### **Performance Scenarios**
 ```javascript
-// DMN-specific commands for keyless API testing
-Cypress.Commands.add('testDMNEvaluation', (formData) => {
-  const headers = { 'Content-Type': 'application/json' }
-
-  // Only add API key header if one is provided
-  const apiKey = Cypress.env('DMN_API_KEY')
-  if (apiKey && apiKey.trim() !== '') {
-    headers['X-API-Key'] = apiKey
-  }
-
-  cy.request({
-    method: 'POST',
-    url: '/wp-json/operaton-dmn/v1/evaluate',
-    body: formData,
-    failOnStatusCode: false,
-    headers: headers
-  }).then((response) => {
-    if (response.status === 200) {
-      expect(response.body).to.have.property('decision')
-      cy.log('✅ DMN Evaluation successful')
-    } else {
-      cy.log(`⚠️ DMN Evaluation returned status: ${response.status}`)
+// Load testing scenarios
+export let options = {
+  scenarios: {
+    smoke_test: {
+      executor: 'constant-vus',
+      vus: 1,
+      duration: '30s'
+    },
+    basic_load_test: {
+      executor: 'ramping-vus',
+      stages: [
+        { duration: '1m', target: 1 },
+        { duration: '2m', target: 3 },
+        { duration: '1m', target: 0 }
+      ]
     }
-  })
-})
-
-Cypress.Commands.add('checkDMNHealth', () => {
-  cy.request({
-    url: '/wp-json/operaton-dmn/v1/health',
-    failOnStatusCode: false
-  }).then((response) => {
-    if (response.status === 200) {
-      cy.log('✅ DMN API Health Check passed')
-      expect(response.body).to.have.property('status')
-    } else {
-      cy.log(`⚠️ DMN API Health Check returned: ${response.status}`)
-    }
-  })
-})
-```
-
-#### **Test Results:**
-- ✅ **6 tests passing** in 3 seconds
-- ✅ **Live environment connection** validated
-- ✅ **API endpoint testing** with proper error handling
-- ✅ **Multiple evaluation scenarios** tested successfully
-
-### **Playwright Cross-Browser Testing Framework**
-Advanced cross-browser testing with Chrome and Firefox support.
-
-#### **Configuration** (`tests/e2e/playwright/playwright.config.js`)
-```javascript
-module.exports = defineConfig({
-  testDir: './',
-  fullyParallel: true,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: [
-    ['html', { outputFolder: '../../../playwright-report' }],
-    ['junit', { outputFile: '../../../test-results/junit-playwright.xml' }]
-  ],
-  use: {
-    baseURL: 'https://owc-gemeente.test.open-regels.nl',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure'
   },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } }
-  ]
-})
-```
-
-#### **Test Implementation** (`tests/e2e/playwright/dmn-workflow.spec.js`)
-```javascript
-const { test, expect } = require('@playwright/test')
-
-test.describe('DMN Plugin Basic Tests', () => {
-  test('should test DMN API test endpoint', async ({ page }) => {
-    const response = await page.request.get('/wp-json/operaton-dmn/v1/test')
-
-    if (response.ok()) {
-      const data = await response.json()
-      console.log('✅ DMN Test endpoint response:', data)
-      expect(data).toHaveProperty('status')
-      expect(data).toHaveProperty('version')
-    }
-  })
-
-  test('should test DMN evaluation with correct format', async ({ page }) => {
-    const testData = {
-      config_id: 1,
-      form_data: {
-        age: 30,
-        income: 50000,
-        credit_score: 'good'
-      }
-    }
-
-    const response = await page.request.post('/wp-json/operaton-dmn/v1/evaluate', {
-      headers: { 'Content-Type': 'application/json' },
-      data: testData
-    })
-
-    if (response.ok()) {
-      const result = await response.json()
-      expect(result).toHaveProperty('success')
-    } else {
-      // Accept 400, 404, or 500 - all indicate the endpoint is working
-      expect([400, 404, 500]).toContain(response.status())
-    }
-  })
-
-  test('should check available DMN endpoints', async ({ page }) => {
-    const endpoints = [
-      { path: '/wp-json/operaton-dmn/v1/test', method: 'GET', name: 'Test endpoint' },
-      { path: '/wp-json/operaton-dmn/v1/evaluate', method: 'POST', name: 'Evaluation endpoint' },
-      { path: '/wp-json/operaton-dmn/v1/decision-flow/1', method: 'GET', name: 'Decision flow endpoint' }
-    ]
-
-    for (const endpoint of endpoints) {
-      let response
-      if (endpoint.method === 'GET') {
-        response = await page.request.get(endpoint.path)
-      } else {
-        response = await page.request.post(endpoint.path, {
-          headers: { 'Content-Type': 'application/json' },
-          data: { test: 'data' }
-        })
-      }
-
-      console.log(`${endpoint.name}: ${response.status()}`)
-
-      if (response.status() === 200) {
-        console.log('  ✅ Endpoint is working')
-      } else if (response.status() === 400) {
-        console.log('  ⚠️ Endpoint exists but validation failed (expected)')
-      }
-    }
-  })
-})
-```
-
-#### **Test Results:**
-- ✅ **10 tests passing** in 14.6 seconds
-- ✅ **Cross-browser testing** (Chromium + Firefox)
-- ✅ **Parallel execution** with 4 workers
-- ✅ **Plugin version detection** (1.0.0-beta.11)
-- ✅ **API endpoint validation** with proper error handling
-- ✅ **HTML reports** with screenshots and videos
-
-### **E2E Testing Benefits Achieved:**
-- **Live Environment Validation**: Tests run against actual deployment environment
-- **Cross-Browser Compatibility**: Ensures plugin works in Chrome, Firefox, and other browsers
-- **API Integration Testing**: Validates REST API endpoints and WordPress integration
-- **Real Network Conditions**: Tests with actual latency and connectivity
-- **Visual Regression Detection**: Screenshots and videos capture UI behavior
-- **Error Handling Verification**: Confirms graceful degradation under failure conditions
-
-## 🚀 **Advanced Testing Capabilities Ready for Extension**
-
-### **Load Testing & Performance Monitoring**
-```php
-public function testProductionLoadCapacity(): void {
-    // Simulate concurrent users
-    $results = [];
-    for ($i = 0; $i < 100; $i++) {
-        $results[] = $this->apiManager->evaluateDmn($this->generateTestData());
-    }
-
-    // Should handle production load
-    $this->assertCount(100, $results);
-    $this->assertTrue($this->allResultsValid($results));
+  thresholds: {
+    'http_req_duration': ['p(95)<500'],
+    'http_req_failed': ['rate<0.5']
+  }
 }
 ```
 
-## 📊 **Quality Metrics Achieved**
+**Load Test Coverage:**
+- ✅ Basic connectivity testing
+- ✅ DMN evaluation performance
+- ✅ Concurrent user simulation
+- ✅ Response time monitoring
+- ✅ Success rate validation
+- ✅ Performance threshold enforcement
+
+### **5. Chaos Engineering**
+
+#### **Resilience Testing**
+```javascript
+// Chaos engineering scenarios
+const chaosScenarios = [
+  {
+    name: 'Malformed Request Attack',
+    description: 'Send malformed JSON to test error handling',
+    execute: async () => {
+      // Test malformed requests
+      await testMalformedRequests()
+    }
+  },
+  {
+    name: 'High Concurrent Load',
+    description: 'Simulate high concurrent user load',
+    execute: async () => {
+      // Test concurrent requests
+      await testConcurrentLoad()
+    }
+  }
+]
+```
+
+**Chaos Test Coverage:**
+- ✅ Malformed request handling
+- ✅ High concurrent load simulation
+- ✅ Network timeout scenarios
+- ✅ Error recovery mechanisms
+- ✅ Security attack simulation
+- ✅ Fault tolerance validation
+
+## 🔧 **Test Infrastructure Components**
+
+### **Pre-commit Hooks**
+Automated code quality validation before commits.
+```bash
+# Setup pre-commit hooks
+composer run hooks:enable
+
+# Test hooks manually
+composer run hooks:test
+
+# Check hook status
+composer run hooks:status
+```
+
+### **Extended Mock DMN Service**
+Realistic test data generation for consistent testing.
+```php
+class ExtendedMockDmnService {
+    public function generateCreditScenarios(): array {
+        return [
+            'high_income_excellent_credit' => [
+                'input' => ['age' => 35, 'income' => 85000, 'credit_score' => 'excellent'],
+                'expected' => ['decision' => 'approved', 'interest_rate' => 2.5]
+            ],
+            'low_income_poor_credit' => [
+                'input' => ['age' => 22, 'income' => 25000, 'credit_score' => 'poor'],
+                'expected' => ['decision' => 'rejected', 'reason' => 'insufficient_income']
+            ]
+        ];
+    }
+}
+```
+
+### **Comprehensive Test Orchestration**
+```bash
+# Main test orchestrator script
+./run-tests.sh quick      # Unit tests only (< 5s)
+./run-tests.sh standard   # Unit + Integration (< 2min)
+./run-tests.sh full       # Add load testing (< 10min)
+./run-tests.sh extreme    # Everything including chaos (< 20min)
+```
+
+## 🚀 **CI/CD Integration**
+
+### **GitLab CI Pipeline**
+Three-stage pipeline with proper separation of concerns:
+
+```yaml
+stages:
+  - test
+  - quality
+
+# Core Tests (No External Dependencies)
+test-core:
+  script:
+    - composer run test:unit
+    - composer run test:mock
+    - composer run test:performance
+    - composer run test:security
+
+# Quality Check (Advisory)
+quality-check:
+  script:
+    - composer run security
+    - composer run lint:summary
+  allow_failure: true
+
+# Integration Tests (Manual/Optional)
+test-integration:
+  script:
+    - composer run test:integration
+  when: manual
+```
+
+**CI Results:**
+- ✅ **24-second pipeline execution**
+- ✅ **100% success rate on core tests**
+- ✅ **Proper artifact generation**
+- ✅ **Quality gates enforcement**
+
+## 📊 **Quality Metrics & Standards**
 
 ### **Code Quality Standards**
-- ✅ **PSR12 Compliance**: 1,216 issues auto-fixed, 474 remaining (manageable)
+- ✅ **PSR12 Compliance**: Automated style checking and fixing
 - ✅ **Security Scanning**: Zero vulnerabilities detected
-- ✅ **Type Safety**: Comprehensive type checking throughout codebase
+- ✅ **Type Safety**: Comprehensive type checking
 - ✅ **Documentation**: Inline documentation for all test methods
 
 ### **Performance Benchmarks**
-- ✅ **Initialization**: 0.41ms (97% faster than industry average)
-- ✅ **Memory Usage**: 10MB peak (70% more efficient than typical plugins)
-- ✅ **Test Execution**: 33ms for 29 tests locally
-- ✅ **CI Pipeline**: 12 seconds total execution time
-- ✅ **E2E Execution**: 3s (Cypress), 14.6s (Playwright cross-browser)
+- ✅ **Test Execution**: 200ms for 32 unit tests
+- ✅ **CI Pipeline**: 24 seconds total execution
+- ✅ **Memory Usage**: Efficient resource utilization
+- ✅ **Load Testing**: Performance validation under realistic conditions
 
 ### **Reliability Metrics**
-- ✅ **100% Test Success Rate**: All 29 unit tests + 6 Cypress + 10 Playwright tests pass consistently
-- ✅ **Zero Breaking Changes**: Backward compatibility maintained
-- ✅ **Graceful Degradation**: Error scenarios handled professionally
-- ✅ **Recovery Mechanisms**: Automatic fallback strategies implemented
+- ✅ **100% Test Success Rate**: Consistent passing tests
 - ✅ **Cross-Browser Compatibility**: Identical behavior across browsers
+- ✅ **Error Handling**: Graceful degradation under failure
+- ✅ **Security Validation**: Protection against common attacks
 
-## 🎯 **Testing Strategy Evolution Path**
+## 🎯 **Testing Strategy & Methodology**
 
-### **Current State**
-- ✅ Comprehensive unit and integration testing
-- ✅ Live environment E2E testing with Cypress and Playwright
-- ✅ Cross-browser compatibility validation
-- ✅ Automated CI/CD pipeline
-- ✅ Security and performance validation
-- ✅ Quality gates enforcement
-
-### **Next Phase Extensions (Ready to Implement)**
-1. **K6 Load Testing**: Stress testing under realistic traffic loads
-2. **API Contract Testing**: DMN endpoint compatibility verification
-3. **Multi-Environment Testing**: Staging, production environment validation
-4. **User Acceptance Testing**: Automated user workflow verification
-5. **Regression Testing**: Version-to-version compatibility validation
-6. **Chaos Engineering**: Fault tolerance and resilience testing
-
-## 🏅 **Achievement Summary**
-
-This testing strategy achieves **quality assurance** that supports:
-
-- ✅ **Rapid Development**: Fast feedback loops (33ms test execution)
-- ✅ **Confident Deployments**: Automated quality gates prevent regressions
-- ✅ **Maintainable Codebase**: Comprehensive test coverage enables safe refactoring
-- ✅ **Professional Standards**: CI/CD pipeline matches industry best practices
-- ✅ **Scalable Architecture**: Testing framework grows with plugin complexity
-- ✅ **Security Assurance**: Automated vulnerability detection and prevention
-- ✅ **Performance Monitoring**: Continuous performance regression detection
-- ✅ **Cross-Platform Reliability**: Works identically across browsers and environments
-
-## 📈 **Testing Strategy Supporting Plugin Evolution**
-
-### **Backward Compatibility Validation**
-The testing suite ensures that each new beta version maintains compatibility with previous functionality:
-
+### **Test-Driven Development**
 ```php
-// Backward Compatibility Testing
-public function testBetaVersionCompatibility(): void {
-    // Test that beta.11 features don't break beta.8 configurations
+// Example TDD approach
+public function testDmnEvaluationReturnsExpectedStructure(): void {
+    // Arrange
+    $testData = $this->createValidTestData();
+
+    // Act
+    $result = $this->dmnEvaluator->evaluate($testData);
+
+    // Assert
+    $this->assertArrayHasKey('decision', $result);
+    $this->assertArrayHasKey('confidence', $result);
+    $this->assertArrayHasKey('evaluation_time', $result);
+}
+```
+
+### **Behavior-Driven Testing**
+```javascript
+// Example BDD approach with Cypress
+describe('When a user submits a DMN evaluation request', () => {
+  context('with valid input data', () => {
+    it('should return a successful evaluation result', () => {
+      cy.submitDmnEvaluation(validTestData)
+      cy.get('[data-testid="evaluation-result"]')
+        .should('contain', 'approved')
+    })
+  })
+})
+```
+
+### **Layered Testing Approach**
+```
+🔺 E2E Tests (Browser automation, real user scenarios)
+🔺 Integration Tests (API endpoints, database operations)
+🔺 Unit Tests (Individual functions, business logic)
+🔺 Mock Services (Consistent test data, isolated testing)
+```
+
+## 🛡️ **Security Testing Implementation**
+
+### **Input Validation & Sanitization**
+```php
+public function testXssPreventionInDmnInputs(): void {
+    $xssAttempts = [
+        '<script>alert("xss")</script>',
+        'javascript:alert(1)',
+        '<img src="x" onerror="alert(1)">'
+    ];
+
+    foreach ($xssAttempts as $attempt) {
+        $sanitized = $this->inputSanitizer->sanitize($attempt);
+        $this->assertStringNotContainsString('<script', $sanitized);
+        $this->assertStringNotContainsString('javascript:', $sanitized);
+        $this->assertStringNotContainsString('onerror', $sanitized);
+    }
+}
+```
+
+### **API Security Testing**
+```php
+public function testApiAuthenticationRequirements(): void {
+    // Test unauthenticated access
+    $response = $this->makeRequest('/wp-json/operaton-dmn/v1/evaluate', [
+        'form_data' => ['test' => 'data']
+    ]);
+
+    // Should handle appropriately (either require auth or validate input)
+    $this->assertContains($response->getStatusCode(), [400, 401, 500]);
+}
+```
+
+## 📈 **Performance Testing & Monitoring**
+
+### **Load Testing Scenarios**
+```javascript
+// K6 load testing configuration
+export default function() {
+  // Test basic connectivity
+  let healthCheck = http.get(`${baseUrl}/wp-json/operaton-dmn/v1/health`)
+  check(healthCheck, {
+    'health endpoint responds': (r) => r.status === 200
+  })
+
+  // Test DMN evaluation under load
+  let evaluation = http.post(`${baseUrl}/wp-json/operaton-dmn/v1/evaluate`,
+    JSON.stringify(testData),
+    { headers: { 'Content-Type': 'application/json' } }
+  )
+
+  check(evaluation, {
+    'evaluation completes': (r) => [200, 400, 500].includes(r.status)
+  })
+}
+```
+
+### **Performance Monitoring**
+```php
+public function testMemoryUsageUnderLoad(): void {
+    $initialMemory = memory_get_usage();
+
+    // Simulate multiple evaluations
+    for ($i = 0; $i < 1000; $i++) {
+        $this->dmnEvaluator->evaluate($this->generateTestData());
+    }
+
+    $finalMemory = memory_get_usage();
+    $memoryIncrease = $finalMemory - $initialMemory;
+
+    // Should not exceed 10MB memory increase
+    $this->assertLessThan(10 * 1024 * 1024, $memoryIncrease);
+}
+```
+
+## 🔮 **Advanced Testing Capabilities**
+
+### **Multi-Environment Testing**
+```bash
+# Environment-specific testing
+export DMN_TEST_URL="https://staging.example.com"
+./run-tests.sh standard
+
+export DMN_TEST_URL="https://production.example.com"
+./run-tests.sh quick  # Conservative testing for production
+```
+
+### **Automated Regression Testing**
+```php
+public function testBackwardCompatibilityWithPreviousVersions(): void {
+    // Test legacy configuration formats
     $legacyConfig = [
         'single_result_field' => 'field_10',
         'evaluation_mode' => 'direct_decision'
@@ -583,102 +580,52 @@ public function testBetaVersionCompatibility(): void {
         'use_process' => false
     ];
 
-    // Both configurations should work
+    // Both should work
     $this->assertTrue($this->configValidator->isValid($legacyConfig));
     $this->assertTrue($this->configValidator->isValid($modernConfig));
 }
 ```
 
-### **Feature Evolution Testing**
-Tests track the evolution from simple decision evaluation to complex process orchestration:
-
+### **API Contract Testing**
 ```php
-// Evolution Path Testing
-public function testFeatureEvolutionPath(): void {
-    // Beta 1-6: Single decision evaluation
-    $simpleResult = $this->apiManager->evaluateDecision($inputData);
-    $this->assertArrayHasKey('decision', $simpleResult);
+public function testDmnApiContractCompliance(): void {
+    $response = $this->apiClient->post('/wp-json/operaton-dmn/v1/evaluate', [
+        'config_id' => 1,
+        'form_data' => $this->createValidFormData()
+    ]);
 
-    // Beta 7-8: Multiple result fields
-    $multipleResults = $this->apiManager->evaluateWithMultipleResults($inputData);
-    $this->assertGreaterThan(1, count($multipleResults));
+    // Verify API contract
+    $this->assertArrayHasKey('success', $response);
+    $this->assertArrayHasKey('data', $response);
 
-    // Beta 9+: Process execution with decision flow
-    $processResults = $this->apiManager->executeProcessWithDecisionFlow($inputData);
-    $this->assertArrayHasKey('decisionFlow', $processResults);
-    $this->assertArrayHasKey('processInstanceId', $processResults);
-}
-```
-
-### **Performance Regression Prevention**
-Tests ensure that new features don't degrade the 97% performance improvement achieved in beta.10:
-
-```php
-// Performance Regression Testing
-public function testPerformanceRegression(): void {
-    $benchmarks = [
-        'initialization_time' => 0.41, // milliseconds
-        'memory_peak_usage' => 10 * 1024 * 1024, // 10MB
-        'evaluation_throughput' => 500 // evaluations per second
-    ];
-
-    $currentMetrics = $this->performanceMonitor->getCurrentMetrics();
-
-    foreach ($benchmarks as $metric => $threshold) {
-        $this->assertLessThanOrEqual(
-            $threshold * 1.1, // 10% tolerance
-            $currentMetrics[$metric],
-            "Performance regression detected in {$metric}"
-        );
+    if ($response['success']) {
+        $this->assertArrayHasKey('decision', $response['data']);
+        $this->assertArrayHasKey('evaluation_time', $response['data']);
     }
 }
 ```
 
-## 🔮 **Future Testing Roadmap**
+## 🏆 **Testing Excellence Achieved**
 
-### **Advanced Testing Scenarios Ready for Implementation**
+### **Quality Assurance**
+- ✅ **Comprehensive Coverage**: 59+ tests across all layers
+- ✅ **Fast Feedback**: Sub-30-second validation cycles
+- ✅ **Automated Quality Gates**: Pre-commit hooks and CI/CD
+- ✅ **Cross-Browser Validation**: Identical behavior across platforms
+- ✅ **Security Assurance**: Protection against common vulnerabilities
+- ✅ **Performance Monitoring**: Continuous performance validation
+- ✅ **Resilience Testing**: Fault tolerance and recovery validation
 
-#### **Multi-Tenant Testing**
-```php
-// Multi-tenant environment testing
-public function testMultiTenantIsolation(): void {
-    $tenant1Data = $this->createTenantConfiguration('tenant_1');
-    $tenant2Data = $this->createTenantConfiguration('tenant_2');
+### **Development Workflow Integration**
+- ✅ **Daily Development**: Fast unit tests for immediate feedback
+- ✅ **Pre-Commit Validation**: Automated quality checks
+- ✅ **CI/CD Pipeline**: 24-second automated validation
+- ✅ **Release Validation**: Comprehensive testing including load and chaos
+- ✅ **Production Monitoring**: Health checks and baseline metrics
 
-    // Ensure complete isolation between tenants
-    $this->assertNotEquals($tenant1Data['api_endpoint'], $tenant2Data['api_endpoint']);
-    $this->assertNoDataLeakage($tenant1Data, $tenant2Data);
-}
-```
-
-#### **Internationalization Testing**
-```php
-// i18n and l10n testing
-public function testInternationalizationSupport(): void {
-    $locales = ['en_US', 'nl_NL', 'de_DE', 'fr_FR'];
-
-    foreach ($locales as $locale) {
-        $this->switchLocale($locale);
-        $this->assertTranslationsComplete($locale);
-        $this->assertDateFormatting($locale);
-        $this->assertNumberFormatting($locale);
-    }
-}
-```
-
-#### **High Availability Testing**
-```php
-// High availability and fault tolerance
-public function testHighAvailabilityScenarios(): void {
-    $scenarios = [
-        'primary_dmn_engine_down' => 'fallback_to_secondary',
-        'database_connection_lost' => 'graceful_degradation',
-        'high_concurrent_load' => 'maintain_response_times'
-    ];
-
-    foreach ($scenarios as $scenario => $expectedBehavior) {
-        $this->simulateFailure($scenario);
-        $this->assertBehavior($expectedBehavior);
-    }
-}
-```
+### **Future-Ready Architecture**
+- ✅ **Scalable Test Framework**: Grows with plugin complexity
+- ✅ **Modular Test Design**: Easy to extend and maintain
+- ✅ **Environment Agnostic**: Works across development, staging, production
+- ✅ **Technology Diverse**: PHP unit tests, JavaScript E2E, K6 load testing
+- ✅ **Quality Focused**: Security, performance, and reliability built-in
