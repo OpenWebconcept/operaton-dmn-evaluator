@@ -63,3 +63,8 @@ cypress.env.json
 /tests/e2e/cypress/videos/
 junit*.xml
 *.mp4
+
+# Playwright specific artifacts
+index.html
+junit-playwright.xml
+test-results.xml
