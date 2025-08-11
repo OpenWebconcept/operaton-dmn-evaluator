@@ -136,8 +136,7 @@ class Operaton_DMN_API
         ];
 
         // Detailed health information
-        if ($detailed)
-        {
+        if ($detailed) {
             $health['details'] = $this->get_detailed_health_info();
         }
 
@@ -146,8 +145,7 @@ class Operaton_DMN_API
 
         // Check for any critical issues
         $critical_issues = $this->check_critical_health();
-        if (!empty($critical_issues))
-        {
+        if (!empty($critical_issues)) {
             $health['status'] = 'degraded';
             $health['issues'] = $critical_issues;
 
@@ -176,16 +174,13 @@ class Operaton_DMN_API
         ];
 
         // Database connectivity
-        try
-        {
+        try {
             $db_check = $wpdb->get_var("SELECT 1");
             $details['database'] = [
                 'status' => $db_check === '1' ? 'connected' : 'error',
                 'version' => $wpdb->get_var("SELECT VERSION()"),
             ];
-        }
-        catch (Exception $e)
-        {
+        } catch (Exception $e) {
             $details['database'] = [
                 'status' => 'error',
                 'error' => $e->getMessage(),
@@ -224,26 +219,22 @@ class Operaton_DMN_API
         // Check memory usage
         $memory_usage = memory_get_usage(true);
         $memory_limit = wp_convert_hr_to_bytes(ini_get('memory_limit'));
-        if ($memory_usage > ($memory_limit * 0.9))
-        {
+        if ($memory_usage > ($memory_limit * 0.9)) {
             $issues[] = 'High memory usage: ' . round($memory_usage / 1024 / 1024, 2) . 'MB';
         }
 
         // Check database connectivity
         global $wpdb;
-        if ($wpdb->last_error)
-        {
+        if ($wpdb->last_error) {
             $issues[] = 'Database error: ' . $wpdb->last_error;
         }
 
         // Check required dependencies
-        if (!class_exists('GFCommon'))
-        {
+        if (!class_exists('GFCommon')) {
             $issues[] = 'Gravity Forms not available';
         }
 
-        if (!function_exists('curl_init'))
-        {
+        if (!function_exists('curl_init')) {
             $issues[] = 'cURL extension not available';
         }
 
@@ -262,8 +253,7 @@ class Operaton_DMN_API
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
 
         // Check if table exists
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name)
-        {
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name) {
             return (int) $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
         }
 
@@ -279,8 +269,7 @@ class Operaton_DMN_API
         global $wpdb;
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
 
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name)
-        {
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name) {
             return (int) $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE active = 1");
         }
 
@@ -296,8 +285,7 @@ class Operaton_DMN_API
         global $wpdb;
         $table_name = $wpdb->prefix . 'operaton_dmn_evaluations';
 
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name)
-        {
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name) {
             $last_24h = $wpdb->get_var("
             SELECT COUNT(*)
             FROM $table_name
@@ -332,8 +320,7 @@ class Operaton_DMN_API
     {
         error_log('Operaton DMN API: register_rest_routes() called');
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN API: Registering REST API routes');
         }
 
@@ -347,16 +334,14 @@ class Operaton_DMN_API
                     'required' => true,
                     'type' => 'integer',
                     'sanitize_callback' => 'absint',
-                    'validate_callback' => function ($value)
-                    {
+                    'validate_callback' => function ($value) {
                         return $value > 0;
                     }
                 ),
                 'form_data' => array(
                     'required' => true,
                     'type' => 'object',
-                    'validate_callback' => function ($value)
-                    {
+                    'validate_callback' => function ($value) {
                         return is_array($value) && !empty($value);
                     }
                 )
@@ -367,8 +352,7 @@ class Operaton_DMN_API
         // Test endpoint for debugging
         register_rest_route('operaton-dmn/v1', '/test', array(
             'methods' => 'GET',
-            'callback' => function ()
-            {
+            'callback' => function () {
                 return array(
                     'status' => 'Plugin REST API is working!',
                     'version' => OPERATON_DMN_VERSION,
@@ -394,26 +378,20 @@ class Operaton_DMN_API
             ),
         ));
 
-        if ($health_registered)
-        {
+        if ($health_registered) {
             error_log('Operaton DMN API: Health route registered successfully');
-        }
-        else
-        {
+        } else {
             error_log('Operaton DMN API: Health route registration FAILED');
         }
 
         // Check if the health_check method exists
-        if (method_exists($this, 'health_check'))
-        {
+        if (method_exists($this, 'health_check')) {
             error_log('Operaton DMN API: health_check method exists');
-        }
-        else
-        {
+        } else {
             error_log('Operaton DMN API: health_check method DOES NOT EXIST');
         }
     }
-    
+
     /**
      * Register decision flow REST endpoint separately for modular loading
      * Creates endpoint for decision flow summary retrieval
