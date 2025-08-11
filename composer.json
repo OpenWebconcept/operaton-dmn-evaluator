@@ -6,12 +6,15 @@
     "yoast/phpunit-polyfills": "^1.0",
     "squizlabs/php_codesniffer": "^3.7",
     "wp-coding-standards/wpcs": "^3.2",
-    "dealerdirect/phpcodesniffer-composer-installer": "^1.1"
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.1",
+    "guzzlehttp/guzzle": "^7.9"
   },
   "scripts": {
     "test": "phpunit tests/",
     "test:unit": "phpunit tests/unit/",
     "test:integration": "phpunit tests/integration/",
+    "test:api": "phpunit tests/integration/RestApiIntegrationTest.php",
+    "test:api:verbose": "phpunit tests/integration/RestApiIntegrationTest.php --verbose",
     "test:ci": "phpunit tests/ --log-junit junit.xml",
     "test:mock": "phpunit tests/unit/MockServiceTest.php",
     "mock:demo": "php -r \"require_once 'tests/fixtures/ExtendedMockDmnService.php'; require_once 'tests/helpers/MockServiceTestHelper.php'; use Operaton\\DMN\\Tests\\Helpers\\MockServiceTestHelper; \\$helper = new MockServiceTestHelper(); \\$report = \\$helper->generateTestReport(); echo json_encode(\\$report, JSON_PRETTY_PRINT);\"",
