@@ -14,6 +14,10 @@
     "playwright:ui": "playwright test --config=tests/e2e/playwright/playwright.config.js --ui",
     "playwright:headed": "playwright test --config=tests/e2e/playwright/playwright.config.js --headed",
     "test:e2e:playwright": "npm run playwright:test",
-    "test:e2e:all": "npm run cypress:run && npm run playwright:test"
+    "test:e2e:all": "npm run cypress:run && npm run playwright:test",
+    "test:load": "k6 run tests/load/dmn-load-test.js",
+    "test:load:smoke": "k6 run tests/load/dmn-load-test.js --env TEST_TYPE=health_only",
+    "test:load:evaluation": "k6 run tests/load/dmn-load-test.js --env TEST_TYPE=evaluation_only",
+    "test:load:report": "k6 run tests/load/dmn-load-test.js --out json=test-results/load-test-results.json"
   }
 }
