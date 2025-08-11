@@ -13,6 +13,8 @@
     "test:unit": "phpunit tests/unit/",
     "test:integration": "phpunit tests/integration/",
     "test:ci": "phpunit tests/ --log-junit junit.xml",
+    "test:mock": "phpunit tests/unit/MockServiceTest.php",
+    "mock:demo": "php -r \"require_once 'tests/fixtures/ExtendedMockDmnService.php'; require_once 'tests/helpers/MockServiceTestHelper.php'; use Operaton\\DMN\\Tests\\Helpers\\MockServiceTestHelper; \\$helper = new MockServiceTestHelper(); \\$report = \\$helper->generateTestReport(); echo json_encode(\\$report, JSON_PRETTY_PRINT);\"",
     "lint": "vendor/bin/phpcs --standard=PSR12 includes/ operaton-dmn-plugin.php",
     "lint:fix": "vendor/bin/phpcbf --standard=PSR12 includes/ operaton-dmn-plugin.php || echo 'Auto-fixed what was possible'",
     "lint:summary": "vendor/bin/phpcs --standard=PSR12 --report=summary includes/ operaton-dmn-plugin.php || true",
