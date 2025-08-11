@@ -2,6 +2,7 @@
   "devDependencies": {
     "@cypress/webpack-preprocessor": "^6.0.4",
     "@playwright/test": "^1.54.2",
+    "axios": "^1.11.0",
     "cypress": "^14.5.3"
   },
   "scripts": {
@@ -18,6 +19,10 @@
     "test:load": "k6 run tests/load/dmn-load-test.js",
     "test:load:smoke": "k6 run tests/load/dmn-load-test.js --env TEST_TYPE=health_only",
     "test:load:evaluation": "k6 run tests/load/dmn-load-test.js --env TEST_TYPE=evaluation_only",
-    "test:load:report": "k6 run tests/load/dmn-load-test.js --out json=test-results/load-test-results.json"
+    "test:load:report": "k6 run tests/load/dmn-load-test.js --out json=test-results/load-test-results.json",
+    "test:chaos": "node tests/chaos/chaos-engineering.js",
+    "test:chaos:dev": "node tests/chaos/chaos-engineering.js development",
+    "test:chaos:staging": "node tests/chaos/chaos-engineering.js staging",
+    "chaos:baseline": "node -e \"const chaos = require('./tests/chaos/chaos-engineering.js'); const test = new chaos(); test.initialize().then(r => console.log('Baseline:', r));\""
   }
 }
