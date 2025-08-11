@@ -23,7 +23,11 @@
     "ci": "composer run test:ci && composer run security",
     "ci:full": "composer run test:ci && composer run quality",
     "format": "composer run lint:fix && composer run lint:summary",
-    "check": "composer run test && composer run quality"
+    "check": "composer run test && composer run quality",
+    "hooks:enable": "bash scripts/hooks/manage-hooks.sh enable",
+    "hooks:disable": "bash scripts/hooks/manage-hooks.sh disable",
+    "hooks:status": "bash scripts/hooks/manage-hooks.sh status",
+    "hooks:test": "bash scripts/hooks/manage-hooks.sh test"
   },
   "autoload-dev": {
     "psr-4": {
