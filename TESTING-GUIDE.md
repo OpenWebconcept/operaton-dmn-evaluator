@@ -9,7 +9,7 @@
 ./run-tests.sh quick
 # OR
 composer run dev
-# OR 
+# OR
 npm run dev
 
 # Standard development testing (recommended)
@@ -342,7 +342,3 @@ export TEST_ENV="development"  # or staging, production
 | `npm run test:e2e:all` | < 30s | UI validation |
 | `npm run test:load:smoke` | < 10s | Quick perf check |
 | `npm run test:chaos` | 5-15min | Resilience testing |
-
----
-
-This comprehensive testing foundation ensures your Operaton DMN Evaluator plugin maintains enterprise-grade quality and reliability! 🎉
