@@ -1,4 +1,6 @@
 # Build artifacts and releases
+/dist/
+/.cache/
 build/
 *.tar.gz
 *.zip
@@ -38,8 +40,10 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
 
 # Environment files
+cypress.env.json
 .env
 .env.local
 .env.development.local
@@ -52,8 +56,10 @@ operaton-dmn-evaluator-*.tar.gz
 operaton-dmn-evaluator-*.zip
 cypress.env.json
 
-# Test artifacts
-playwright-report/
-test-results/
-tests/e2e/cypress/screenshots/
-tests/e2e/cypress/videos/junit*.xml
+# Test artifacts and reports
+/test-results/
+/playwright-report/
+/tests/e2e/cypress/screenshots/
+/tests/e2e/cypress/videos/
+junit*.xml
+*.mp4
