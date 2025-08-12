@@ -9,7 +9,7 @@ operaton-dmn-evaluator/
 │   │   ├── cypress/
 │   │   │   ├── e2e/
 │   │   │   │   ├── dmn-keyless-api.cy.js      # Basic API testing (6 tests)
-│   │   │   │   └── dish-form-workflow.cy.js   # ✨ Complete form workflow (4 tests)
+│   │   │   │   └── dish-form-workflow.cy.js   # ✨ Complete form workflow (10 tests)
 │   │   │   ├── fixtures/
 │   │   │   │   └── example.json               # Test data files
 │   │   │   ├── support/
@@ -19,7 +19,7 @@ operaton-dmn-evaluator/
 │   │   │   └── videos/                        # Auto-generated videos
 │   │   └── playwright/
 │   │       ├── playwright.config.js           # Playwright configuration
-│   │       └── dmn-workflow.spec.js          # Playwright test suite (10 tests)
+│   │       └── dmn-workflow.spec.js           # ✨ Playwright test suite (8 tests)
 │   ├── fixtures/
 │   │   ├── mock-classes.php                   # Mock classes for testing
 │   │   └── ExtendedMockDmnService.php         # Extended mock DMN service
