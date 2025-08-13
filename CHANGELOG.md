@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 
 ## Issues
 - [Issue #18](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/18) - Testresults shouldn't be tracked by git
+- [Issue #19](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/19) - Expanding API tests based on OpenAPI specification
 - [Issue #21](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/21) - Create release script also copies vendor dir
 - [Issue #26](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/26) - DMN Health and Evaluation Endpoint tests
 
@@ -13,11 +14,16 @@ All notable changes to this project will be documented in this file.
 - ✅ **End-to-End Form Workflow Tests (10 tests)** Complete Dish Form Workflow Testing (`dish-form-workflow.cy.js`)
 - ✅ **Playwright Cross-Browser Testing (8 tests)** Complete Cross-Browser Form Workflow Testing (`dish-form-workflow.spec.js`)
 
+### OpenAPI Enhancement
+- ✅ **Unit Tests**: 44 tests (259 assertions) - ✨ Enhanced with comprehensive OpenAPI coverage
+- ✅ **Integration Tests**: 16 tests (39 assertions) - ✨ Complete Operaton DMN API validation
+
+
 ### Release packages
 - ✅ Exclude `vendor/` from being copied in (`create-release.sh`)
   - `composer.json` only has dev dependencies
   - `plugin-updater` is a standalone implementation that handles GitLab API calls and updates without external libraries
-  - The vendor/ directory would add unnecessary bloat
+  - The `vendor/` directory would add unnecessary bloat
 
 
 ## [1.0.0-beta.13] - 2025-08-11
