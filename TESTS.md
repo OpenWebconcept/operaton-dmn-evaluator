@@ -48,7 +48,7 @@ operaton-dmn-evaluator/
 │   │   ├── setup-precommit-hooks.sh           # Pre-commit hooks setup
 │   │   ├── manage-hooks.sh                    # Hook management utilities
 │   │   └── check-php-syntax.sh                # PHP syntax validation
-│   ├── setup-step1.sh through step6.sh       # Incremental setup scripts
+│   ├── setup-step1.sh through step6.sh        # Incremental setup scripts
 │   └── run-comprehensive-tests.sh             # Main test orchestrator
 ├── test-results/                              # Test output directory
 │   ├── junit-playwright.xml                   # Playwright test results
@@ -63,7 +63,7 @@ operaton-dmn-evaluator/
 ├── junit.xml                                  # PHPUnit test results
 ├── run-tests.sh                               # Convenient test runner
 ├── TESTS.md                                   # This comprehensive documentation
-└── TESTING-GUIDE.md                          # Complete command reference
+└── TESTING-GUIDE.md                           # Complete command reference
 ```
 
 ## 📊 **Test Suite Statistics**
