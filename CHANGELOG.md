@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.0.0-beta.14] - 2025-08-XX
+## [1.0.0-beta.14] - 2025-08-13
 
 ## Issues
 - [Issue #18](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/18) - Testresults shouldn't be tracked by git
