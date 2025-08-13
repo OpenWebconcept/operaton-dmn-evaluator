@@ -1,31 +1,55 @@
 <?xml version="1.0"?>
-<phpunit bootstrap="tests/bootstrap.php" colors="true">
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.6/phpunit.xsd"
+         bootstrap="bootstrap.php"
+         colors="true"
+         stopOnFailure="false"
+         processIsolation="false">
+
     <testsuites>
         <testsuite name="default">
-            <directory>tests/unit</directory>
-            <directory>tests/integration</directory>
+            <directory>unit</directory>
+            <directory>integration</directory>
+            <!-- Explicitly exclude non-test directories -->
+            <exclude>fixtures</exclude>
+            <exclude>helpers</exclude>
+            <exclude>e2e</exclude>
+            <exclude>load</exclude>
+            <exclude>chaos</exclude>
         </testsuite>
+
         <testsuite name="unit">
-            <directory>tests/unit</directory>
+            <directory>unit</directory>
         </testsuite>
+
         <testsuite name="integration">
-            <directory>tests/integration</directory>
+            <directory>integration</directory>
+        </testsuite>
+
+        <testsuite name="safe">
+            <directory>unit</directory>
         </testsuite>
     </testsuites>
 
     <coverage processUncoveredFiles="true">
         <include>
-            <directory suffix=".php">./includes/</directory>
-            <file>./operaton-dmn-plugin.php</file>
+            <directory suffix=".php">../includes/</directory>
+            <file>../operaton-dmn-plugin.php</file>
         </include>
         <exclude>
-            <directory>./tests/</directory>
-            <directory>./vendor/</directory>
+            <directory>./</directory>
+            <directory>../vendor/</directory>
+            <directory>../node_modules/</directory>
+            <!-- Explicitly exclude support directories -->
+            <directory>fixtures</directory>
+            <directory>helpers</directory>
+            <directory>e2e</directory>
+            <directory>load</directory>
+            <directory>chaos</directory>
         </exclude>
     </coverage>
 
     <logging>
-        <log type="coverage-html" target="coverage"/>
-        <log type="junit" target="junit.xml"/>
+        <junit outputFile="../junit.xml"/>
     </logging>
 </phpunit>
