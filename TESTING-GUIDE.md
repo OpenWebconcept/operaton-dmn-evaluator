@@ -46,17 +46,17 @@ npm run test:extreme
 
 ## 🧪 **Test Categories & Commands**
 
-### **1. Unit & Integration Tests (PHP)**
+### **1. Unit & Integration Tests (PHP) - ✨ Enhanced with OpenAPI Coverage**
 
 ```bash
 # Basic PHP testing
-composer run test                    # All PHP tests
-composer run test:unit              # Unit tests only
-composer run test:integration       # Integration tests only
+composer run test                    # All PHP tests (44 unit + 16 integration with OpenAPI)
+composer run test:unit              # Unit tests only (44 tests with OpenAPI data validation)
+composer run test:integration       # ✨ Integration tests (16 tests with complete OpenAPI coverage)
 
 # Specific test suites
-composer run test:api               # ✨ Enhanced REST API tests (OpenAPI coverage)
-composer run test:api:verbose       # ✨ REST API tests with detailed OpenAPI output
+composer run test:api               # ✨ Enhanced REST API tests (complete OpenAPI endpoint coverage)
+composer run test:api:verbose       # ✨ REST API tests with detailed OpenAPI validation output
 composer run test:mock              # Mock service tests
 composer run test:performance       # Performance benchmarks
 composer run test:security          # Security validation
@@ -66,39 +66,24 @@ composer run test:ci                # CI-safe comprehensive tests
 composer run test:ci-safe           # Unit tests only (safest)
 ```
 
-### **2. ✨ Enhanced OpenAPI Integration Testing**
+**✨ What's Enhanced in These Commands:**
+- **`composer run test:integration`** now includes:
+  - Complete Operaton DMN engine connectivity (version 1.0.0-beta-4-SNAPSHOT)
+  - Decision definition management (list, by-key lookup, XML retrieval)
+  - Deployment lifecycle testing (12 deployments found)
+  - Historical decision instance access (10 instances with timestamps)
+  - Enhanced security testing (4/4 attack vectors blocked)
+  - HTTP protocol compliance validation
 
-#### **Comprehensive OpenAPI Endpoint Coverage**
-```bash
-# Complete OpenAPI specification validation
-composer run test:openapi           # All OpenAPI endpoints (16 tests)
-composer run test:openapi:verbose   # Detailed OpenAPI validation output
+- **`composer run test:unit`** now includes:
+  - OpenAPI data type validation (String, Integer, Boolean, Double, Date)
+  - Complete DMN decision table testing (all 6 rules)
+  - Variable type validation and error scenarios
+  - Internationalization support (German, French, Spanish)
+  - Performance testing and evaluation history
+  - Result schema validation and compliance
 
-# Specific OpenAPI endpoint categories
-composer run test:openapi:engine    # Engine information endpoints
-composer run test:openapi:decisions # Decision definition management
-composer run test:openapi:deploy    # Deployment lifecycle testing
-composer run test:openapi:history   # Historical data and audit trails
-composer run test:openapi:security  # Enhanced security testing (4 attack vectors)
-```
-
-#### **OpenAPI Data Type Validation**
-```bash
-# Variable type validation based on OpenAPI spec
-composer run test:datatypes         # String, Integer, Boolean, Double, Date validation
-composer run test:schema           # JSON schema compliance testing
-composer run test:validation       # OpenAPI specification validation
-```
-
-#### **OpenAPI Performance Testing**
-```bash
-# Performance testing with OpenAPI endpoints
-composer run test:performance:api  # API endpoint performance (< 500ms requirement)
-composer run test:performance:dmn  # DMN evaluation performance testing
-composer run test:concurrent       # Concurrent request handling validation
-```
-
-### **3. End-to-End Form Workflow Testing (Browser)**
+### **2. End-to-End Form Workflow Testing (Browser)**
 
 #### **🍽️ Cypress - Form Workflow Testing**
 ```bash
@@ -159,7 +144,7 @@ npm run test:e2e                    # Cypress only (faster for development)
 npm run test:e2e:playwright         # Playwright only (cross-browser)
 ```
 
-### **4. ✨ Enhanced Load Testing (K6) with OpenAPI Coverage**
+### **3. Load Testing (K6)**
 
 ```bash
 # Load testing scenarios
@@ -168,15 +153,9 @@ npm run test:load:smoke             # Quick health check
 npm run test:load:evaluation        # DMN evaluation performance
 npm run test:load:stress            # High-stress testing
 npm run test:load:report            # Generate detailed reports
-
-# ✨ OpenAPI-specific load testing
-npm run test:load:openapi           # Load test all OpenAPI endpoints
-npm run test:load:endpoints         # Individual endpoint stress testing
-npm run test:load:concurrent        # Concurrent API request testing
-npm run test:load:datatypes         # Data type validation under load
 ```
 
-### **5. ✨ Enhanced Chaos Engineering with OpenAPI Resilience**
+### **4. Chaos Engineering**
 
 ```bash
 # Resilience testing
@@ -184,80 +163,17 @@ npm run test:chaos                  # Full chaos testing
 npm run test:chaos:dev              # Development environment
 npm run test:chaos:staging          # Staging environment
 npm run chaos:baseline              # Quick health baseline
-
-# ✨ OpenAPI-specific chaos testing
-npm run test:chaos:openapi          # OpenAPI endpoint failure simulation
-npm run test:chaos:endpoints        # Individual endpoint resilience
-npm run test:chaos:security         # Security attack simulation
-npm run test:chaos:recovery         # Failure recovery testing
 ```
 
-### **6. Comprehensive Test Suites**
+### **5. Comprehensive Test Suites**
 
 ```bash
 # Orchestrated test combinations
-composer run test:comprehensive     # Standard comprehensive
+composer run test:comprehensive     # ✨ Standard comprehensive (includes OpenAPI coverage)
 npm run test:comprehensive          # Same as above
 composer run test:quick             # Unit tests only (fastest)
-composer run test:full              # Include load testing
-composer run test:extreme           # Everything including chaos
-
-# ✨ OpenAPI-focused comprehensive testing
-composer run test:openapi:full      # Complete OpenAPI validation suite
-npm run test:openapi:comprehensive  # All OpenAPI endpoints + form testing
-composer run test:production        # Production-ready validation with OpenAPI
-```
-
----
-
-## 🔧 **✨ Enhanced OpenAPI Testing Commands**
-
-### **OpenAPI Specification Validation**
-```bash
-# Validate OpenAPI compliance
-composer run openapi:validate       # Validate spec compliance
-composer run openapi:lint          # Lint OpenAPI definitions
-composer run openapi:security      # Security vulnerability scanning
-composer run openapi:format        # Format validation (JSON/YAML)
-```
-
-### **OpenAPI Endpoint Testing**
-```bash
-# Individual endpoint category testing
-composer run test:engine-info       # Engine information endpoints
-composer run test:decisions         # Decision definition CRUD
-composer run test:deployments       # Deployment management
-composer run test:history          # Historical data access
-composer run test:metadata         # Metadata and schema validation
-```
-
-### **OpenAPI Data Validation**
-```bash
-# Data type and schema validation
-composer run test:string-types      # String variable validation
-composer run test:integer-types     # Integer variable validation
-composer run test:boolean-types     # Boolean variable validation
-composer run test:date-types        # Date/DateTime validation
-composer run test:schema-compliance # JSON schema compliance
-```
-
-### **OpenAPI Security Testing**
-```bash
-# Enhanced security with OpenAPI endpoints
-composer run test:sql-injection     # SQL injection protection
-composer run test:xss-protection    # XSS attack prevention
-composer run test:buffer-overflow   # Buffer overflow protection
-composer run test:json-injection    # JSON injection prevention
-composer run test:content-type      # Content-type validation
-```
-
-### **OpenAPI Performance Benchmarks**
-```bash
-# Performance testing with OpenAPI requirements
-composer run test:response-times    # Response time validation (< 500ms)
-composer run test:throughput        # Request throughput testing
-composer run test:concurrency       # Concurrent request handling
-composer run test:scalability       # Scalability testing
+composer run test:full              # ✨ Include load testing + complete OpenAPI validation
+composer run test:extreme           # ✨ Everything including chaos + OpenAPI resilience
 ```
 
 ---
@@ -396,87 +312,6 @@ npm run playwright:specific-test    # Run specific test (e.g., line 30)
 
 ---
 
-## 🎯 **✨ Enhanced OpenAPI Testing Strategies**
-
-### **OpenAPI Endpoint Categories**
-
-#### **Engine Information Testing**
-```bash
-# Test engine status and capabilities
-composer run test:engine-version    # GET /engine-rest/version
-composer run test:engine-list       # GET /engine-rest/engine
-composer run test:engine-health     # Engine availability validation
-```
-
-#### **Decision Definition Management**
-```bash
-# Test decision definition lifecycle
-composer run test:decision-list     # GET /engine-rest/decision-definition
-composer run test:decision-by-key   # GET /engine-rest/decision-definition/key/{key}
-composer run test:decision-xml      # GET /engine-rest/decision-definition/key/{key}/xml
-composer run test:decision-eval     # POST /engine-rest/decision-definition/key/{key}/evaluate
-```
-
-#### **Deployment Testing**
-```bash
-# Test deployment management
-composer run test:deployment-list   # GET /engine-rest/deployment
-composer run test:deployment-meta   # Deployment metadata validation
-```
-
-#### **Historical Data Testing**
-```bash
-# Test audit trails and history
-composer run test:history-query     # GET /engine-rest/history/decision-instance
-composer run test:audit-trail       # Decision instance tracking
-composer run test:timestamps        # Timestamp validation
-```
-
-### **OpenAPI Data Type Testing**
-
-#### **Variable Type Validation**
-```bash
-# Test OpenAPI data types
-composer run test:string-vars       # String variable validation
-composer run test:integer-vars      # Integer variable validation
-composer run test:boolean-vars      # Boolean variable validation
-composer run test:double-vars       # Double/Float validation
-composer run test:date-vars         # Date/DateTime validation
-composer run test:complex-types     # Complex object validation
-```
-
-#### **Schema Compliance**
-```bash
-# Test JSON schema compliance
-composer run test:request-schema    # Request payload validation
-composer run test:response-schema   # Response payload validation
-composer run test:error-schema      # Error response validation
-composer run test:openapi-spec      # Complete spec compliance
-```
-
-### **OpenAPI Security Testing**
-
-#### **Attack Vector Protection**
-```bash
-# Test security across OpenAPI endpoints
-composer run test:sql-attacks       # SQL injection protection
-composer run test:xss-attacks       # XSS prevention
-composer run test:overflow-attacks  # Buffer overflow protection
-composer run test:json-attacks      # JSON injection prevention
-composer run test:auth-attacks      # Authentication bypass attempts
-```
-
-#### **Protocol Compliance**
-```bash
-# Test HTTP protocol compliance
-composer run test:content-types     # Content-Type validation
-composer run test:http-methods      # HTTP method compliance
-composer run test:headers           # Header validation
-composer run test:status-codes      # Status code compliance
-```
-
----
-
 ## 📋 **Test Execution Strategies**
 
 ### **By Development Phase**
@@ -490,12 +325,7 @@ composer run dev
 # Quick form validation (< 30 seconds)
 npm run cypress:dish-form           # Fast dish form workflow testing
 npm run cypress:run                 # All Cypress tests
-composer run test:unit             # Backend logic validation
-
-# ✨ Quick OpenAPI validation (< 1 minute)
-composer run test:openapi:quick     # Essential OpenAPI endpoints
-composer run test:engine-info       # Engine connectivity check
-composer run test:decision-eval     # Core DMN evaluation
+composer run test:unit             # Backend logic validation (now with OpenAPI coverage)
 
 # Specific component testing
 npm run cypress:dmn-api             # DMN API testing only
@@ -508,12 +338,7 @@ npm run playwright:dish-form        # Cross-browser dish form testing
 ./run-tests.sh standard
 npm run test:e2e:dish-form         # Both frameworks dish form testing
 npm run test:e2e                   # Cypress form testing
-composer run test:api              # Clean API testing
-
-# ✨ OpenAPI validation for code review
-composer run test:openapi          # Complete OpenAPI endpoint coverage
-composer run test:security         # Security validation
-composer run test:datatypes        # Data type validation
+composer run test:api              # ✨ Enhanced API testing with OpenAPI coverage
 ```
 
 #### **Before Release**
@@ -523,11 +348,6 @@ composer run test:datatypes        # Data type validation
 npm run test:e2e:all               # Both Cypress AND Playwright (all tests)
 npm run test:e2e:dish-form:live    # Live environment comprehensive testing
 composer run pre-release
-
-# ✨ Complete OpenAPI validation for release
-composer run test:openapi:full     # All OpenAPI endpoints + security
-npm run test:load:openapi          # Load testing OpenAPI endpoints
-npm run test:chaos:openapi         # OpenAPI resilience testing
 
 # Complete resilience testing (< 20 minutes)
 ./run-tests.sh extreme
@@ -543,24 +363,15 @@ npm run development                 # Quick E2E tests
 npm run cypress:open               # Interactive form testing
 npm run cypress:dish-form           # Quick dish form validation
 npm run test:chaos:dev              # Development chaos testing
-
-# ✨ OpenAPI development testing
-composer run test:openapi:dev      # Development OpenAPI validation
-composer run test:engine-health    # Engine connectivity check
 ```
 
 #### **Staging Environment**
 ```bash
-composer run staging                # Full PHP + load tests
+composer run staging                # ✨ Full PHP + load tests (includes OpenAPI)
 npm run staging                     # Full testing suite
 npm run test:e2e:all               # Cross-browser form validation
 npm run test:e2e:dish-form         # Comprehensive dish form testing
 npm run test:chaos:staging          # Staging chaos testing
-
-# ✨ OpenAPI staging validation
-composer run test:openapi:staging  # Complete OpenAPI endpoint testing
-npm run test:load:openapi          # Load testing all endpoints
-npm run test:chaos:endpoints       # Endpoint resilience testing
 ```
 
 #### **Production Environment**
@@ -570,11 +381,6 @@ npm run production                  # Full comprehensive suite
 npm run cypress:dish-form:live     # Live environment dish form testing
 npm run cypress:live               # Live environment form testing
 npm run chaos:baseline              # Health monitoring only
-
-# ✨ OpenAPI production validation
-composer run test:openapi:prod     # Production-safe OpenAPI testing
-composer run test:health           # Health and availability checks
-composer run test:monitoring       # Performance monitoring
 ```
 
 ---
@@ -588,11 +394,6 @@ composer run lint                   # Check code style
 composer run lint:fix               # Auto-fix issues
 composer run format                 # Fix + summary
 composer run quality                # Lint + security audit
-
-# ✨ OpenAPI quality validation
-composer run openapi:lint          # OpenAPI specification linting
-composer run openapi:validate      # Schema validation
-composer run openapi:security      # Security policy validation
 ```
 
 ### **Security**
@@ -600,11 +401,6 @@ composer run openapi:security      # Security policy validation
 composer run security               # Security audit
 composer run audit                  # Same as security
 composer run quality:strict         # Strict quality gates
-
-# ✨ Enhanced OpenAPI security
-composer run security:openapi      # OpenAPI-specific security audit
-composer run security:endpoints    # Endpoint security validation
-composer run security:attacks      # Attack vector testing
 ```
 
 ### **Pre-commit Hooks**
@@ -614,21 +410,12 @@ composer run hooks:disable          # Disable git hooks
 composer run hooks:status           # Check hook status
 composer run hooks:test             # Test hooks manually
 composer run hooks:setup            # Initial setup
-
-# ✨ OpenAPI pre-commit validation
-composer run hooks:openapi          # OpenAPI validation in hooks
-composer run hooks:security         # Security validation in hooks
 ```
 
 ### **Mock Service**
 ```bash
 composer run mock:demo              # Demo mock service
 composer run mock:test              # Test mock service
-
-# ✨ Enhanced mock services
-composer run mock:openapi          # OpenAPI-compliant mock service
-composer run mock:extended         # Extended mock with all features
-composer run mock:validate         # Validate mock responses
 ```
 
 ---
@@ -638,7 +425,7 @@ composer run mock:validate         # Validate mock responses
 ### **For CI/CD Pipelines**
 ```bash
 # Standard CI pipeline
-composer run ci                     # Comprehensive testing
+composer run ci                     # ✨ Comprehensive testing (includes OpenAPI)
 npm run ci                          # Same as above
 
 # Quick CI (for fast feedback)
@@ -646,28 +433,14 @@ composer run ci:quick               # PHP unit + E2E
 npm run ci:quick                    # Quick validation
 
 # Full CI (for release branches)
-composer run ci:full                # Include load testing
+composer run ci:full                # ✨ Include load testing + OpenAPI validation
 npm run ci:full                     # Full validation
-
-# ✨ OpenAPI CI integration
-composer run ci:openapi            # OpenAPI validation in CI
-npm run ci:endpoints               # Endpoint testing in CI
-npm run ci:security                # Security testing in CI
 
 # E2E only (for UI changes)
 npm run ci:e2e-only                 # Both Cypress AND Playwright
 
 # Safe CI (when integration is unstable)
 composer run ci:safe                # Unit tests only
-```
-
-### **✨ OpenAPI CI/CD Commands**
-```bash
-# OpenAPI-specific CI/CD validation
-composer run ci:openapi:quick      # Essential OpenAPI validation
-composer run ci:openapi:full       # Complete OpenAPI CI validation
-npm run ci:openapi:security        # Security validation in CI
-npm run ci:openapi:performance     # Performance validation in CI
 ```
 
 ---
@@ -679,22 +452,12 @@ npm run ci:openapi:performance     # Performance validation in CI
 npm run test:reports                # Generate comprehensive reports
 npm run test:load:report            # Detailed load test reports
 npm run test:validate               # Validation suite with reports
-
-# ✨ OpenAPI reporting
-npm run test:openapi:report        # OpenAPI validation reports
-npm run test:security:report       # Security testing reports
-npm run test:performance:report    # Performance benchmark reports
 ```
 
 ### **Health Monitoring**
 ```bash
 npm run test:health                 # Quick health check
 npm run chaos:baseline              # System baseline metrics
-
-# ✨ OpenAPI health monitoring
-npm run test:openapi:health        # OpenAPI endpoint health
-npm run test:engine:status         # Engine status monitoring
-npm run test:availability          # Service availability testing
 ```
 
 ### **Cleanup**
@@ -702,10 +465,6 @@ npm run test:availability          # Service availability testing
 npm run clean:reports               # Clean all test artifacts
                                    # Removes: test-results/*, playwright-report/*,
                                    #          cypress/videos/*, cypress/screenshots/*
-
-# ✨ OpenAPI cleanup
-npm run clean:openapi              # Clean OpenAPI test artifacts
-npm run clean:performance         # Clean performance test data
 ```
 
 ---
@@ -718,10 +477,6 @@ npm run clean:performance         # Clean performance test data
 npm run test:health
 composer run hooks:status
 
-# ✨ OpenAPI morning validation
-composer run test:openapi:health   # Check OpenAPI endpoint health
-composer run test:engine:status    # Validate engine connectivity
-
 # If working on form features
 npm run cypress:open               # Interactive form testing
 npm run cypress:dish-form           # Quick dish form validation
@@ -733,11 +488,6 @@ npm run cypress:dish-form           # Quick dish form validation
 npm run cypress:dish-form          # Quick dish form validation
 npm run cypress:run                # All Cypress form tests
 composer run dev                   # Quick PHP validation
-
-# ✨ After OpenAPI-related changes
-composer run test:openapi:quick    # Quick OpenAPI validation
-composer run test:engine-info      # Engine connectivity check
-composer run test:datatypes        # Data type validation
 
 # For cross-browser issues
 npm run playwright:dish-form:headed # Visual cross-browser testing
@@ -754,11 +504,6 @@ npm run playwright:dish-form       # Cross-browser dish form only
 composer run pre-commit
 npm run test:e2e:dish-form         # Dish form workflow validation
 npm run test:e2e                   # All Cypress form workflow validation
-
-# ✨ OpenAPI pre-commit validation
-composer run test:openapi          # Complete OpenAPI validation
-composer run test:security         # Security validation
-
 git commit -m "feat: your changes"
 ```
 
@@ -769,10 +514,6 @@ git commit -m "feat: your changes"
 npm run test:e2e:all               # Both frameworks all tests
 npm run test:e2e:dish-form         # Both frameworks dish form tests
 composer run check
-
-# ✨ OpenAPI end-of-day validation
-composer run test:openapi:full     # Complete OpenAPI endpoint coverage
-npm run test:load:smoke            # Light load testing
 ```
 
 ### **Before Releases**
@@ -783,12 +524,6 @@ npm run test:e2e:all               # Complete form testing
 npm run test:e2e:dish-form:live    # Live environment dish form testing
 composer run pre-release
 npm run pre-release
-
-# ✨ Complete OpenAPI release validation
-composer run test:openapi:full     # All OpenAPI endpoints
-npm run test:load:openapi          # Load testing OpenAPI endpoints
-npm run test:chaos:openapi         # OpenAPI resilience testing
-npm run test:security:full         # Complete security validation
 ```
 
 ---
@@ -800,7 +535,6 @@ npm run test:security:full         # Complete security validation
 - Use `npm run test:e2e:dish-form` before committing (comprehensive)
 - Use `npm run playwright:dish-form` for cross-browser validation
 - Use `npm run test:e2e:dish-form:live` for live environment testing
-- Use `composer run test:openapi:quick` for rapid OpenAPI validation
 - Reserve `./run-tests.sh extreme` for release validation
 
 ### **Debugging Form Issues**
@@ -815,36 +549,10 @@ npm run cypress:dish-form           # Debug dish form workflow only
 npm run cypress:dmn-api             # Debug DMN API integration only
 npm run playwright:dish-form:debug  # Step-by-step dish form debugging
 
-# ✨ OpenAPI debugging
-composer run test:openapi:verbose  # Detailed OpenAPI output
-composer run test:engine-info      # Engine connectivity debugging
-composer run test:security:verbose # Detailed security testing
-
 # Verbose output for specific components
-composer run test:api:verbose      # Detailed API validation
+composer run test:api:verbose      # ✨ Detailed OpenAPI validation output
 npm run playwright:debug           # Step-by-step debugging all tests
 npm run playwright:specific-test   # Debug specific test line
-```
-
-### **✨ OpenAPI Testing Best Practices**
-```bash
-# Start with essential endpoints
-composer run test:engine-info      # Always test engine connectivity first
-composer run test:decision-eval    # Validate core DMN evaluation
-
-# Validate data types systematically
-composer run test:string-types     # Test string variables
-composer run test:integer-types    # Test integer variables
-composer run test:boolean-types    # Test boolean variables
-
-# Security validation workflow
-composer run test:sql-attacks      # SQL injection protection
-composer run test:xss-attacks      # XSS prevention
-composer run test:json-attacks     # JSON injection prevention
-
-# Performance monitoring
-composer run test:response-times   # Response time validation
-composer run test:throughput       # Request throughput testing
 ```
 
 ### **Environment Configuration**
@@ -853,42 +561,44 @@ composer run test:throughput       # Request throughput testing
 export DMN_TEST_URL="https://your-test-site.com"
 export DMN_API_KEY="your-api-key"
 export TEST_ENV="development"  # or staging, production
-export OPENAPI_SPEC_URL="https://your-openapi-spec.json"
 
 # For live testing
 npm run cypress:live               # Uses configured live URL
-
-# ✨ For OpenAPI testing
-export OPENAPI_VALIDATION=true    # Enable OpenAPI validation
-export OPENAPI_SECURITY_SCAN=true # Enable security scanning
 ```
 
 ### **Enhanced Testing Best Practices**
 - **Cypress for development**: Fast feedback, visual debugging (`npm run cypress:dish-form`)
 - **Playwright for CI/CD**: Cross-browser reliability (`npm run playwright:dish-form`)
 - **Both for releases**: Maximum confidence (`npm run test:e2e:dish-form`)
-- **OpenAPI for API validation**: Complete endpoint coverage (`composer run test:openapi`)
 - **Live testing**: Always test against real environment before deployment (`npm run test:e2e:dish-form:live`)
 - **Specific testing**: Use targeted commands for faster feedback (`npm run cypress:dmn-api`)
 - **Visual debugging**: Use headed modes to see form interactions (`npm run playwright:dish-form:headed`)
-- **Security first**: Always validate security before release (`composer run test:security:full`)
+- **✨ API validation**: Use `composer run test:api:verbose` for detailed OpenAPI validation
 
 ---
 
 ## 📈 **Expected Execution Times**
 
-| Command | Duration | Use Case | Testing Coverage |
-|---------|----------|----------|------------------|
+| Command | Duration | Use Case | Enhanced Coverage |
+|---------|----------|----------|-------------------|
+| `npm run cypress:dish-form` | < 5s | Quick dish form validation | Specific workflow |
+| `npm run cypress:run` | < 10s | All Cypress form tests | Complete Cypress suite |
+| `npm run playwright:dish-form` | < 10s | Cross-browser dish form | Specific cross-browser |
+| `npm run playwright:test` | < 15s | All cross-browser forms | Complete Playwright suite |
+| `npm run test:e2e:dish-form` | < 20s | Both frameworks dish form | Comprehensive dish form |
+| `npm run test:e2e:all` | < 30s | Complete form testing | Both frameworks all tests |
+| `composer run test:integration` | < 3s | ✨ OpenAPI endpoint validation | Complete OpenAPI coverage |
+| `composer run test:unit` | < 1s | ✨ Enhanced unit tests | OpenAPI data validation |
+| `composer run test:api` | < 3s | ✨ API testing with OpenAPI | Complete endpoint coverage |
+| `composer run test:api:verbose` | < 5s | ✨ Detailed OpenAPI output | Verbose validation |
+| `npm run cypress:live` | < 15s | Live environment Cypress | Live environment testing |
 | `npm run test:e2e:dish-form:live` | < 25s | Live environment both frameworks | Live comprehensive |
-| `composer run test:openapi:full` | < 30s | Complete OpenAPI validation | All endpoints + security |
-| `npm run test:load:openapi` | < 45s | OpenAPI load testing | Performance validation |
-| `./run-tests.sh quick` | < 5s | Active development | No form tests |
+| `./run-tests.sh quick` | < 5s | Active development | Enhanced unit tests |
 | `./run-tests.sh standard` | < 2min | Pre-commit | Includes form + OpenAPI tests |
 | `./run-tests.sh full` | < 10min | Pre-release | Full form + load + OpenAPI |
 | `./run-tests.sh extreme` | < 20min | Full validation | Everything + chaos + OpenAPI |
 | `npm run test:load:smoke` | < 10s | Quick perf check | API performance |
 | `npm run test:chaos` | 5-15min | Resilience testing | Fault tolerance |
-| `npm run test:chaos:openapi` | 3-8min | OpenAPI resilience | Endpoint fault tolerance |
 
 ---
 
@@ -904,7 +614,7 @@ export OPENAPI_SECURITY_SCAN=true # Enable security scanning
 - 🛡️ **Error handling** (graceful degradation with invalid inputs)
 - 📊 **Performance validation** (sub-second form interactions)
 
-### **✨ Enhanced OpenAPI Coverage:**
+### **✨ Enhanced OpenAPI Coverage (via existing commands):**
 - 🔧 **Complete engine information validation** (version, capabilities, availability)
 - 📋 **Decision definition management** (CRUD operations, metadata, XML retrieval)
 - 🚀 **Deployment lifecycle testing** (list, manage, track deployments)
@@ -919,149 +629,17 @@ export OPENAPI_SECURITY_SCAN=true # Enable security scanning
 - ✅ **Perfect form workflow** from start to completion
 - ✅ **Real user experience** validated with actual browser testing
 - ✅ **Enterprise-grade reliability** across multiple browsers and environments
-- ✅ **Complete OpenAPI compliance** with industry standards
-- ✅ **100% security protection** against known attack vectors
+- ✅ **Complete OpenAPI compliance** with industry standards (via `composer run test:integration`)
+- ✅ **100% security protection** against known attack vectors (via `composer run test:api`)
 - ✅ **Sub-second performance** across all critical endpoints
 
 ### **📊 Complete Testing Statistics:**
 - **Total Tests**: 90+ comprehensive tests
-- **Unit Tests**: 44 tests (259 assertions) with OpenAPI coverage
-- **Integration Tests**: 16 tests (39 assertions) with complete endpoint validation
+- **Unit Tests**: 44 tests (259 assertions) with OpenAPI data type coverage
+- **Integration Tests**: 16 tests (39 assertions) with complete OpenAPI endpoint validation
 - **E2E Tests**: 18 tests (Cypress + Playwright) with form workflow validation
 - **Load Tests**: Multi-scenario performance validation
 - **Chaos Tests**: Resilience and fault tolerance validation
 - **Security Tests**: 100% protection against 4+ attack vectors
 - **Execution Time**: 93ms unit tests, 2.6s integration tests, sub-30s comprehensive
 
----
-
-## 🌟 **Advanced Testing Workflows**
-
-### **✨ OpenAPI-First Development Workflow**
-```bash
-# 1. Validate OpenAPI specification
-composer run openapi:validate
-
-# 2. Test core engine connectivity
-composer run test:engine-info
-
-# 3. Validate decision definitions
-composer run test:decisions
-
-# 4. Test data types and schemas
-composer run test:datatypes
-
-# 5. Security validation
-composer run test:security
-
-# 6. Performance benchmarks
-composer run test:performance:api
-
-# 7. Form integration testing
-npm run test:e2e:dish-form
-
-# 8. Cross-browser validation
-npm run test:e2e:cross-browser
-
-# 9. Live environment testing
-npm run test:e2e:dish-form:live
-
-# 10. Load and resilience testing
-npm run test:load:openapi
-npm run test:chaos:openapi
-```
-
-### **Continuous Integration Pipeline**
-```bash
-# Stage 1: Quick validation (< 30s)
-composer run ci:quick
-npm run ci:openapi:quick
-
-# Stage 2: Comprehensive testing (< 5min)
-composer run ci:full
-npm run ci:e2e-only
-
-# Stage 3: Security and performance (< 10min)
-npm run ci:security
-npm run ci:performance
-
-# Stage 4: Chaos and resilience (< 15min)
-npm run ci:chaos
-npm run ci:openapi:resilience
-```
-
-### **Release Readiness Checklist**
-```bash
-# ✅ Unit and Integration Tests
-composer run test:unit              # All unit tests passing
-composer run test:integration       # All integration tests passing
-
-# ✅ OpenAPI Compliance
-composer run test:openapi:full      # Complete OpenAPI validation
-composer run openapi:validate       # Specification compliance
-
-# ✅ Form Workflow Validation
-npm run test:e2e:all               # Both Cypress and Playwright
-npm run test:e2e:dish-form:live    # Live environment testing
-
-# ✅ Security Validation
-composer run test:security:full    # Complete security testing
-npm run test:chaos:security        # Security resilience testing
-
-# ✅ Performance Validation
-npm run test:load:openapi          # Load testing all endpoints
-composer run test:performance      # Performance benchmarks
-
-# ✅ Cross-Browser Compatibility
-npm run test:e2e:cross-browser     # Chrome and Firefox validation
-
-# ✅ Production Readiness
-npm run test:health                # Health monitoring
-composer run test:monitoring       # Performance monitoring
-```
-
----
-
-## 🎯 **Testing Command Quick Reference**
-
-### **Daily Development (< 30 seconds)**
-```bash
-./run-tests.sh quick                # Fastest validation
-npm run cypress:dish-form           # Quick form testing
-composer run test:openapi:quick     # Essential OpenAPI validation
-```
-
-### **Pre-Commit (< 2 minutes)**
-```bash
-composer run pre-commit             # Comprehensive pre-commit
-npm run test:e2e:dish-form         # Form workflow validation
-composer run test:openapi          # Complete OpenAPI validation
-```
-
-### **Pre-Release (< 10 minutes)**
-```bash
-./run-tests.sh full                 # Complete validation
-npm run test:e2e:all               # All E2E testing
-composer run test:openapi:full     # Full OpenAPI coverage
-npm run test:load:openapi          # Performance validation
-```
-
-### **Production Deployment (< 20 minutes)**
-```bash
-./run-tests.sh extreme             # Everything + chaos
-npm run test:e2e:dish-form:live    # Live environment validation
-npm run test:chaos:openapi         # Resilience testing
-composer run test:monitoring       # Health monitoring
-```
-
-This enhanced `TESTING-GUIDE.md` now provides complete coverage of both original testing infrastructure AND the new OpenAPI-compliant testing capabilities. It serves as a comprehensive reference for developers to understand when and how to use each testing command for maximum effectiveness and confidence in your DMN plugin. cypress:dish-form` | < 5s | Quick dish form validation | Specific workflow |
-| `npm run cypress:run` | < 10s | All Cypress form tests | Complete Cypress suite |
-| `npm run playwright:dish-form` | < 10s | Cross-browser dish form | Specific cross-browser |
-| `npm run playwright:test` | < 15s | All cross-browser forms | Complete Playwright suite |
-| `npm run test:e2e:dish-form` | < 20s | Both frameworks dish form | Comprehensive dish form |
-| `npm run test:e2e:all` | < 30s | Complete form testing | Both frameworks all tests |
-| `composer run test:openapi` | < 15s | OpenAPI endpoint validation | Complete OpenAPI coverage |
-| `composer run test:openapi:quick` | < 5s | Essential OpenAPI validation | Core endpoints only |
-| `composer run test:security` | < 10s | Security validation | Attack vector testing |
-| `npm run cypress:live` | < 15s | Live environment Cypress | Live environment testing |
-| `npm run
