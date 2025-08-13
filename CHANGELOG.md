@@ -1,6 +1,17 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.0.0-beta.14] - 2025-08-XX
+
+## Issues
+- [Issue #18](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/18) - Testresults shouldn't be tracked by git
+- [Issue #26](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/26) - DMN Health and Evaluation Endpoint tests
+
+### Test coverage extended
+- ✅ **Clean API Integration Tests (9 tests)** Focused REST API Integration (`RestApiIntegrationTest.php`)
+- ✅ **End-to-End Form Workflow Tests (10 tests)** Complete Dish Form Workflow Testing (`dish-form-workflow.cy.js`)
+- ✅ **Playwright Cross-Browser Testing (8 tests)** Complete Cross-Browser Form Workflow Testing (`dish-form-workflow.spec.js`)
+
 ## [1.0.0-beta.13] - 2025-08-11
 
 ### 🏆 **Enterprise-Grade Testing Infrastructure Complete**
