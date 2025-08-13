@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
 - ✅ Exclude `vendor/` from being copied in (`create-release.sh`)
   - `composer.json` only has dev dependencies
   - `plugin-updater` is a standalone implementation that handles GitLab API calls and updates without external libraries
-  - The vendor/ directory would add unnecessary bloat
+  - The `vendor/` directory would add unnecessary bloat
 
 
 ## [1.0.0-beta.13] - 2025-08-11

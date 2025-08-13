@@ -1,9 +1,12 @@
 <?php
 
 /**
- * Step 2: Extended Mock DMN Service Implementation
- * Save this as: tests/fixtures/ExtendedMockDmnService.php
+ * Extended Mock DMN Service - Enhanced with OpenAPI Coverage
+ * Provides comprehensive mock functionality for both original and enhanced unit testing
+ * Maintains backward compatibility while adding new OpenAPI spec features
  */
+
+declare(strict_types=1);
 
 namespace Operaton\DMN\Tests\Fixtures;
 
@@ -12,8 +15,12 @@ class ExtendedMockDmnService
     private array $configurations = [];
     private array $decisionTables = [];
     private array $executionHistory = [];
+    private array $evaluationHistory = [];
     private bool $simulateLatency = false;
     private float $errorRate = 0.0;
+    private bool $isHealthy = true;
+    private string $version = '1.0.0-beta-4-SNAPSHOT';
+    private array $capabilities = ['DMN_1_1', 'DMN_1_3'];
 
     public function __construct()
     {
@@ -99,8 +106,12 @@ class ExtendedMockDmnService
         ];
     }
 
+    // ========================================
+    // ORIGINAL METHODS (for backward compatibility)
+    // ========================================
+
     /**
-     * Evaluate DMN decision
+     * Evaluate DMN decision (original method)
      */
     public function evaluateDecision(int $configId, array $formData): array
     {
@@ -154,46 +165,7 @@ class ExtendedMockDmnService
     }
 
     /**
-     * Execute decision table logic
-     */
-    private function executeDecisionTable(array $decisionTable, array $inputData): array
-    {
-        foreach ($decisionTable['rules'] as $rule)
-        {
-            try
-            {
-                if ($rule['condition']($inputData))
-                {
-                    return $rule['result'];
-                }
-            }
-            catch (\Throwable $e)
-            {
-                continue;
-            }
-        }
-        return ['error' => 'No matching rules found'];
-    }
-
-    /**
-     * Calculate age from birth date
-     */
-    private function calculateAge(string $birthDate): int
-    {
-        try
-        {
-            $birth = new \DateTime($birthDate);
-            $now = new \DateTime();
-            return $now->diff($birth)->y;
-        }
-        catch (\Exception $e)
-        {
-            return 0;
-        }
-    }
-
-    /**
-     * Get test data sets
+     * Get test data sets (original method)
      */
     public function getTestDataSets(): array
     {
@@ -237,7 +209,308 @@ class ExtendedMockDmnService
     }
 
     /**
-     * Helper methods
+     * Reset method (original)
+     */
+    public function reset(): void
+    {
+        $this->executionHistory = [];
+        $this->evaluationHistory = [];
+        $this->simulateLatency = false;
+        $this->errorRate = 0.0;
+        $this->isHealthy = true;
+    }
+
+    // ========================================
+    // NEW ENHANCED METHODS (for OpenAPI coverage)
+    // ========================================
+
+    /**
+     * Evaluate dish decision based on season and guest count
+     * Implements the complete decision table logic
+     */
+    public function evaluateDishDecision(string $season, int $guestCount): array
+    {
+        $result = $this->determineDish($season, $guestCount);
+
+        // Record in history
+        $this->evaluationHistory[] = [
+            'id' => $this->generateId(),
+            'decisionDefinitionKey' => 'dish',
+            'evaluationTime' => date('c'),
+            'inputVariables' => [
+                'season' => $season,
+                'guestCount' => $guestCount
+            ],
+            'outputVariables' => $result
+        ];
+
+        return $result;
+    }
+
+    /**
+     * Evaluate dish decision with validation
+     */
+    public function evaluateDishDecisionWithValidation(?string $season, ?int $guestCount): array
+    {
+        if ($season === null)
+        {
+            throw new \InvalidArgumentException('Season is a required variable');
+        }
+
+        if ($guestCount === null)
+        {
+            throw new \InvalidArgumentException('GuestCount is a required variable');
+        }
+
+        if (!in_array($season, ['Spring', 'Summer', 'Fall', 'Winter']))
+        {
+            throw new \InvalidArgumentException('Invalid season value');
+        }
+
+        if ($guestCount < 0)
+        {
+            throw new \InvalidArgumentException('Guest count must be positive');
+        }
+
+        if ($guestCount > 1000)
+        {
+            throw new \InvalidArgumentException('Guest count too large');
+        }
+
+        return $this->evaluateDishDecision($season, $guestCount);
+    }
+
+    /**
+     * Evaluate with typed variables (OpenAPI spec format)
+     */
+    public function evaluateWithTypedVariables(array $variables): array
+    {
+        $season = $variables['season']['value'] ?? null;
+        $guestCount = $variables['guestCount']['value'] ?? null;
+
+        // Handle type conversion
+        if (isset($variables['guestCount']['type']) && $variables['guestCount']['type'] === 'Integer')
+        {
+            $guestCount = (int) $guestCount;
+        }
+
+        return $this->evaluateDishDecision($season, $guestCount);
+    }
+
+    /**
+     * Evaluate with locale support
+     */
+    public function evaluateDishDecisionWithLocale(string $season, int $guestCount, string $locale): array
+    {
+        // Simple locale mapping
+        $seasonMapping = [
+            'de' => ['Sommer' => 'Summer', 'Winter' => 'Winter', 'Frühling' => 'Spring', 'Herbst' => 'Fall'],
+            'fr' => ['Été' => 'Summer', 'Hiver' => 'Winter', 'Printemps' => 'Spring', 'Automne' => 'Fall'],
+            'es' => ['Verano' => 'Summer', 'Invierno' => 'Winter', 'Primavera' => 'Spring', 'Otoño' => 'Fall']
+        ];
+
+        if (isset($seasonMapping[$locale][$season]))
+        {
+            $season = $seasonMapping[$locale][$season];
+        }
+        elseif (!in_array($season, ['Spring', 'Summer', 'Fall', 'Winter']))
+        {
+            return ['error' => 'Unsupported season in locale ' . $locale];
+        }
+
+        return $this->evaluateDishDecision($season, $guestCount);
+    }
+
+    /**
+     * Validate variable type
+     */
+    public function validateVariableType(string $key, $value, string $type): bool
+    {
+        switch ($type)
+        {
+            case 'String':
+                return is_string($value);
+            case 'Integer':
+                return is_int($value) || (is_string($value) && is_numeric($value));
+            case 'Boolean':
+                return is_bool($value) || in_array($value, ['true', 'false', '1', '0'], true);
+            case 'Double':
+                return is_float($value) || is_numeric($value);
+            case 'Date':
+                return is_string($value) && strtotime($value) !== false;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Get decision definition metadata
+     */
+    public function getDecisionDefinitionMetadata(string $key): array
+    {
+        return [
+            'id' => $key . ':1:' . $this->generateId(),
+            'key' => $key,
+            'name' => ucfirst($key),
+            'version' => 1,
+            'deploymentId' => $this->generateId(),
+            'resource' => $key . '.dmn'
+        ];
+    }
+
+    /**
+     * Check engine availability
+     */
+    public function checkEngineAvailability(): bool
+    {
+        return $this->isHealthy;
+    }
+
+    /**
+     * Get engine version
+     */
+    public function getEngineVersion(): string
+    {
+        return $this->version;
+    }
+
+    /**
+     * Get engine capabilities
+     */
+    public function getEngineCapabilities(): array
+    {
+        return $this->capabilities;
+    }
+
+    /**
+     * Get evaluation history (new method)
+     */
+    public function getEvaluationHistory(): array
+    {
+        return array_reverse($this->evaluationHistory); // Most recent first
+    }
+
+    // ========================================
+    // PRIVATE HELPER METHODS
+    // ========================================
+
+    /**
+     * Determine dish based on decision table logic
+     */
+    private function determineDish(string $season, int $guestCount): array
+    {
+        $dish = '';
+        $confidence = 1.0;
+
+        // Decision Table Logic (as per your DMN spec)
+        if ($season === 'Fall' && $guestCount <= 8)
+        {
+            $dish = 'Spareribs'; // Rule 1
+        }
+        elseif ($season === 'Winter' && $guestCount <= 8)
+        {
+            $dish = 'Roastbeef'; // Rule 2
+        }
+        elseif ($season === 'Spring' && $guestCount <= 4)
+        {
+            $dish = 'Dry Aged Gourmet Steak'; // Rule 3
+        }
+        elseif ($season === 'Spring' && $guestCount >= 5 && $guestCount <= 8)
+        {
+            $dish = 'Steak'; // Rule 4
+        }
+        elseif (in_array($season, ['Fall', 'Winter', 'Spring']) && $guestCount > 8)
+        {
+            $dish = 'Stew'; // Rule 5
+        }
+        elseif ($season === 'Summer')
+        {
+            $dish = 'Light Salad and nice Steak'; // Rule 6
+        }
+        else
+        {
+            $dish = 'Default Meal';
+            $confidence = 0.5;
+        }
+
+        return [
+            'desiredDish' => $dish,
+            'confidence' => $confidence,
+            'evaluationTime' => date('c'),
+            'ruleMatches' => [$this->determineRuleNumber($season, $guestCount)]
+        ];
+    }
+
+    /**
+     * Determine which rule was matched
+     */
+    private function determineRuleNumber(string $season, int $guestCount): int
+    {
+        if ($season === 'Fall' && $guestCount <= 8) return 1;
+        if ($season === 'Winter' && $guestCount <= 8) return 2;
+        if ($season === 'Spring' && $guestCount <= 4) return 3;
+        if ($season === 'Spring' && $guestCount >= 5 && $guestCount <= 8) return 4;
+        if (in_array($season, ['Fall', 'Winter', 'Spring']) && $guestCount > 8) return 5;
+        if ($season === 'Summer') return 6;
+        return 0; // No rule matched
+    }
+
+    /**
+     * Execute decision table logic (original method)
+     */
+    private function executeDecisionTable(array $decisionTable, array $inputData): array
+    {
+        foreach ($decisionTable['rules'] as $rule)
+        {
+            try
+            {
+                if ($rule['condition']($inputData))
+                {
+                    return $rule['result'];
+                }
+            }
+            catch (\Throwable $e)
+            {
+                continue;
+            }
+        }
+        return ['error' => 'No matching rules found'];
+    }
+
+    /**
+     * Calculate age from birth date (original method)
+     */
+    private function calculateAge(string $birthDate): int
+    {
+        try
+        {
+            $birth = new \DateTime($birthDate);
+            $now = new \DateTime();
+            return $now->diff($birth)->y;
+        }
+        catch (\Exception $e)
+        {
+            return 0;
+        }
+    }
+
+    /**
+     * Generate a unique ID
+     */
+    private function generateId(): string
+    {
+        return sprintf(
+            '%s-%s-%s-%s-%s',
+            bin2hex(random_bytes(4)),
+            bin2hex(random_bytes(2)),
+            bin2hex(random_bytes(2)),
+            bin2hex(random_bytes(2)),
+            bin2hex(random_bytes(6))
+        );
+    }
+
+    /**
+     * Original helper methods for backward compatibility
      */
     public function setSimulateLatency(bool $enabled): void
     {
@@ -287,10 +560,19 @@ class ExtendedMockDmnService
         return array_reverse($this->executionHistory);
     }
 
-    public function reset(): void
+    /**
+     * Set mock error state
+     */
+    public function setMockError(string $error): void
     {
-        $this->executionHistory = [];
-        $this->simulateLatency = false;
-        $this->errorRate = 0.0;
+        $this->isHealthy = false;
+    }
+
+    /**
+     * Reset to healthy state
+     */
+    public function resetToHealthy(): void
+    {
+        $this->isHealthy = true;
     }
 }
