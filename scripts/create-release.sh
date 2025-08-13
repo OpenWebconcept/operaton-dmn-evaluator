@@ -36,7 +36,7 @@ echo "Copying plugin files..."
 cp operaton-dmn-plugin.php "$RELEASE_DIR/$PLUGIN_NAME/" || { echo "Main plugin file not found!"; exit 1; }
 
 # Copy directories if they exist
-for dir in assets templates includes languages vendor; do
+for dir in assets templates includes languages; do
     if [ -d "$dir" ]; then
         echo "Copying $dir/ directory..."
         cp -r "$dir/" "$RELEASE_DIR/$PLUGIN_NAME/"
