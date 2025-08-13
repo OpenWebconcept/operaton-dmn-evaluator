@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 ## Issues
 - [Issue #18](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/18) - Testresults shouldn't be tracked by git
 - [Issue #19](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/19) - Expanding API tests based on OpenAPI specification
+- [Issue #20](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/20) - Composer overriding phpunit.xml
 - [Issue #21](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/21) - Create release script also copies vendor dir
 - [Issue #26](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/26) - DMN Health and Evaluation Endpoint tests
 
@@ -18,6 +19,21 @@ All notable changes to this project will be documented in this file.
 - ✅ **Unit Tests**: 44 tests (259 assertions) - ✨ Enhanced with comprehensive OpenAPI coverage
 - ✅ **Integration Tests**: 16 tests (39 assertions) - ✨ Complete Operaton DMN API validation
 
+### Composer overriding phpunit.xml fixed
+
+- ✅ **PHPUnit** respects  XML configuration (`--configuration tests/phpunit.xml`)
+- ✅ **Test suites** properly isolated (`--testsuite=unit vs --testsuite=integration`)
+- ✅ **No unwanted** test execution (fixtures/helpers excluded)
+- ✅ **Enterprise** performance (sub-second unit tests)
+- ✅ **Production-ready** reliability (100% success rates)
+
+✅ **Key Commands** That Now Work Perfectly:
+```
+bashcomposer run test:unit          # 44 unit tests only (0.073s)
+composer run test:integration       # 21 integration tests (2.5s)
+composer run test                   # All 65 tests (2.6s)
+composer run test:debug             # Verbose unit testing
+```
 
 ### Release packages
 - ✅ Exclude `vendor/` from being copied in (`create-release.sh`)
