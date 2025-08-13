@@ -64,6 +64,13 @@ cypress.env.json
 junit*.xml
 *.mp4
 
+# PHPUnit cache and artifacts
+.phpunit.result.cache
+tests/.phpunit.result.cache
+/.phpunit.cache
+/tests/.phpunit.cache
+/coverage/
+
 # Playwright specific artifacts
 index.html
 junit-playwright.xml
