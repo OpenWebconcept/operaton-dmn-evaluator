@@ -152,7 +152,7 @@ class Operaton_DMN_Admin
                 $database->clear_configuration_cache();
 
                 // Manually count configurations
-                $configs_table = $wpdb->prefix . 'operaton_dmn_configurations';
+                $configs_table = $wpdb->prefix . 'operaton_dmn_configs';
                 if ($wpdb->get_var("SHOW TABLES LIKE '{$configs_table}'") === $configs_table)
                 {
                     $stats['configs_reloaded'] = $wpdb->get_var("SELECT COUNT(*) FROM {$configs_table}");
@@ -213,7 +213,7 @@ class Operaton_DMN_Admin
             {
                 // Method 2: Manual force reload
                 global $wpdb;
-                $configs_table = $wpdb->prefix . 'operaton_dmn_configurations';
+                $configs_table = $wpdb->prefix . 'operaton_dmn_configs';
 
                 if ($wpdb->get_var("SHOW TABLES LIKE '{$configs_table}'") === $configs_table)
                 {
