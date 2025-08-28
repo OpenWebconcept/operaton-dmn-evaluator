@@ -23,6 +23,36 @@ if (!defined('ABSPATH'))
         <p><?php _e('Manage your DMN decision table configurations for Gravity Forms integration.', 'operaton-dmn'); ?></p>
     </div>
 
+    <!-- Debug Tools Section - Now positioned after header with consistent styling -->
+    <div class="operaton-update-section">
+        <h3><?php _e('Debug Tools', 'operaton-dmn'); ?></h3>
+        <p><?php _e('Development and troubleshooting tools for plugin diagnostics and testing.', 'operaton-dmn'); ?></p>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+            <button type="button" id="get-plugin-status" class="button"
+                title="<?php _e('Get current plugin status and configuration information', 'operaton-dmn'); ?>">
+                <?php _e('Get Plugin Status', 'operaton-dmn'); ?>
+            </button>
+        </div>
+
+        <div id="debug-operation-result" style="margin-top: 10px;"></div>
+
+        <details style="margin-top: 15px;">
+            <summary style="cursor: pointer; font-weight: 600; color: #0073aa;"><?php _e('Debug Tools Help', 'operaton-dmn'); ?></summary>
+            <div style="padding: 10px 0; font-size: 14px; color: #666; line-height: 1.5;">
+                <ul style="margin-left: 20px;">
+                    <li><strong><?php _e('Plugin Status:', 'operaton-dmn'); ?></strong> <?php _e('Shows current plugin version, configuration status, and system information', 'operaton-dmn'); ?></li>
+                </ul>
+                <p style="margin-top: 10px;"><strong><?php _e('When to use:', 'operaton-dmn'); ?></strong></p>
+                <ul style="margin-left: 20px;">
+                    <li><?php _e('When troubleshooting plugin issues', 'operaton-dmn'); ?></li>
+                    <li><?php _e('Before contacting support', 'operaton-dmn'); ?></li>
+                    <li><?php _e('After plugin updates to verify functionality', 'operaton-dmn'); ?></li>
+                </ul>
+            </div>
+        </details>
+    </div>
+
     <!-- Enhanced Decision Flow Cache Management Section -->
     <div class="operaton-update-section">
         <h3>Configuration & Cache Management</h3>
@@ -372,6 +402,33 @@ if (!defined('ABSPATH'))
 
     // Global variables to manage feedback timers
     var cacheOperationTimer = null;
+    var debugOperationTimer = null;
+
+    // Global function to show full debug data
+    function showFullDebugData() {
+        if (window.operatonDebugData) {
+            var existingFullData = document.getElementById('full-debug-data');
+            if (existingFullData) {
+                existingFullData.remove();
+                return;
+            }
+
+            // Append to the parent container instead of the auto-fading result div
+            var parentContainer = jQuery('#debug-operation-result').parent();
+            var fullDataHtml = '<div id="full-debug-data" style="margin-top: 10px; max-height: 400px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: pre-wrap; border: 1px solid #ddd;">' +
+                '<div style="margin-bottom: 10px; font-family: sans-serif; font-weight: bold; color: #0073aa;">Complete Debug Information:</div>' +
+                JSON.stringify(window.operatonDebugData, null, 2) +
+                '</div>';
+
+            parentContainer.append(fullDataHtml);
+
+            // Change button text
+            var button = jQuery('#debug-operation-result').find('button');
+            if (button.length) {
+                button.text('Hide Full Details');
+            }
+        }
+    }
 
     jQuery(document).ready(function($) {
         // Helper function to show feedback with proper timer management
@@ -396,8 +453,98 @@ if (!defined('ABSPATH'))
             }
         }
 
+        // Helper function for debug operation feedback
+        function showDebugOperationFeedback(html, fadeOut = true) {
+            var result = $('#debug-operation-result');
+
+            // Clear any existing timer
+            if (debugOperationTimer) {
+                clearTimeout(debugOperationTimer);
+                debugOperationTimer = null;
+            }
+
+            // Make sure the div is visible and show content
+            result.stop(true, true).show().html(html);
+
+            // Set new timer if fadeOut is requested
+            if (fadeOut) {
+                debugOperationTimer = setTimeout(function() {
+                    result.fadeOut(500);
+                    debugOperationTimer = null;
+                }, 5000); // Longer timeout for debug info
+            }
+        }
+
+        // Fixed Get Plugin Status functionality
+        $('#get-plugin-status').on('click', function() {
+            console.log('Get Plugin Status button clicked');
+            var button = $(this);
+
+            button.prop('disabled', true).text('<?php _e('Getting Status...', 'operaton-dmn'); ?>');
+            showDebugOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ <?php _e('Retrieving plugin status information...', 'operaton-dmn'); ?></div>', false);
+
+            $.post(ajaxurl, {
+                action: 'operaton_debug_status',
+                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+            }, function(response) {
+                if (response.success && response.data) {
+                    console.log('Plugin status response:', response.data);
+
+                    // Create a formatted display instead of raw JSON
+                    var statusHtml = '<div style="color: #155724; padding: 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
+                        '<h4 style="margin: 0 0 10px 0;">✅ <?php _e('Plugin Status Information', 'operaton-dmn'); ?></h4>';
+
+                    // Display key information in a readable format
+                    if (response.data.plugin_version) {
+                        statusHtml += '<div><strong><?php _e('Plugin Version:', 'operaton-dmn'); ?></strong> ' + response.data.plugin_version + '</div>';
+                    }
+
+                    if (response.data.environment) {
+                        statusHtml += '<div><strong><?php _e('WordPress:', 'operaton-dmn'); ?></strong> ' + response.data.environment.wordpress + '</div>';
+                        statusHtml += '<div><strong><?php _e('PHP:', 'operaton-dmn'); ?></strong> ' + response.data.environment.php + '</div>';
+                    }
+
+                    if (response.data.managers) {
+                        var activeManagers = Object.keys(response.data.managers).filter(function(key) {
+                            return response.data.managers[key] === 'loaded' || response.data.managers[key] === true;
+                        });
+                        statusHtml += '<div><strong><?php _e('Active Managers:', 'operaton-dmn'); ?></strong> ' + activeManagers.length + '</div>';
+                    }
+
+                    if (response.data.performance && response.data.performance.current_request) {
+                        statusHtml += '<div><strong><?php _e('Performance:', 'operaton-dmn'); ?></strong> ' +
+                            response.data.performance.current_request.total_time_ms + 'ms, ' +
+                            response.data.performance.current_request.peak_memory_formatted + '</div>';
+                    }
+
+                    if (response.data.health && Array.isArray(response.data.health)) {
+                        var healthStatus = response.data.health.length === 0 ? 'All systems operational' : response.data.health.length + ' issues detected';
+                        statusHtml += '<div><strong><?php _e('Health Status:', 'operaton-dmn'); ?></strong> ' + healthStatus + '</div>';
+                    }
+
+                    statusHtml += '<div style="margin-top: 10px;"><button onclick="showFullDebugData()" class="button button-small"><?php _e('Show Full Details', 'operaton-dmn'); ?></button></div>';
+                    statusHtml += '</div>';
+
+                    showDebugOperationFeedback(statusHtml);
+
+                    // Store the full data globally for the "Show Full Details" button
+                    window.operatonDebugData = response.data;
+
+                } else {
+                    showDebugOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                        '❌ <strong><?php _e('Status retrieval failed:', 'operaton-dmn'); ?></strong> ' + (response.data ? response.data.message : '<?php _e('Unknown error', 'operaton-dmn'); ?>') + '</div>', false);
+                }
+            }).fail(function(xhr, status, error) {
+                console.error('AJAX request failed:', xhr, status, error);
+                showDebugOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                    '❌ <strong><?php _e('Status retrieval failed:', 'operaton-dmn'); ?></strong> <?php _e('Connection error', 'operaton-dmn'); ?> (' + status + ')</div>', false);
+            }).always(function() {
+                button.prop('disabled', false).text('<?php _e('Get Plugin Status', 'operaton-dmn'); ?>');
+            });
+        });
+
         // NEW: Clear Decision Flow Cache functionality (matching other buttons)
-        $('#clear-decision-cache').click(function() {
+        $('#clear-decision-cache').on('click', function() {
             console.log('Clear Decision Flow Cache button clicked');
             var button = $(this);
 
@@ -426,7 +573,7 @@ if (!defined('ABSPATH'))
         });
 
         // Update check functionality
-        $('#operaton-check-updates').click(function() {
+        $('#operaton-check-updates').on('click', function() {
             var button = $(this);
             var status = $('#operaton-update-status');
 
@@ -453,7 +600,7 @@ if (!defined('ABSPATH'))
         });
 
         // Clear All Cache functionality
-        $('#clear-all-cache').click(function() {
+        $('#clear-all-cache').on('click', function() {
             console.log('Clear All Configuration Cache button clicked, starting AJAX request');
             var button = $(this);
 
@@ -488,7 +635,7 @@ if (!defined('ABSPATH'))
         });
 
         // Force Reload Configurations functionality
-        $('#force-reload-configs').click(function() {
+        $('#force-reload-configs').on('click', function() {
             console.log('Force Reload Configurations button clicked, starting AJAX request');
             var button = $(this);
 

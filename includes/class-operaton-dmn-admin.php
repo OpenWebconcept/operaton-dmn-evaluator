@@ -308,98 +308,230 @@ class Operaton_DMN_Admin
     }
 
     /**
-     * Enhanced ajax_debug_status method for class-operaton-dmn-admin.php
-     *
-     * This cleans up the duplicate performance data and adds context
+     * Replace your ajax_debug_status() method with this version that has error handling
      */
     public function ajax_debug_status()
     {
-        if (!current_user_can('manage_options'))
+        error_log('AJAX debug_status called - comprehensive version');
+
+        // Security check
+        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
         {
-            wp_die('Insufficient permissions');
+            wp_send_json_error(array('message' => 'Insufficient permissions or invalid nonce'));
+            return;
         }
 
-        // Get performance data if available
-        $performance_data = array();
-        if (class_exists('Operaton_DMN_Performance_Monitor'))
+        error_log('Security check passed, building comprehensive status');
+
+        try
         {
+            // Initialize the status array with basic info
+            $status = array(
+                'plugin_version' => OPERATON_DMN_VERSION,
+                'timestamp' => current_time('mysql'),
+            );
+
+            // Add managers status safely
             try
             {
-                $performance_monitor = Operaton_DMN_Performance_Monitor::get_instance();
-                $performance_summary = $performance_monitor->get_summary();
-
-                // Clean and organize performance data
-                $performance_data = array(
-                    'current_request' => array(
-                        'total_time_ms' => $performance_summary['total_time_ms'],
-                        'peak_memory_formatted' => $performance_summary['peak_memory_formatted'],
-                        'milestone_count' => $performance_summary['milestone_count'],
-                        'request_type' => $performance_summary['request_data']['is_ajax'] ? 'AJAX' : 'Standard',
-                        'is_admin' => $performance_summary['request_data']['is_admin']
-                    ),
-                    'initialization_timing' => array(
-                        'plugin_construct' => $this->get_milestone_duration($performance_summary['milestones'], 'plugin_construct'),
-                        'assets_manager' => $this->get_milestone_time($performance_summary['milestones'], 'assets_manager_loaded'),
-                        'database_manager' => $this->get_milestone_time($performance_summary['milestones'], 'database_manager_loaded'),
-                        'gravity_forms_manager' => $this->get_milestone_time($performance_summary['milestones'], 'gravity_forms_manager_loaded'),
-                        'wp_loaded_at' => $this->get_milestone_time($performance_summary['milestones'], 'wp_loaded')
-                    ),
-                    'performance_grade' => $this->calculate_performance_grade($performance_summary),
-                    'recommendations' => $this->get_performance_recommendations($performance_summary)
-                );
+                $status['managers'] = $this->core->get_managers_status();
             }
             catch (Exception $e)
             {
+                $status['managers'] = array('error' => 'Could not retrieve managers status: ' . $e->getMessage());
+            }
+
+            // Add health check safely
+            try
+            {
+                $status['health'] = $this->core->health_check();
+            }
+            catch (Exception $e)
+            {
+                $status['health'] = array('error' => 'Could not perform health check: ' . $e->getMessage());
+            }
+
+            // Add assets status safely - using basic WordPress functions instead of missing method
+            try
+            {
+                // Create basic assets status without calling the missing method
+                $asset_status = array(
+                    'scripts_registered' => array(),
+                    'styles_registered' => array(),
+                    'context' => array(
+                        'current_page' => get_current_screen() ? get_current_screen()->id : 'unknown',
+                        'is_ajax_request' => wp_doing_ajax(),
+                        'script_loading_note' => 'Scripts are only registered when needed on specific pages - this is optimal behavior'
+                    )
+                );
+
+                // Check if common scripts are registered
+                global $wp_scripts, $wp_styles;
+
+                $operaton_scripts = array(
+                    'operaton-dmn-admin',
+                    'operaton-dmn-frontend',
+                    'operaton-dmn-gravity-integration',
+                    'operaton-dmn-decision-flow',
+                    'operaton-dmn-radio-sync'
+                );
+
+                $operaton_styles = array(
+                    'operaton-dmn-admin',
+                    'operaton-dmn-frontend',
+                    'operaton-dmn-decision-flow',
+                    'operaton-dmn-radio-sync'
+                );
+
+                // Check script registration status
+                if (isset($wp_scripts->registered))
+                {
+                    foreach ($operaton_scripts as $script)
+                    {
+                        $asset_status['scripts_registered'][$script] = isset($wp_scripts->registered[$script]);
+                    }
+                }
+
+                // Check style registration status
+                if (isset($wp_styles->registered))
+                {
+                    foreach ($operaton_styles as $style)
+                    {
+                        $asset_status['styles_registered'][$style] = isset($wp_styles->registered[$style]);
+                    }
+                }
+
+                $status['assets'] = $asset_status;
+            }
+            catch (Exception $e)
+            {
+                $status['assets'] = array('error' => 'Could not retrieve assets status: ' . $e->getMessage());
+            }
+            
+            // Add performance data safely
+            $performance_data = array();
+            if (class_exists('Operaton_DMN_Performance_Monitor'))
+            {
+                try
+                {
+                    $performance_monitor = Operaton_DMN_Performance_Monitor::get_instance();
+                    $performance_summary = $performance_monitor->get_summary();
+
+                    // Clean and organize performance data with safe access
+                    $performance_data = array(
+                        'current_request' => array(
+                            'total_time_ms' => isset($performance_summary['total_time_ms']) ? $performance_summary['total_time_ms'] : 0,
+                            'peak_memory_formatted' => isset($performance_summary['peak_memory_formatted']) ? $performance_summary['peak_memory_formatted'] : 'Unknown',
+                            'milestone_count' => isset($performance_summary['milestone_count']) ? $performance_summary['milestone_count'] : 0,
+                            'request_type' => (isset($performance_summary['request_data']['is_ajax']) && $performance_summary['request_data']['is_ajax']) ? 'AJAX' : 'Standard',
+                            'is_admin' => isset($performance_summary['request_data']['is_admin']) ? $performance_summary['request_data']['is_admin'] : false
+                        )
+                    );
+
+                    // Add initialization timing safely
+                    if (isset($performance_summary['milestones']))
+                    {
+                        $performance_data['initialization_timing'] = array(
+                            'plugin_construct' => $this->get_milestone_duration($performance_summary['milestones'], 'plugin_construct'),
+                            'assets_manager' => $this->get_milestone_time($performance_summary['milestones'], 'assets_manager_loaded'),
+                            'database_manager' => $this->get_milestone_time($performance_summary['milestones'], 'database_manager_loaded'),
+                            'gravity_forms_manager' => $this->get_milestone_time($performance_summary['milestones'], 'gravity_forms_manager_loaded'),
+                            'wp_loaded_at' => $this->get_milestone_time($performance_summary['milestones'], 'wp_loaded')
+                        );
+                    }
+
+                    // Add performance grade and recommendations safely
+                    $performance_data['performance_grade'] = $this->calculate_performance_grade($performance_summary);
+                    $performance_data['recommendations'] = $this->get_performance_recommendations($performance_summary);
+                }
+                catch (Exception $e)
+                {
+                    $performance_data = array(
+                        'error' => 'Performance monitor error: ' . $e->getMessage()
+                    );
+                }
+            }
+            else
+            {
                 $performance_data = array(
-                    'error' => 'Performance monitor error: ' . $e->getMessage()
+                    'status' => 'Performance monitor class not available'
                 );
             }
-        }
-        else
-        {
-            $performance_data = array(
-                'status' => 'Performance monitor class not available'
-            );
-        }
 
-        // Get asset status with context
-        $asset_status = $this->assets->get_assets_status();
+            $status['performance'] = $performance_data;
 
-        // Add context about why scripts might not be registered
-        $asset_status['context'] = array(
-            'current_page' => get_current_screen()->id ?? 'unknown',
-            'is_ajax_request' => wp_doing_ajax(),
-            'script_loading_note' => 'Scripts are only registered when needed on specific pages - this is optimal behavior'
-        );
-
-        $status = array(
-            'plugin_version' => OPERATON_DMN_VERSION,
-            'managers' => $this->core->get_managers_status(),
-            'health' => $this->core->health_check(),
-            'assets' => $asset_status,
-            'performance' => $performance_data, // Cleaned up single performance section
-            'environment' => array(
+            // Add environment info safely
+            $status['environment'] = array(
                 'wordpress' => get_bloginfo('version'),
                 'php' => PHP_VERSION,
                 'theme' => wp_get_theme()->get('Name') . ' v' . wp_get_theme()->get('Version'),
                 'memory_limit' => ini_get('memory_limit'),
                 'max_execution_time' => ini_get('max_execution_time'),
                 'wp_debug' => defined('WP_DEBUG') && WP_DEBUG
-            ),
-            'operaton_constants' => array(
-                'version' => OPERATON_DMN_VERSION,
-                'plugin_url' => OPERATON_DMN_PLUGIN_URL,
-                'plugin_path' => OPERATON_DMN_PLUGIN_PATH
-            ),
-            'timestamp' => current_time('mysql'),
-            'user_context' => array(
+            );
+
+            // Add operaton constants safely
+            $status['operaton_constants'] = array(
+                'version' => defined('OPERATON_DMN_VERSION') ? OPERATON_DMN_VERSION : 'Unknown',
+                'plugin_url' => defined('OPERATON_DMN_PLUGIN_URL') ? OPERATON_DMN_PLUGIN_URL : 'Unknown',
+                'plugin_path' => defined('OPERATON_DMN_PLUGIN_PATH') ? OPERATON_DMN_PLUGIN_PATH : 'Unknown'
+            );
+
+            // Add user context safely
+            $current_user = wp_get_current_user();
+            $status['user_context'] = array(
                 'user_id' => get_current_user_id(),
-                'user_role' => implode(', ', wp_get_current_user()->roles),
-                'request_uri' => $_SERVER['REQUEST_URI'] ?? 'unknown'
-            )
+                'user_role' => !empty($current_user->roles) ? implode(', ', $current_user->roles) : 'Unknown',
+                'request_uri' => isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'unknown'
+            );
+
+            error_log('Debug status retrieved successfully');
+            wp_send_json_success($status);
+        }
+        catch (Exception $e)
+        {
+            error_log('Operaton DMN Debug Status Error: ' . $e->getMessage());
+            error_log('Error trace: ' . $e->getTraceAsString());
+            wp_send_json_error(array('message' => 'Failed to retrieve debug status: ' . $e->getMessage()));
+        }
+    }
+
+    /**
+     * Helper method to count total configurations
+     */
+    private function count_configurations()
+    {
+        try
+        {
+            $configs = $this->core->get_database_instance()->get_all_configurations();
+            return count($configs);
+        }
+        catch (Exception $e)
+        {
+            return 0;
+        }
+    }
+
+    /**
+     * Helper method to get cache status information
+     */
+    private function get_cache_status()
+    {
+        $cache_info = array();
+
+        // Check for common transients
+        $transients_to_check = array(
+            'operaton_dmn_configurations',
+            'operaton_dmn_decision_flows',
+            'operaton_dmn_endpoint_status'
         );
 
-        wp_send_json_success($status);
+        foreach ($transients_to_check as $transient)
+        {
+            $cache_info[$transient] = get_transient($transient) !== false ? 'Cached' : 'Not cached';
+        }
+
+        return $cache_info;
     }
 
     /**
@@ -680,9 +812,6 @@ class Operaton_DMN_Admin
         echo '<div class="wrap">';
         echo '<h1>' . __('Operaton DMN Configurations', 'operaton-dmn') . '</h1>';
 
-        // ADD DEBUG BUTTON HERE
-        $this->add_debug_button();
-
         // Include the admin list template
         $this->load_admin_template('list', compact('configs'));
 
@@ -736,9 +865,6 @@ class Operaton_DMN_Admin
         echo '<div class="wrap">';
         echo '<h1>' . __('Add/Edit Configuration', 'operaton-dmn') . '</h1>';
 
-        // ADD DEBUG BUTTON HERE TOO
-        $this->add_debug_button();
-
         // Include the admin form template
         $this->load_admin_template('form', compact('gravity_forms', 'config'));
 
@@ -760,9 +886,6 @@ class Operaton_DMN_Admin
 
         echo '<div class="wrap operaton-debug-page">';
         echo '<h1>' . __('Debug Menu Test', 'operaton-dmn') . '</h1>';
-
-        // ADD THE MAIN DEBUG BUTTON AT THE TOP
-        $this->add_debug_button();
 
         // Debug system status
         echo '<div class="debug-section">';
