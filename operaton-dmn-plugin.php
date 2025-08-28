@@ -272,15 +272,8 @@ class OperatonDMNEvaluator
         // Cleanup scheduled task
         add_action('operaton_dmn_cleanup', array($this->database, 'cleanup_old_data'));
 
-        // TEMPORARY: Clear decision flow cache
-        add_action('admin_init', function () {
-            if (isset($_GET['clear_operaton_cache'])) {
-                global $wpdb;
-                $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_operaton_%'");
-                wp_redirect(admin_url('admin.php?page=operaton-dmn&cache_cleared=1'));
-                exit;
-            }
-        });
+        // Enhanced cache clearing with both simple and comprehensive options
+        add_action('admin_init', 'operaton_dmn_handle_cache_clear_url');
 
         // FORCE LOAD FRONTEND ASSETS - This should fix operaton_ajax issue
         add_action('wp_enqueue_scripts', array($this, 'force_frontend_assets_on_gravity_forms'), 20);
@@ -895,6 +888,56 @@ class OperatonDMNEvaluator
 // =============================================================================
 // GLOBAL FUNCTIONS AND INITIALIZATION
 // =============================================================================
+
+/**
+ * Enhanced admin action for URL-based cache clearing (existing functionality)
+ */
+function operaton_dmn_handle_cache_clear_url()
+{
+    if (!current_user_can('manage_options'))
+    {
+        return;
+    }
+
+    // Simple decision flow cache clear (existing functionality)
+    if (isset($_GET['clear_operaton_cache']))
+    {
+        global $wpdb;
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_operaton_%'");
+        wp_redirect(admin_url('admin.php?page=operaton-dmn&cache_cleared=1'));
+        exit;
+    }
+
+    // Comprehensive cache clear (new functionality)
+    if (isset($_GET['operaton_clear_all_cache']))
+    {
+        global $wpdb;
+
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_operaton_%'");
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_operaton_%'");
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%operaton_config_%'");
+
+        if (function_exists('wp_cache_flush'))
+        {
+            wp_cache_flush();
+        }
+
+        // Force database manager to reload
+        $plugin_instance = OperatonDMNEvaluator::get_instance();
+        $database = $plugin_instance->get_database_instance();
+        if ($database && method_exists($database, 'force_reload_all_configurations'))
+        {
+            $database->force_reload_all_configurations();
+        }
+
+        error_log('Operaton DMN: All cache cleared via URL parameter');
+
+        $redirect_url = remove_query_arg('operaton_clear_all_cache');
+        $redirect_url = add_query_arg('full_cache_cleared', '1', $redirect_url);
+        wp_redirect($redirect_url);
+        exit;
+    }
+}
 
 /**
  * Global debug functions for asset loading tracking

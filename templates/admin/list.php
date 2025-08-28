@@ -23,22 +23,60 @@ if (!defined('ABSPATH'))
         <p><?php _e('Manage your DMN decision table configurations for Gravity Forms integration.', 'operaton-dmn'); ?></p>
     </div>
 
-    <!-- Decision Flow Cache Management Section -->
+    <!-- Enhanced Decision Flow Cache Management Section -->
     <div class="operaton-update-section">
-        <h3><?php _e('Decision Flow Cache', 'operaton-dmn'); ?></h3>
-        <p><?php _e('Clear cached decision flow data to force fresh retrieval from Operaton engine.', 'operaton-dmn'); ?></p>
+        <h3>Configuration & Cache Management</h3>
+        <p>Manage cached decision flow data and configuration settings. Clear cache when you update DMN endpoints or experience configuration issues.</p>
 
         <?php if (isset($_GET['cache_cleared'])): ?>
             <div class="operaton-notice success" style="margin: 10px 0; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; color: #155724; border-radius: 4px;">
-                <p>✅ <?php _e('Decision flow cache cleared successfully!', 'operaton-dmn'); ?></p>
+                <p>Cache cleared successfully! Configurations will reload from database.</p>
             </div>
         <?php endif; ?>
 
-        <p>
-            <a href="<?php echo admin_url('admin.php?page=operaton-dmn&clear_operaton_cache=1'); ?>" class="button">
-                <?php _e('Clear Decision Flow Cache', 'operaton-dmn'); ?>
+        <?php if (isset($_GET['full_cache_cleared'])): ?>
+            <div class="operaton-notice success" style="margin: 10px 0; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; color: #155724; border-radius: 4px;">
+                <p>All caches cleared successfully! All configurations and decision flows will reload fresh from database.</p>
+            </div>
+        <?php endif; ?>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+            <a href="<?php echo admin_url('admin.php?page=operaton-dmn&clear_operaton_cache=1'); ?>"
+                class="button"
+                title="Clear decision flow summaries and temporary data">
+                Clear Decision Flow Cache
             </a>
-        </p>
+
+            <button type="button" id="clear-all-cache" class="button button-secondary"
+                title="Clear all cached configurations, decision flows, and force database reload">
+                Clear All Configuration Cache
+            </button>
+
+            <button type="button" id="force-reload-configs" class="button button-secondary"
+                title="Force reload all configurations from database without using cache">
+                Force Reload Configurations
+            </button>
+        </div>
+
+        <div id="cache-operation-result" style="margin-top: 10px;"></div>
+
+        <details style="margin-top: 15px;">
+            <summary style="cursor: pointer; font-weight: 600; color: #0073aa;">Cache Management Help</summary>
+            <div style="padding: 10px 0; font-size: 14px; color: #666; line-height: 1.5;">
+                <ul style="margin-left: 20px;">
+                    <li><strong>Decision Flow Cache:</strong> Clears cached decision flow summaries and temporary evaluation data</li>
+                    <li><strong>All Configuration Cache:</strong> Clears ALL cached data including form configurations, transients, and forces fresh database reads</li>
+                    <li><strong>Force Reload:</strong> Bypasses cache and reloads all configurations directly from database</li>
+                </ul>
+                <p style="margin-top: 10px;"><strong>When to use:</strong></p>
+                <ul style="margin-left: 20px;">
+                    <li>After updating DMN endpoint URLs in form configurations</li>
+                    <li>When forms show old evaluation results</li>
+                    <li>If configuration changes aren't being reflected</li>
+                    <li>After plugin updates or database schema changes</li>
+                </ul>
+            </div>
+        </details>
     </div>
 
     <!-- Update Management Section -->
@@ -304,35 +342,7 @@ if (!defined('ABSPATH'))
 </div>
 
 <script>
-    jQuery(document).ready(function($) {
-        // Update check functionality
-        $('#operaton-check-updates').click(function() {
-            var button = $(this);
-            var status = $('#operaton-update-status');
-
-            button.prop('disabled', true).text('<?php _e('Checking...', 'operaton-dmn'); ?>');
-            status.html('<span style="color: #666;">⏳ <?php _e('Checking for updates...', 'operaton-dmn'); ?></span>');
-
-            $.post(ajaxurl, {
-                action: 'operaton_clear_update_cache',
-                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
-            }, function(response) {
-                if (response.success) {
-                    setTimeout(function() {
-                        location.reload();
-                    }, 1000);
-                    status.html('<span style="color: #46b450;">✓ <?php _e('Update check completed', 'operaton-dmn'); ?></span>');
-                } else {
-                    status.html('<span style="color: #dc3232;">✗ <?php _e('Update check failed', 'operaton-dmn'); ?></span>');
-                    button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
-                }
-            }).fail(function() {
-                status.html('<span style="color: #dc3232;">✗ <?php _e('Update check failed', 'operaton-dmn'); ?></span>');
-                button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
-            });
-        });
-    });
-
+    // Global functions that need to be called from HTML
     // Delete configuration function
     function deleteConfig(configId, configName) {
         if (confirm('<?php _e('Are you sure you want to delete the configuration', 'operaton-dmn'); ?> "' + configName + '"?\n\n<?php _e('This action cannot be undone.', 'operaton-dmn'); ?>')) {
@@ -370,6 +380,111 @@ if (!defined('ABSPATH'))
         alert('<?php _e('Testing functionality will be implemented in the next update.', 'operaton-dmn'); ?>');
         // TODO: Implement AJAX testing functionality
     }
+
+    jQuery(document).ready(function($) {
+        // Update check functionality
+        $('#operaton-check-updates').click(function() {
+            var button = $(this);
+            var status = $('#operaton-update-status');
+
+            button.prop('disabled', true).text('<?php _e('Checking...', 'operaton-dmn'); ?>');
+            status.html('<span style="color: #666;">⏳ <?php _e('Checking for updates...', 'operaton-dmn'); ?></span>');
+
+            $.post(ajaxurl, {
+                action: 'operaton_clear_update_cache',
+                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+            }, function(response) {
+                if (response.success) {
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1000);
+                    status.html('<span style="color: #46b450;">✓ <?php _e('Update check completed', 'operaton-dmn'); ?></span>');
+                } else {
+                    status.html('<span style="color: #dc3232;">✗ <?php _e('Update check failed', 'operaton-dmn'); ?></span>');
+                    button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
+                }
+            }).fail(function() {
+                status.html('<span style="color: #dc3232;">✗ <?php _e('Update check failed', 'operaton-dmn'); ?></span>');
+                button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
+            });
+        });
+
+        // NEW: Clear All Cache functionality
+        $('#clear-all-cache').click(function() {
+            console.log('Button clicked, starting AJAX request');
+            var button = $(this);
+            var result = $('#cache-operation-result');
+
+            // Confirm action
+            if (!confirm('Clear all cached configurations and decision flows?\n\nThis will:\n• Clear all WordPress transients\n• Clear object cache\n• Force reload all configurations\n\nThis action is safe and recommended when configurations aren\'t updating.')) {
+                return;
+            }
+
+            button.prop('disabled', true).text('Clearing Cache...');
+            result.html('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Clearing all configuration cache...</div>');
+
+            $.post(ajaxurl, {
+                action: 'operaton_clear_all_cache',
+                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+            }, function(response) {
+                if (response.success) {
+                    console.log('AJAX response:', response);
+                    result.html('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
+                        '✅ <strong>All cache cleared successfully!</strong><br>' +
+                        '<small>Cleared ' + (response.data.transients_cleared || 0) + ' transients and ' +
+                        (response.data.configs_reloaded || 0) + ' configurations reloaded.</small></div>');
+
+                    // Auto-refresh after 2 seconds to show updated data
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    result.html('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                        '❌ <strong>Cache clear failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>');
+                }
+            }).fail(function(xhr, status, error) {
+                result.html('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                    '❌ <strong>Cache clear failed:</strong> Connection error (' + status + ')</div>');
+            }).always(function() {
+                button.prop('disabled', false).text('Clear All Configuration Cache');
+            });
+        });
+
+        // NEW: Force Reload Configurations functionality
+        $('#force-reload-configs').click(function() {
+            console.log('Button clicked, starting AJAX request');
+            var button = $(this);
+            var result = $('#cache-operation-result');
+
+            button.prop('disabled', true).text('Reloading...');
+            result.html('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Force reloading configurations from database...</div>');
+
+            $.post(ajaxurl, {
+                action: 'operaton_force_reload_configs',
+                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+            }, function(response) {
+                if (response.success) {
+                    console.log('AJAX response:', response);
+                    result.html('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
+                        '✅ <strong>Configurations reloaded successfully!</strong><br>' +
+                        '<small>Reloaded ' + (response.data.configs_reloaded || 0) + ' configurations from database.</small></div>');
+
+                    // Auto-refresh after 1.5 seconds
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    result.html('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                        '❌ <strong>Reload failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>');
+                }
+            }).fail(function(xhr, status, error) {
+                result.html('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                    '❌ <strong>Reload failed:</strong> Connection error (' + status + ')</div>');
+            }).always(function() {
+                button.prop('disabled', false).text('Force Reload Configurations');
+            });
+        });
+    });
 </script>
 
 <style>
