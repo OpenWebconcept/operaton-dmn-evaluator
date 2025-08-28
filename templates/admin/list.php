@@ -28,24 +28,13 @@ if (!defined('ABSPATH'))
         <h3>Configuration & Cache Management</h3>
         <p>Manage cached decision flow data and configuration settings. Clear cache when you update DMN endpoints or experience configuration issues.</p>
 
-        <?php if (isset($_GET['cache_cleared'])): ?>
-            <div class="operaton-notice success" style="margin: 10px 0; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; color: #155724; border-radius: 4px;">
-                <p>Cache cleared successfully! Configurations will reload from database.</p>
-            </div>
-        <?php endif; ?>
-
-        <?php if (isset($_GET['full_cache_cleared'])): ?>
-            <div class="operaton-notice success" style="margin: 10px 0; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; color: #155724; border-radius: 4px;">
-                <p>All caches cleared successfully! All configurations and decision flows will reload fresh from database.</p>
-            </div>
-        <?php endif; ?>
+        <!-- Remove the PHP success messages since we're using AJAX now -->
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
-            <a href="<?php echo admin_url('admin.php?page=operaton-dmn&clear_operaton_cache=1'); ?>"
-                class="button"
+            <button type="button" id="clear-decision-cache" class="button"
                 title="Clear decision flow summaries and temporary data">
                 Clear Decision Flow Cache
-            </a>
+            </button>
 
             <button type="button" id="clear-all-cache" class="button button-secondary"
                 title="Clear all cached configurations, decision flows, and force database reload">
@@ -381,7 +370,61 @@ if (!defined('ABSPATH'))
         // TODO: Implement AJAX testing functionality
     }
 
+    // Global variables to manage feedback timers
+    var cacheOperationTimer = null;
+
     jQuery(document).ready(function($) {
+        // Helper function to show feedback with proper timer management
+        function showCacheOperationFeedback(html, fadeOut = true) {
+            var result = $('#cache-operation-result');
+
+            // Clear any existing timer
+            if (cacheOperationTimer) {
+                clearTimeout(cacheOperationTimer);
+                cacheOperationTimer = null;
+            }
+
+            // Make sure the div is visible and show content
+            result.stop(true, true).show().html(html);
+
+            // Set new timer if fadeOut is requested
+            if (fadeOut) {
+                cacheOperationTimer = setTimeout(function() {
+                    result.fadeOut(500);
+                    cacheOperationTimer = null;
+                }, 3000);
+            }
+        }
+
+        // NEW: Clear Decision Flow Cache functionality (matching other buttons)
+        $('#clear-decision-cache').click(function() {
+            console.log('Clear Decision Flow Cache button clicked');
+            var button = $(this);
+
+            button.prop('disabled', true).text('Clearing Cache...');
+            showCacheOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Clearing decision flow cache...</div>', false);
+
+            $.post(ajaxurl, {
+                action: 'operaton_clear_decision_cache',
+                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+            }, function(response) {
+                if (response.success) {
+                    console.log('AJAX response:', response);
+                    showCacheOperationFeedback('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
+                        '✅ <strong>Decision flow cache cleared successfully!</strong><br>' +
+                        '<small>Configurations will reload from database.</small></div>');
+                } else {
+                    showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                        '❌ <strong>Cache clear failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>', false);
+                }
+            }).fail(function(xhr, status, error) {
+                showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                    '❌ <strong>Cache clear failed:</strong> Connection error (' + status + ')</div>', false);
+            }).always(function() {
+                button.prop('disabled', false).text('Clear Decision Flow Cache');
+            });
+        });
+
         // Update check functionality
         $('#operaton-check-updates').click(function() {
             var button = $(this);
@@ -409,11 +452,10 @@ if (!defined('ABSPATH'))
             });
         });
 
-        // NEW: Clear All Cache functionality
+        // Clear All Cache functionality
         $('#clear-all-cache').click(function() {
-            console.log('Button clicked, starting AJAX request');
+            console.log('Clear All Configuration Cache button clicked, starting AJAX request');
             var button = $(this);
-            var result = $('#cache-operation-result');
 
             // Confirm action
             if (!confirm('Clear all cached configurations and decision flows?\n\nThis will:\n• Clear all WordPress transients\n• Clear object cache\n• Force reload all configurations\n\nThis action is safe and recommended when configurations aren\'t updating.')) {
@@ -421,7 +463,7 @@ if (!defined('ABSPATH'))
             }
 
             button.prop('disabled', true).text('Clearing Cache...');
-            result.html('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Clearing all configuration cache...</div>');
+            showCacheOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Clearing all configuration cache...</div>', false);
 
             $.post(ajaxurl, {
                 action: 'operaton_clear_all_cache',
@@ -429,35 +471,29 @@ if (!defined('ABSPATH'))
             }, function(response) {
                 if (response.success) {
                     console.log('AJAX response:', response);
-                    result.html('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
+                    showCacheOperationFeedback('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
                         '✅ <strong>All cache cleared successfully!</strong><br>' +
                         '<small>Cleared ' + (response.data.transients_cleared || 0) + ' transients and ' +
                         (response.data.configs_reloaded || 0) + ' configurations reloaded.</small></div>');
-
-                    // Auto-refresh after 2 seconds to show updated data
-                    setTimeout(function() {
-                        location.reload();
-                    }, 2000);
                 } else {
-                    result.html('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
-                        '❌ <strong>Cache clear failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>');
+                    showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                        '❌ <strong>Cache clear failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>', false);
                 }
             }).fail(function(xhr, status, error) {
-                result.html('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
-                    '❌ <strong>Cache clear failed:</strong> Connection error (' + status + ')</div>');
+                showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                    '❌ <strong>Cache clear failed:</strong> Connection error (' + status + ')</div>', false);
             }).always(function() {
                 button.prop('disabled', false).text('Clear All Configuration Cache');
             });
         });
 
-        // NEW: Force Reload Configurations functionality
+        // Force Reload Configurations functionality
         $('#force-reload-configs').click(function() {
-            console.log('Button clicked, starting AJAX request');
+            console.log('Force Reload Configurations button clicked, starting AJAX request');
             var button = $(this);
-            var result = $('#cache-operation-result');
 
             button.prop('disabled', true).text('Reloading...');
-            result.html('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Force reloading configurations from database...</div>');
+            showCacheOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Force reloading configurations from database...</div>', false);
 
             $.post(ajaxurl, {
                 action: 'operaton_force_reload_configs',
@@ -465,21 +501,16 @@ if (!defined('ABSPATH'))
             }, function(response) {
                 if (response.success) {
                     console.log('AJAX response:', response);
-                    result.html('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
+                    showCacheOperationFeedback('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
                         '✅ <strong>Configurations reloaded successfully!</strong><br>' +
                         '<small>Reloaded ' + (response.data.configs_reloaded || 0) + ' configurations from database.</small></div>');
-
-                    // Auto-refresh after 1.5 seconds
-                    setTimeout(function() {
-                        location.reload();
-                    }, 1500);
                 } else {
-                    result.html('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
-                        '❌ <strong>Reload failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>');
+                    showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                        '❌ <strong>Reload failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>', false);
                 }
             }).fail(function(xhr, status, error) {
-                result.html('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
-                    '❌ <strong>Reload failed:</strong> Connection error (' + status + ')</div>');
+                showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                    '❌ <strong>Reload failed:</strong> Connection error (' + status + ')</div>', false);
             }).always(function() {
                 button.prop('disabled', false).text('Force Reload Configurations');
             });

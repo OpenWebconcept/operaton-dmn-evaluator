@@ -96,6 +96,9 @@ class Operaton_DMN_Admin
 
         // AJAX handler for force reloading configurations
         add_action('wp_ajax_operaton_force_reload_configs', array($this, 'ajax_force_reload_configs'));
+
+        // AJAX handler for clearing decision flow cache
+        add_action('wp_ajax_operaton_clear_decision_cache', array($this, 'ajax_clear_decision_cache'));
     }
 
     // =============================================================================
@@ -249,6 +252,58 @@ class Operaton_DMN_Admin
         {
             error_log('Operaton DMN: Configuration reload failed - ' . $e->getMessage());
             wp_send_json_error(array('message' => 'Configuration reload failed: ' . $e->getMessage()));
+        }
+    }
+
+    /**
+     * AJAX handler for clearing decision flow cache
+     */
+    public function ajax_clear_decision_cache()
+    {
+        // Security check
+        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
+        {
+            wp_send_json_error(array('message' => 'Insufficient permissions or invalid nonce'));
+            return;
+        }
+
+        try
+        {
+            // Clear decision flow cache - this replicates what your URL parameter method was doing
+            // You can adjust this to match your specific cache clearing logic
+
+            // Option 1: Clear specific transients
+            delete_transient('operaton_decision_flow_cache');
+            delete_transient('operaton_dmn_cache');
+
+            // Option 2: Clear all decision-related transients
+            global $wpdb;
+            $transients_cleared = $wpdb->query(
+                "DELETE FROM {$wpdb->options}
+                 WHERE option_name LIKE '_transient_operaton_decision_%'
+                 OR option_name LIKE '_transient_timeout_operaton_decision_%'"
+            );
+
+            // Option 3: If you have a specific method in your database class, use it
+            $plugin_instance = OperatonDMNEvaluator::get_instance();
+            $database = $plugin_instance->get_database_instance();
+
+            if ($database && method_exists($database, 'clear_decision_flow_cache'))
+            {
+                $database->clear_decision_flow_cache();
+            }
+
+            error_log('Operaton DMN: Decision flow cache cleared via admin interface');
+
+            wp_send_json_success(array(
+                'message' => 'Decision flow cache cleared successfully',
+                'cache_cleared' => true
+            ));
+        }
+        catch (Exception $e)
+        {
+            error_log('Operaton DMN: Decision flow cache clear failed - ' . $e->getMessage());
+            wp_send_json_error(array('message' => 'Cache clear failed: ' . $e->getMessage()));
         }
     }
 

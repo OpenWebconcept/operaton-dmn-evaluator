@@ -899,15 +899,6 @@ function operaton_dmn_handle_cache_clear_url()
         return;
     }
 
-    // Simple decision flow cache clear (existing functionality)
-    if (isset($_GET['clear_operaton_cache']))
-    {
-        global $wpdb;
-        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_operaton_%'");
-        wp_redirect(admin_url('admin.php?page=operaton-dmn&cache_cleared=1'));
-        exit;
-    }
-
     // Comprehensive cache clear (new functionality)
     if (isset($_GET['operaton_clear_all_cache']))
     {
