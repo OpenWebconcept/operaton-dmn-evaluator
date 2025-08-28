@@ -4,10 +4,11 @@ All notable changes to this project will be documented in this file.
 ## [1.0.0-beta.15] - 2025-08-xx
 
 ## Issues
+- [Issue #24](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/24) - Debug Tools - Get Plugin Status must be able to be closed
 - [Issue #29](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/29) - Using a cached or hardcoded endpoint instead of respecting configuration changes
 - [Issue #30](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/30) - Feedback button Clear Decision Flow Cach sync with both others
 
-### Changes
+### Caching
 - ✅ **Cache Clearing Buttons** to manage cached decision flow data and configuration settings.
 
 ![Cache clearing buttons](./assets/images/Cache-clearing-buttons.png)
@@ -15,8 +16,16 @@ All notable changes to this project will be documented in this file.
  - ✅ **Assets Management** simplification that works with, not against, WordPress patterns
  - ✅ **Redundant Asset Loading** eliminated in Gravity Forms Class
  - ✅ **Clear Decision Flow Cache** URL parameter handling code removed and replaced by new AJAX method
+
+ ### Styling
  - ✅ **Consistent behavior** All three buttons now use the same AJAX pattern with temporary feedback
  - ✅ **Proper timer management** with a shared feedback system
+
+ ### Debug Tools section
+- ✅ **Proper positioning** Debug Tools appears after the main header with consistent styling
+- ✅ **User-friendly status display** Shows key information (Plugin Version, WordPress, PHP, Active Managers, Performance, Health Status) in a readable format
+- ✅ **Persistent detailed view** The "Complete Debug Information" section stays visible and doesn't auto-fade, allowing thorough review of the comprehensive JSON data
+- ✅ **Clean functionality** All buttons work without jQuery deprecation warnings or JavaScript errors
 
 ## [1.0.0-beta.14] - 2025-08-13
 
