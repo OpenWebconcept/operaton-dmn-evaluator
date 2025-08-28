@@ -500,9 +500,11 @@ class Operaton_DMN_Assets
         if (
             wp_script_is('operaton-dmn-frontend', 'localized') ||
             wp_scripts()->get_data('operaton-dmn-frontend', 'data')
-        ) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Assets: ⏭️ Localization skipped - already done');
+        )
+        {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN Assets: Localization skipped - already done');
             }
             return;
         }
@@ -532,13 +534,16 @@ class Operaton_DMN_Assets
                 'timestamp' => time(),
                 'atomic_loading' => true
             ),
-            'loading_source' => 'enhanced_atomic_management'
+            'loading_source' => 'enhanced_atomic_management',
+            // FIXED: Add cache busting parameter
+            'cache_bust' => time() . '_' . wp_generate_password(8, false)
         );
 
         wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', $localization_data);
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Assets: ✅ Smart localization completed');
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN Assets: Smart localization completed with cache bust: ' . $localization_data['cache_bust']);
         }
     }
 
@@ -614,33 +619,68 @@ class Operaton_DMN_Assets
     }
 
     /**
-     * PHASE 1 FIX: Efficient form configuration processing
+     * FIXED: Enhanced form configuration processing with cache clearing
      */
     private function process_form_configuration($form, $config)
     {
+        // CRITICAL FIX: Always get fresh config from database to avoid stale cache
+        $fresh_config = null;
+        if ($this->gravity_forms_manager)
+        {
+            $database = $this->gravity_forms_manager->get_database_instance();
+            if ($database)
+            {
+                // Force fresh load from database, bypass cache
+                $fresh_config = $database->get_config_by_form_id($form['id'], false);
+            }
+        }
+
+        // Use fresh config if available, otherwise fall back to passed config
+        $working_config = $fresh_config ? $fresh_config : $config;
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN Assets: Processing form config - Form ID: ' . $form['id'] .
+                ' | Using: ' . ($fresh_config ? 'FRESH' : 'CACHED') .
+                ' | Endpoint: ' . ($working_config->dmn_endpoint ?? 'NONE'));
+        }
+
         // Process configuration for JavaScript efficiently
-        $field_mappings = $this->safe_json_decode($config->field_mappings, array());
-        $result_mappings = $this->safe_json_decode($config->result_mappings, array());
+        $field_mappings = $this->safe_json_decode($working_config->field_mappings, array());
+        $result_mappings = $this->safe_json_decode($working_config->result_mappings, array());
 
         // Localize form-specific configuration (only once per form)
         $config_handle = 'operaton_config_' . $form['id'];
 
-        // Check if already localized for this form
-        if (!isset($this->loaded_assets['config_' . $form['id']])) {
+        // FIXED: Check if already localized for this form AND clear if config updated
+        $localization_key = 'config_' . $form['id'];
+        if (!isset($this->loaded_assets[$localization_key]))
+        {
             wp_localize_script('operaton-dmn-gravity-integration', $config_handle, array(
-                'config_id' => $config->id,
-                'button_text' => $config->button_text,
+                'config_id' => $working_config->id,
+                'button_text' => $working_config->button_text,
                 'field_mappings' => $field_mappings,
                 'result_mappings' => $result_mappings,
                 'form_id' => $form['id'],
-                'evaluation_step' => isset($config->evaluation_step) ? $config->evaluation_step : 'auto',
-                'use_process' => isset($config->use_process) ? $config->use_process : false,
-                'show_decision_flow' => isset($config->show_decision_flow) ? $config->show_decision_flow : false,
+                'evaluation_step' => isset($working_config->evaluation_step) ? $working_config->evaluation_step : 'auto',
+                'use_process' => isset($working_config->use_process) ? $working_config->use_process : false,
+                'show_decision_flow' => isset($working_config->show_decision_flow) ? $working_config->show_decision_flow : false,
                 'debug' => defined('WP_DEBUG') && WP_DEBUG,
-                'atomic_loading' => true
+                'atomic_loading' => true,
+                // FIXED: Add endpoint URL and cache busting
+                'endpoint' => $working_config->dmn_endpoint ?? '',
+                'decision_key' => $working_config->decision_key ?? '',
+                'process_key' => $working_config->process_key ?? '',
+                'cache_bust' => time() . '_' . wp_generate_password(8, false),
+                'config_loaded_at' => time()
             ));
 
-            $this->loaded_assets['config_' . $form['id']] = true;
+            $this->loaded_assets[$localization_key] = true;
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN Assets: Config localized for form ' . $form['id'] . ' with fresh endpoint: ' . ($working_config->dmn_endpoint ?? 'NONE'));
+            }
         }
     }
 
@@ -848,6 +888,45 @@ class Operaton_DMN_Assets
         <?php
     }
 
+    /**
+     * NEW: Clear localization cache for specific form
+     */
+    public function clear_form_localization_cache($form_id)
+    {
+        $localization_key = 'config_' . $form_id;
+        if (isset($this->loaded_assets[$localization_key]))
+        {
+            unset($this->loaded_assets[$localization_key]);
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN Assets: Cleared localization cache for form: ' . $form_id);
+            }
+        }
+    }
+
+    /**
+     * NEW: Clear all localization caches
+     */
+    public function clear_all_localization_cache()
+    {
+        foreach ($this->loaded_assets as $key => $value)
+        {
+            if (strpos($key, 'config_') === 0)
+            {
+                unset($this->loaded_assets[$key]);
+            }
+        }
+
+        // Also reset static loading states to force re-detection
+        self::reset_all_loading_states();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN Assets: All localization caches cleared');
+        }
+    }
+    
     // =============================================================================
     // PHASE 1 FIX: PERFORMANCE MONITORING AND OPTIMIZATION
     // =============================================================================
