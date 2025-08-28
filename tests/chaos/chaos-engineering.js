@@ -1,15 +1,21 @@
 /**
- * Step 5: Simplified Chaos Engineering Tests for Operaton DMN Evaluator
- * Save this as: tests/chaos/chaos-engineering.js
+ * Updated Chaos Engineering Tests for Operaton DMN Evaluator
+ * Now uses .env.testing for consistent environment configuration
  *
  * Usage: node tests/chaos/chaos-engineering.js [development|staging|production]
  */
 
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 class SimpleDmnChaosEngineering {
   constructor(options = {}) {
+    // Load environment from .env.testing file
+    this.loadEnvironment();
+
     this.baseUrl = options.baseUrl || process.env.DMN_TEST_URL || 'https://owc-gemeente.test.open-regels.nl';
+    this.engineUrl = options.engineUrl || process.env.DMN_ENGINE_URL || 'http://localhost:8080';
     this.apiKey = options.apiKey || process.env.DMN_API_KEY || null;
     this.results = [];
     this.config = {
@@ -20,24 +26,73 @@ class SimpleDmnChaosEngineering {
   }
 
   /**
+   * Load environment variables from .env.testing file
+   */
+  loadEnvironment() {
+    const envFile = '.env.testing';
+
+    if (!fs.existsSync(envFile)) {
+      console.log(`Creating default ${envFile} file...`);
+      const defaultEnv = `# Environment configuration for testing
+DMN_TEST_URL=https://owc-gemeente.test.open-regels.nl
+DMN_ENGINE_URL=http://localhost:8080
+DMN_API_KEY=
+TEST_ENV=development`;
+
+      fs.writeFileSync(envFile, defaultEnv);
+      console.log(`Created ${envFile} with default values`);
+    }
+
+    // Parse and load .env.testing file
+    if (fs.existsSync(envFile)) {
+      const envContent = fs.readFileSync(envFile, 'utf8');
+      const lines = envContent.split('\n');
+
+      for (const line of lines) {
+        // Skip comments and empty lines
+        if (line.trim().startsWith('#') || !line.trim()) {
+          continue;
+        }
+
+        // Parse key=value pairs
+        const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+        if (match) {
+          const [, key, value] = match;
+          // Remove quotes if present
+          const cleanValue = value.replace(/^["']|["']$/g, '');
+          process.env[key] = cleanValue;
+        }
+      }
+
+      console.log('Environment loaded from .env.testing:');
+      console.log(`  DMN_TEST_URL: ${process.env.DMN_TEST_URL}`);
+      console.log(`  DMN_ENGINE_URL: ${process.env.DMN_ENGINE_URL}`);
+      console.log(`  DMN_API_KEY: ${process.env.DMN_API_KEY ? 'configured' : 'not set'}`);
+      console.log(`  TEST_ENV: ${process.env.TEST_ENV}`);
+    }
+  }
+
+  /**
    * Initialize chaos testing session
    */
   async initialize() {
-    console.log('🔥 Initializing Simplified Chaos Engineering Tests');
+    console.log('Initializing Simplified Chaos Engineering Tests');
     console.log('='.repeat(50));
-    console.log(`Target: ${this.baseUrl}`);
+    console.log(`WordPress Test URL: ${this.baseUrl}`);
+    console.log(`DMN Engine URL: ${this.engineUrl}`);
     console.log(`API Key: ${this.apiKey ? 'Configured' : 'Not configured'}`);
+    console.log(`Test Environment: ${process.env.TEST_ENV || 'development'}`);
     console.log('');
 
     // Verify baseline functionality
-    console.log('📋 Establishing baseline...');
+    console.log('Establishing baseline...');
     const baseline = await this.runBaselineTests();
 
     if (!baseline.healthy) {
-      throw new Error('❌ System is not healthy at baseline. Cannot proceed with chaos testing.');
+      throw new Error('System is not healthy at baseline. Cannot proceed with chaos testing.');
     }
 
-    console.log('✅ Baseline established - system is healthy');
+    console.log('Baseline established - system is healthy');
     return baseline;
   }
 
@@ -48,6 +103,7 @@ class SimpleDmnChaosEngineering {
     const tests = [
       { name: 'WordPress API Health', test: () => this.testWordPressApi() },
       { name: 'DMN Plugin Detection', test: () => this.testDmnPluginDetection() },
+      { name: 'DMN Engine Connectivity', test: () => this.testDmnEngineConnectivity() },
     ];
 
     let healthyCount = 0;
@@ -66,7 +122,7 @@ class SimpleDmnChaosEngineering {
     }
 
     return {
-      healthy: healthyCount >= 1, // At least 1/2 tests must pass
+      healthy: healthyCount >= 1, // At least 1/3 tests must pass
       healthyCount,
       totalTests: tests.length,
       results,
@@ -77,7 +133,7 @@ class SimpleDmnChaosEngineering {
    * Execute simplified chaos engineering tests
    */
   async executeChaosTests() {
-    console.log('🌪️  Starting Simplified Chaos Engineering Tests');
+    console.log('Starting Simplified Chaos Engineering Tests');
     console.log('='.repeat(50));
 
     const chaosScenarios = [
@@ -89,6 +145,9 @@ class SimpleDmnChaosEngineering {
       { name: 'Malicious Input Handling', scenario: () => this.testMaliciousInput() },
       { name: 'Large Payload Handling', scenario: () => this.testLargePayloads() },
 
+      // DMN Engine chaos
+      { name: 'DMN Engine Resilience', scenario: () => this.testDmnEngineResilience() },
+
       // Concurrency chaos
       { name: 'Concurrent Request Handling', scenario: () => this.testConcurrentRequests() },
 
@@ -97,7 +156,7 @@ class SimpleDmnChaosEngineering {
     ];
 
     for (const scenario of chaosScenarios) {
-      console.log(`\n🎭 Running: ${scenario.name}`);
+      console.log(`\nRunning: ${scenario.name}`);
       console.log('-'.repeat(40));
 
       try {
@@ -131,10 +190,82 @@ class SimpleDmnChaosEngineering {
   }
 
   /**
+   * Test DMN Engine resilience
+   */
+  async testDmnEngineResilience() {
+    console.log('  🔧 Testing DMN Engine resilience...');
+
+    const engineTests = [
+      {
+        name: 'Engine Version Check',
+        endpoint: '/engine-rest/version',
+        method: 'GET',
+      },
+      {
+        name: 'Decision Definition List',
+        endpoint: '/engine-rest/decision-definition',
+        method: 'GET',
+      },
+      {
+        name: 'Invalid DMN Evaluation',
+        endpoint: '/engine-rest/decision-definition/key/nonexistent/evaluate',
+        method: 'POST',
+        data: { variables: {} },
+      },
+    ];
+
+    const results = [];
+
+    for (const test of engineTests) {
+      try {
+        const config = {
+          method: test.method,
+          url: `${this.engineUrl}${test.endpoint}`,
+          timeout: 10000,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        };
+
+        if (test.data) {
+          config.data = test.data;
+        }
+
+        const response = await axios(config);
+
+        results.push({
+          test: test.name,
+          success: true,
+          statusCode: response.status,
+        });
+
+        console.log(`    ${test.name}: Success (${response.status})`);
+      } catch (error) {
+        const isExpectedError = error.response && error.response.status >= 400;
+
+        results.push({
+          test: test.name,
+          success: isExpectedError, // Some errors are expected (like 404 for nonexistent resources)
+          statusCode: error.response?.status,
+          error: error.message,
+        });
+
+        console.log(
+          `    ${test.name}: ${isExpectedError ? 'Expected error' : 'Failed'} (${
+            error.response?.status || 'no response'
+          })`
+        );
+      }
+    }
+
+    return { scenario: 'DMN Engine Resilience', results };
+  }
+
+  /**
    * Test timeout handling
    */
   async testTimeoutHandling() {
-    console.log('  ⏱️  Testing timeout handling...');
+    console.log('  ⏱️ Testing timeout handling...');
 
     const timeouts = [1000, 5000, 10000]; // ms
     const results = [];
@@ -395,19 +526,19 @@ class SimpleDmnChaosEngineering {
    */
   generateReport() {
     console.log('\n' + '='.repeat(50));
-    console.log('🔥 CHAOS ENGINEERING TEST REPORT');
+    console.log('CHAOS ENGINEERING TEST REPORT');
     console.log('='.repeat(50));
 
     const totalScenarios = this.results.length;
     const successfulScenarios = this.results.filter(r => r.success).length;
 
-    console.log(`\n📊 OVERALL RESULTS:`);
+    console.log(`\nOVERALL RESULTS:`);
     console.log(`   Total Scenarios: ${totalScenarios}`);
     console.log(`   Successful: ${successfulScenarios}`);
     console.log(`   Failed: ${totalScenarios - successfulScenarios}`);
     console.log(`   Success Rate: ${((successfulScenarios / totalScenarios) * 100).toFixed(1)}%`);
 
-    console.log(`\n📋 DETAILED RESULTS:`);
+    console.log(`\nDETAILED RESULTS:`);
     this.results.forEach((result, index) => {
       console.log(`\n${index + 1}. ${result.scenario}`);
       console.log(`   Status: ${result.success ? '✅ PASSED' : '❌ FAILED'}`);
@@ -469,6 +600,15 @@ class SimpleDmnChaosEngineering {
     return response.status === 200 || response.status === 404; // 404 is acceptable
   }
 
+  async testDmnEngineConnectivity() {
+    try {
+      const response = await axios.get(`${this.engineUrl}/engine-rest/version`, { timeout: 5000 });
+      return response.status === 200;
+    } catch (error) {
+      throw new Error(`DMN Engine not reachable at ${this.engineUrl}: ${error.message}`);
+    }
+  }
+
   async sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -480,12 +620,9 @@ class SimpleDmnChaosEngineering {
 async function runChaosEngineering() {
   const environment = process.argv[2] || 'development';
 
-  console.log(`🎯 Running chaos engineering tests for: ${environment}`);
+  console.log(`Running chaos engineering tests for: ${environment}`);
 
-  const chaosTest = new SimpleDmnChaosEngineering({
-    baseUrl: process.env.DMN_TEST_URL || 'https://owc-gemeente.test.open-regels.nl',
-    apiKey: process.env.DMN_API_KEY,
-  });
+  const chaosTest = new SimpleDmnChaosEngineering();
 
   try {
     // Initialize and verify baseline
@@ -498,9 +635,6 @@ async function runChaosEngineering() {
     const report = chaosTest.generateReport();
 
     // Save report to file
-    const fs = require('fs');
-    const path = require('path');
-
     const reportDir = 'test-results';
     const reportFile = path.join(reportDir, `chaos-engineering-${Date.now()}.json`);
 
@@ -509,24 +643,24 @@ async function runChaosEngineering() {
     }
 
     fs.writeFileSync(reportFile, JSON.stringify(report, null, 2));
-    console.log(`\n📄 Detailed report saved to: ${reportFile}`);
+    console.log(`\nDetailed report saved to: ${reportFile}`);
 
     // Exit with appropriate code
     const failureRate =
       (report.summary.totalScenarios - report.summary.successfulScenarios) / report.summary.totalScenarios;
 
     if (failureRate > 0.5) {
-      console.log('\n❌ HIGH FAILURE RATE: System shows poor resilience');
+      console.log('\nHIGH FAILURE RATE: System shows poor resilience');
       process.exit(1);
     } else if (failureRate > 0.2) {
-      console.log('\n⚠️  MODERATE ISSUES: System has room for improvement');
+      console.log('\nMODERATE ISSUES: System has room for improvement');
       process.exit(0);
     } else {
-      console.log('\n✅ GOOD RESILIENCE: System handles chaos well');
+      console.log('\nGOOD RESILIENCE: System handles chaos well');
       process.exit(0);
     }
   } catch (error) {
-    console.error('\n💥 CHAOS TEST EXECUTION FAILED:');
+    console.error('\nCHAOS TEST EXECUTION FAILED:');
     console.error(error.message);
     process.exit(1);
   }
