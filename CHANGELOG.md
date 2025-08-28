@@ -1,6 +1,19 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.0.0-beta.15] - 2025-08-xx
+
+## Issues
+- [Issue #29](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/29) - Using a cached or hardcoded endpoint instead of respecting configuration changes
+
+### Changes
+- ✅ **Cache Clearing Buttons** to manage cached decision flow data and configuration settings.
+
+![Cache clearing buttons](./assets/images/Cache-clearing-buttons.png)
+
+ - ✅ **Assets Management** simplification that works with, not against, WordPress patterns
+ - ✅ **Redundant Asset Loading** eliminated in Gravity Forms Class
+
 ## [1.0.0-beta.14] - 2025-08-13
 
 ## Issues
