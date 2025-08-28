@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 ## [1.0.0-beta.15] - 2025-08-xx
 
 ## Issues
+- [Issue #23](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/23) - Debug Tools in Admin Dashboard in wrong place
 - [Issue #24](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/24) - Debug Tools - Get Plugin Status must be able to be closed
 - [Issue #29](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/29) - Using a cached or hardcoded endpoint instead of respecting configuration changes
 - [Issue #30](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/30) - Feedback button Clear Decision Flow Cach sync with both others
