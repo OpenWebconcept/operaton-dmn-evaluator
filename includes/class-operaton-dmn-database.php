@@ -62,7 +62,7 @@ class Operaton_DMN_Database
      * @var int
      * @since 1.0.0
      */
-    private $current_db_version = 3;
+    private $current_db_version = 4;
 
     /**
      * Constructor for database manager
@@ -145,14 +145,16 @@ class Operaton_DMN_Database
             use_process boolean DEFAULT false,
             process_key varchar(255) DEFAULT NULL,
             show_decision_flow boolean DEFAULT false,
+            active tinyint(1) NOT NULL DEFAULT 1,  -- Health Endpoint
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY unique_form_id (form_id),
             KEY idx_form_id (form_id),
             KEY idx_decision_key (decision_key),
-            KEY idx_process_key (process_key)
-        ) $charset_collate;";
+            KEY idx_process_key (process_key),
+            KEY idx_active (active)  -- Health Endpoint
+            ) $charset_collate;";
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         $result = dbDelta($sql);
@@ -190,6 +192,7 @@ class Operaton_DMN_Database
             'use_process' => "ADD COLUMN use_process boolean DEFAULT false",
             'process_key' => "ADD COLUMN process_key varchar(255) DEFAULT NULL",
             'show_decision_flow' => "ADD COLUMN show_decision_flow boolean DEFAULT false",
+            'active' => "ADD COLUMN active tinyint(1) NOT NULL DEFAULT 1",  // Health Endpoint
             'created_at' => "ADD COLUMN created_at datetime DEFAULT CURRENT_TIMESTAMP",
             'updated_at' => "ADD COLUMN updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
         );
@@ -236,7 +239,8 @@ class Operaton_DMN_Database
     {
         $indexes = array(
             'idx_decision_key' => "CREATE INDEX idx_decision_key ON {$this->table_name} (decision_key)",
-            'idx_process_key' => "CREATE INDEX idx_process_key ON {$this->table_name} (process_key)"
+            'idx_process_key' => "CREATE INDEX idx_process_key ON {$this->table_name} (process_key)",
+            'idx_active' => "CREATE INDEX idx_active ON {$this->table_name} (active)"
         );
 
         foreach ($indexes as $index_name => $sql)
@@ -321,6 +325,12 @@ class Operaton_DMN_Database
                 $success &= $this->migrate_to_version_3();
             }
 
+            // Version 3 to 4: Add active column
+            if ($from_version < 4)
+            {
+                $success &= $this->migrate_to_version_4();
+            }
+
             if ($success)
             {
                 update_option($this->db_version_option, $this->current_db_version);
@@ -398,6 +408,51 @@ class Operaton_DMN_Database
                     return false;
                 }
             }
+        }
+
+        return true;
+    }
+
+    /**
+     * Migrate database schema to version 4
+     * Adds active column for configuration management
+     *
+     * @since 1.0.0
+     * @return bool Success status
+     */
+    private function migrate_to_version_4()
+    {
+        $columns = $this->wpdb->get_col("SHOW COLUMNS FROM {$this->table_name}");
+
+        if (!in_array('active', $columns))
+        {
+            $result = $this->wpdb->query("ALTER TABLE {$this->table_name} ADD COLUMN active tinyint(1) NOT NULL DEFAULT 1");
+            if ($result === false)
+            {
+                error_log("Operaton DMN Database: Failed to add 'active' column: " . $this->wpdb->last_error);
+                return false;
+            }
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log("Operaton DMN Database: Added 'active' column successfully");
+            }
+        }
+
+        // Add index for active column
+        $index_exists = $this->wpdb->get_var(
+            $this->wpdb->prepare(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE table_schema = %s AND table_name = %s AND index_name = %s",
+                DB_NAME,
+                $this->table_name,
+                'idx_active'
+            )
+        );
+
+        if (!$index_exists)
+        {
+            $this->wpdb->query("CREATE INDEX idx_active ON {$this->table_name} (active)");
         }
 
         return true;
@@ -1332,7 +1387,7 @@ class Operaton_DMN_Database
             }
         }
     }
-    
+
     /**
      * Cleanup old data scheduled task for maintenance
      * Removes expired cache entries and temporary data
@@ -1506,6 +1561,7 @@ class Operaton_DMN_Database
             'use_process',
             'process_key',
             'show_decision_flow',
+            'active',
             'created_at',
             'updated_at'
         );
