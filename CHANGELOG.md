@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 - [Issue #24](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/24) - Debug Tools - Get Plugin Status must be able to be closed
 - [Issue #29](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/29) - Using a cached or hardcoded endpoint instead of respecting configuration changes
 - [Issue #30](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/30) - Feedback button Clear Decision Flow Cach sync with both others
+- [Issue #32](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/32) - DMN health endpoint test is receiving a WordPress database error instead of a proper JSON response
 
 ### Caching
 - ✅ **Cache Clearing Buttons** to manage cached decision flow data and configuration settings.
@@ -27,6 +28,9 @@ All notable changes to this project will be documented in this file.
 - ✅ **User-friendly status display** Shows key information (Plugin Version, WordPress, PHP, Active Managers, Performance, Health Status) in a readable format
 - ✅ **Persistent detailed view** The "Complete Debug Information" section stays visible and doesn't auto-fade, allowing thorough review of the comprehensive JSON data
 - ✅ **Clean functionality** All buttons work without jQuery deprecation warnings or JavaScript errors
+
+ ### Tests
+ - ✅ **DMN Health Endpoint** "Unknown column 'active'" error fixed using existing database migration system
 
 ## [1.0.0-beta.14] - 2025-08-13
 
