@@ -894,30 +894,26 @@ class OperatonDMNEvaluator
  */
 function operaton_dmn_handle_cache_clear_url()
 {
-    if (!current_user_can('manage_options'))
-    {
+    if (!current_user_can('manage_options')) {
         return;
     }
 
     // Comprehensive cache clear (new functionality)
-    if (isset($_GET['operaton_clear_all_cache']))
-    {
+    if (isset($_GET['operaton_clear_all_cache'])) {
         global $wpdb;
 
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_operaton_%'");
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_operaton_%'");
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%operaton_config_%'");
 
-        if (function_exists('wp_cache_flush'))
-        {
+        if (function_exists('wp_cache_flush')) {
             wp_cache_flush();
         }
 
         // Force database manager to reload
         $plugin_instance = OperatonDMNEvaluator::get_instance();
         $database = $plugin_instance->get_database_instance();
-        if ($database && method_exists($database, 'force_reload_all_configurations'))
-        {
+        if ($database && method_exists($database, 'force_reload_all_configurations')) {
             $database->force_reload_all_configurations();
         }
 
