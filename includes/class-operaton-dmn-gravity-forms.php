@@ -578,8 +578,8 @@ class Operaton_DMN_Gravity_Forms
     }
 
     /**
-     * NEW: Ensure form configuration is properly localized to JavaScript
-     * This is critical for the frontend to recognize the form has DMN config
+     * Enhanced ensure_form_config_localized method
+     * Update this method to include explicit result field identification
      */
     private function ensure_form_config_localized($form, $config)
     {
@@ -587,17 +587,64 @@ class Operaton_DMN_Gravity_Forms
         $config_var_name = 'operaton_config_' . $form_id;
 
         // Check if already localized
-        if (isset(self::$form_config_cache['localized_' . $form_id])) {
+        if (isset(self::$form_config_cache['localized_' . $form_id]))
+        {
             return;
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Gravity Forms: 🔧 CRITICAL FIX - Ensuring config localized for form ' . $form_id);
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN Gravity Forms: CRITICAL FIX - Ensuring config localized for form ' . $form_id);
         }
 
         // Process configuration for JavaScript (cached)
         $field_mappings = $this->get_cached_field_mappings($config);
         $result_mappings = $this->get_cached_result_mappings($config);
+
+        // CONFIGURATION-DRIVEN: Extract result field IDs from the actual DMN configuration
+        $result_field_ids = array();
+
+        if (is_array($result_mappings))
+        {
+            foreach ($result_mappings as $dmn_variable => $mapping)
+            {
+                if (isset($mapping['field_id']) && is_numeric($mapping['field_id']))
+                {
+                    $result_field_ids[] = intval($mapping['field_id']);
+                }
+            }
+        }
+
+        // FALLBACK: If no result mappings configured, try to detect from field mappings that might be result fields
+        if (empty($result_field_ids) && is_array($field_mappings))
+        {
+            foreach ($field_mappings as $dmn_variable => $mapping)
+            {
+                // Look for variables that are likely result fields based on naming patterns
+                if (isset($mapping['field_id']) && is_numeric($mapping['field_id']))
+                {
+                    $field_id = intval($mapping['field_id']);
+
+                    // Include fields that are likely result fields based on variable names
+                    if (
+                        strpos($dmn_variable, 'aanmerking') !== false ||
+                        strpos($dmn_variable, 'result') !== false ||
+                        strpos($dmn_variable, 'eligibility') !== false ||
+                        strpos($dmn_variable, 'qualified') !== false ||
+                        strpos($dmn_variable, 'approved') !== false
+                    )
+                    {
+                        $result_field_ids[] = $field_id;
+                    }
+                }
+            }
+        }
+
+        // LOG for debugging
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN: Result field IDs detected for form ' . $form_id . ': ' . implode(', ', $result_field_ids));
+        }
 
         // Create the JavaScript configuration object
         $js_config = array(
@@ -610,25 +657,29 @@ class Operaton_DMN_Gravity_Forms
             'use_process' => ($config->use_process ?? false) ? true : false,
             'show_decision_flow' => ($config->show_decision_flow ?? false) ? true : false,
             'result_display_field' => $config->result_display_field ?? null,
-            'debug' => defined('WP_DEBUG') && WP_DEBUG
+            'debug' => defined('WP_DEBUG') && WP_DEBUG,
+            // CONFIGURATION-DRIVEN: Add result field identification based on actual config
+            'result_field_ids' => $result_field_ids,
+            'clear_results_on_change' => true // Flag to enable aggressive clearing
         );
 
         // Output the configuration directly to ensure it's available
         echo '<script type="text/javascript">';
         echo 'window.' . $config_var_name . ' = ' . wp_json_encode($js_config) . ';';
         echo 'if (window.console && window.console.log) {';
-        echo '  console.log("✅ Operaton DMN: Config localized for form ' . $form_id . '", window.' . $config_var_name . ');';
+        echo '  console.log("Enhanced Config localized for form ' . $form_id . '", window.' . $config_var_name . ');';
         echo '}';
         echo '</script>';
 
         // Mark as localized
         self::$form_config_cache['localized_' . $form_id] = true;
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Gravity Forms: ✅ FIXED - Config localized for form ' . $form_id . ' with config ID ' . $config->id);
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN Gravity Forms: ENHANCED - Config localized for form ' . $form_id . ' with explicit result fields');
         }
     }
-
+    
     /**
      * NEW: Cached field mappings processing
      */

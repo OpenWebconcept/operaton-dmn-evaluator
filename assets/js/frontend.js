@@ -426,72 +426,56 @@ window.operatonButtonManager = window.operatonButtonManager || {
 // =============================================================================
 
 /**
- * OPTIMIZED: Debounced form initialization with promise-based duplicate prevention
+ * Simple, working form initialization
  */
-function debouncedFormInitialization(formId) {
+function simpleFormInitialization(formId) {
   formId = parseInt(formId);
 
-  // Start performance tracking
-  if (!globalPerformanceTimer) {
-    globalPerformanceTimer = performance.now();
-  }
-
-  window.operatonInitialized.performanceStats.initializationAttempts++;
-
-  // Check if already initialized
+  // Prevent duplicate initialization
   if (window.operatonInitialized.forms.has(formId)) {
-    window.operatonInitialized.performanceStats.duplicatePrevented++;
-    console.log('🔄 Form', formId, 'already initialized, skipping duplicate');
-    return Promise.resolve();
+    return;
   }
 
-  // Clear existing timeout
-  if (formInitializationTimeouts.has(formId)) {
-    clearTimeout(formInitializationTimeouts.get(formId));
-    formInitializationTimeouts.delete(formId);
+  const config = getFormConfigCached(formId);
+  if (!config) {
+    return;
   }
 
-  // Return existing promise if initialization is in progress
-  if (initializationPromises.has(formId)) {
-    console.log('⏳ Form', formId, 'initialization in progress, returning existing promise');
-    return initializationPromises.get(formId);
-  }
+  console.log(`Initializing form ${formId}`);
 
-  // Create new initialization promise
-  const initPromise = new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      try {
-        // Clean up tracking
-        formInitializationTimeouts.delete(formId);
-        initializationPromises.delete(formId);
+  // Mark as initialized
+  window.operatonInitialized.forms.add(formId);
 
-        // Double-check initialization state
-        if (!window.operatonInitialized.forms.has(formId)) {
-          console.log('🚀 DEBOUNCED: Initializing form', formId);
+  // Set up input monitoring directly (using the working pattern from the fix)
+  const $ = window.jQuery || window.$;
+  const $form = $(`#gform_${formId}`);
 
-          const startTime = performance.now();
-          initializeFormEvaluation(formId);
-          const endTime = performance.now();
+  if ($form.length > 0) {
+    $form.off('.operaton-clear');
 
-          window.operatonInitialized.performanceStats.totalProcessingTime += endTime - startTime;
-          window.operatonInitialized.performanceStats.successfulInits++;
+    $form.on('change.operaton-clear', 'input, select, textarea', function () {
+      const $field = $(this);
+      const fieldId = $field.attr('id');
 
-          resolve(formId);
-        } else {
-          window.operatonInitialized.performanceStats.duplicatePrevented++;
-          resolve(formId);
-        }
-      } catch (error) {
-        console.error('❌ Form initialization error for form', formId, ':', error);
-        reject(error);
+      // Get result fields for this form
+      const resultFieldIds = getResultFieldIds(formId);
+      const isResultField = resultFieldIds.some(id => fieldId && fieldId.includes(`input_${formId}_${id}`));
+
+      if (isResultField) {
+        return; // Don't clear when result fields themselves change
       }
-    }, 300); // Debounce delay
 
-    formInitializationTimeouts.set(formId, timeoutId);
-  });
+      const fieldName = $field.attr('name') || fieldId;
+      const fieldValue = $field.val();
 
-  initializationPromises.set(formId, initPromise);
-  return initPromise;
+      console.log(`INPUT CHANGE DETECTED: ${fieldName} = "${fieldValue}"`);
+
+      clearAllResultFields(formId, `Input changed: ${fieldName}`);
+      clearStoredResults(formId);
+    });
+
+    console.log(`Form ${formId} input monitoring active`);
+  }
 }
 
 /**
@@ -520,7 +504,6 @@ function batchFormDetection() {
   }
 
   const initPromises = [];
-
   $forms.each(function () {
     const $form = $(this);
     const formId = parseInt($form.attr('id').replace('gform_', ''));
@@ -532,28 +515,13 @@ function batchFormDetection() {
       const config = getFormConfigCached(formId);
       if (config) {
         console.log('🎯 DMN-enabled form detected:', formId);
-        initPromises.push(debouncedFormInitialization(formId));
+        simpleFormInitialization(formId);
       }
     }
   });
 
-  // Wait for all initializations to complete
-  if (initPromises.length > 0) {
-    Promise.allSettled(initPromises).then(results => {
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
-
-      const endTime = performance.now();
-      console.log(
-        `✅ Batch detection complete: ${successful} successful, ${failed} failed in ${(endTime - startTime).toFixed(
-          2
-        )}ms`
-      );
-
-      // Log performance stats
-      logPerformanceStats();
-    });
-  }
+  const endTime = performance.now();
+  console.log(`✅ Batch detection complete in ${(endTime - startTime).toFixed(2)}ms`);
 
   return detectedForms;
 }
@@ -613,7 +581,7 @@ function initializeFormEvaluation(formId) {
   if (formInitializationState.has(formId)) {
     const state = formInitializationState.get(formId);
     if (state === 'initializing' || state === 'complete') {
-      console.log('🔄 Form', formId, 'initialization already in progress/complete');
+      console.log('Form', formId, 'initialization already in progress/complete');
       return;
     }
   }
@@ -623,14 +591,14 @@ function initializeFormEvaluation(formId) {
 
   // Check if already initialized (double-check)
   if (window.operatonInitialized.forms.has(formId)) {
-    console.log('🔄 Form', formId, 'already initialized at evaluation level');
+    console.log('Form', formId, 'already initialized at evaluation level');
     formInitializationState.set(formId, 'complete');
     return;
   }
 
   const config = getFormConfigCached(formId);
   if (!config) {
-    console.log('❌ No configuration found for form:', formId);
+    console.log('No configuration found for form:', formId);
     formInitializationState.delete(formId);
     return;
   }
@@ -641,10 +609,15 @@ function initializeFormEvaluation(formId) {
     // Mark as initializing in both systems
     window.operatonInitialized.forms.add(formId);
 
-    // Your existing initialization code...
+    // Bind evaluation button events
     bindEvaluationEventsOptimized(formId);
+
+    // Bind navigation events (page changes, etc.)
     bindNavigationEventsOptimized(formId);
-    bindInputChangeListenersOptimized(formId);
+
+    // CRITICAL FIX: Replace the old bindInputChangeListenersOptimized call with the new enhanced version
+    console.log('Setting up enhanced input change detection for form:', formId);
+    ensureInputChangeListenersAreSetup(formId);
 
     // Initialize decision flow summary if enabled (delegated to decision-flow.js)
     if (config.show_decision_flow && typeof window.initializeDecisionFlowForForm === 'function') {
@@ -658,8 +631,15 @@ function initializeFormEvaluation(formId) {
 
     formInitializationState.set(formId, 'complete');
     console.log('=== FORM', formId, 'INITIALIZATION COMPLETE ===');
+
+    // VERIFICATION: Log what got initialized
+    console.log('Initialized for form', formId + ':');
+    console.log('- Evaluation events: bound');
+    console.log('- Navigation events: bound');
+    console.log('- Input change detection: enhanced version bound');
+    console.log('- Decision flow:', config.show_decision_flow ? 'enabled' : 'disabled');
   } catch (error) {
-    console.error('❌ Error initializing form', formId, ':', error);
+    console.error('Error initializing form', formId, ':', error);
     // Clean up on error
     window.operatonInitialized.forms.delete(formId);
     formInitializationState.delete(formId);
@@ -735,7 +715,7 @@ function initOperatonDMN() {
         console.log('📋 Gravity Form rendered via gform action, form:', formId);
         // Clear cache for this form
         clearDOMCache(formId);
-        debouncedFormInitialization(formId);
+        simpleFormInitialization(formId);
       },
       10,
       'operaton_form_render'
@@ -749,14 +729,6 @@ function initOperatonDMN() {
     smartFormDetection();
   }, 100);
 
-  // Periodic cleanup and re-detection (less frequent)
-  setInterval(() => {
-    cleanupCaches();
-    if (document.querySelectorAll('form[id^="gform_"]').length > window.operatonInitialized.forms.size) {
-      console.log('🔄 Periodic re-detection triggered');
-      smartFormDetection();
-    }
-  }, 5000);
 }
 
 /**
@@ -865,22 +837,26 @@ function bindNavigationEventsOptimized(formId) {
 }
 
 /**
- * OPTIMIZED: Bind input change listeners with smart field detection
+ * ENHANCED: Bind input change listeners with comprehensive result field clearing
  */
 function bindInputChangeListenersOptimized(formId) {
   const $form = getCachedElement(`#gform_${formId}`);
   const config = getFormConfigCached(formId);
 
-  if (!config || !config.field_mappings) return;
+  if (!config || !config.field_mappings) {
+    console.log(`No field mappings found for form ${formId}`);
+    return;
+  }
 
-  console.log('🔗 Binding optimized input change listeners for form:', formId);
+  console.log(`Setting up ENHANCED input change listeners for form: ${formId}`);
 
-  // Use single delegated handler for all mapped fields
-  const fieldSelectors = [];
+  // Use single delegated handler for all form inputs
+  const inputSelectors = [];
 
+  // Add input field selectors from configuration
   Object.entries(config.field_mappings).forEach(([dmnVariable, mapping]) => {
     const fieldId = mapping.field_id;
-    fieldSelectors.push(
+    inputSelectors.push(
       `#input_${formId}_${fieldId}`,
       `input[name="input_${formId}_${fieldId}"]`,
       `select[name="input_${formId}_${fieldId}"]`,
@@ -888,19 +864,296 @@ function bindInputChangeListenersOptimized(formId) {
     );
   });
 
-  const combinedSelector = fieldSelectors.join(', ');
+  // Also monitor all standard form inputs
+  inputSelectors.push(
+    'input[type="text"]',
+    'input[type="number"]',
+    'input[type="email"]',
+    'input[type="date"]',
+    'input[type="radio"]',
+    'input[type="checkbox"]',
+    'select',
+    'textarea'
+  );
 
-  $form.off(`change.operaton-${formId}`);
-  $form.on(`change.operaton-${formId}`, combinedSelector, function () {
-    console.log('🔄 Input field changed:', $(this).attr('name'), 'New value:', $(this).val());
+  const combinedSelector = inputSelectors.join(', ');
 
-    // Clear caches related to this form
+  // Clear existing handlers to prevent duplicates
+  $form.off(`change.operaton-input-${formId}`);
+  $form.off(`input.operaton-input-${formId}`);
+
+  // CRITICAL: Bind to both change and input events with immediate clearing
+  $form.on(`change.operaton-input-${formId}`, combinedSelector, function () {
+    const $changedField = $(this);
+    const fieldName = $changedField.attr('name') || $changedField.attr('id');
+    const newValue = $changedField.val();
+
+    console.log(`INPUT CHANGED - Field: ${fieldName}, New value: ${newValue}`);
+
+    // IMMEDIATE: Clear all result fields when ANY input changes
+    clearAllResultFields(formId, `Input changed: ${fieldName}`);
+
+    // Clear caches and stored data
     clearDOMCache(formId);
-
-    setTimeout(() => {
-      clearResultFieldWithMessage(formId, 'Input changed - result cleared');
-    }, 100);
+    clearStoredResults(formId);
   });
+
+  // Also bind to 'input' event for real-time changes (like typing)
+  $form.on(`input.operaton-input-${formId}`, 'input[type="text"], input[type="number"], textarea', function () {
+    const $changedField = $(this);
+    const fieldName = $changedField.attr('name') || $changedField.attr('id');
+
+    // Debounced clearing to avoid excessive clearing while typing
+    clearTimeout(window[`inputDebounce_${formId}`]);
+    window[`inputDebounce_${formId}`] = setTimeout(() => {
+      console.log(`TYPING DETECTED - Field: ${fieldName}`);
+      clearAllResultFields(formId, `Typing in: ${fieldName}`);
+      clearStoredResults(formId);
+    }, 800); // 800ms debounce for typing
+  });
+
+  console.log(`Enhanced input change listeners bound for form: ${formId}`);
+  console.log(`Monitoring selectors: ${combinedSelector}`);
+
+  // Test the setup immediately
+  setTimeout(() => {
+    console.log(`Testing input change detection setup for form ${formId}...`);
+    const testField = $form.find('input[type="text"], input[type="number"]').first();
+    if (testField.length > 0) {
+      console.log(`Found test field: ${testField.attr('name')} with value: "${testField.val()}"`);
+    } else {
+      console.warn(`No suitable test field found in form ${formId}`);
+    }
+  }, 1000);
+}
+
+/**
+ * FIXED: Get result field IDs from configuration (no duplicates)
+ * Replace the existing getResultFieldIds function with this version
+ */
+function getResultFieldIds(formId) {
+  const config = getFormConfigCached(formId);
+  const resultFieldIds = [];
+
+  if (!config) {
+    console.warn(`No configuration found for form ${formId}`);
+    return resultFieldIds;
+  }
+
+  // Primary: result_field_ids from config
+  if (config.result_field_ids && Array.isArray(config.result_field_ids)) {
+    config.result_field_ids.forEach(fieldId => {
+      const normalizedId = parseInt(fieldId); // Ensure it's a number
+      if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
+        resultFieldIds.push(normalizedId);
+      }
+    });
+  }
+
+  // Secondary: result_mappings (only if no result_field_ids were found)
+  if (resultFieldIds.length === 0 && config.result_mappings && typeof config.result_mappings === 'object') {
+    Object.values(config.result_mappings).forEach(mapping => {
+      if (mapping && mapping.field_id) {
+        const normalizedId = parseInt(mapping.field_id);
+        if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
+          resultFieldIds.push(normalizedId);
+        }
+      }
+    });
+  }
+
+  // Tertiary: Look for result-like variables in field_mappings (only if still no results)
+  if (resultFieldIds.length === 0 && config.field_mappings && typeof config.field_mappings === 'object') {
+    Object.entries(config.field_mappings).forEach(([dmnVariable, mapping]) => {
+      if (mapping && mapping.field_id) {
+        // Include fields that are likely result fields based on variable names
+        if (
+          dmnVariable.includes('aanmerking') ||
+          dmnVariable.includes('result') ||
+          dmnVariable.includes('eligibility') ||
+          dmnVariable.includes('qualified') ||
+          dmnVariable.includes('approved')
+        ) {
+          const normalizedId = parseInt(mapping.field_id);
+          if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
+            resultFieldIds.push(normalizedId);
+          }
+        }
+      }
+    });
+  }
+
+  console.log(`Result field IDs for form ${formId}:`, resultFieldIds);
+  return resultFieldIds;
+}
+
+/**
+ * Clear all result fields
+ */
+function clearAllResultFields(formId, reason) {
+  console.log(`CLEARING result fields for form ${formId}: ${reason}`);
+
+  const $ = window.jQuery || window.$;
+  if (!$) return;
+
+  const $form = getCachedElement(`#gform_${formId}`);
+  const resultFieldIds = getResultFieldIds(formId);
+  let clearedCount = 0;
+
+  // Clear result fields
+  resultFieldIds.forEach(fieldId => {
+    const $resultField = $form.find(`#input_${formId}_${fieldId}`);
+
+    if ($resultField.length > 0) {
+      const currentValue = $resultField.val();
+      if (currentValue && currentValue.trim() !== '') {
+        console.log(`Clearing field ${fieldId}: "${currentValue}"`);
+        $resultField.val('');
+        $resultField.trigger('change');
+        clearedCount++;
+      }
+    }
+  });
+
+  if (clearedCount > 0) {
+    console.log(`Cleared ${clearedCount} result fields`);
+  }
+}
+
+/**
+ * Setup input change monitoring with direct event binding
+ */
+function setupInputChangeMonitoring(formId) {
+  const $ = window.jQuery || window.$;
+  if (!$) return;
+
+  const $form = $(`#gform_${formId}`);
+  if ($form.length === 0) return;
+
+  console.log(`Setting up input change monitoring for form ${formId}`);
+
+  // Remove existing handlers
+  $form.off('.operaton-clear');
+
+  // Monitor ALL form inputs
+  $form.on('change.operaton-clear', 'input, select, textarea', function () {
+    const $field = $(this);
+    const fieldName = $field.attr('name') || $field.attr('id');
+    const fieldValue = $field.val();
+
+    // Skip if this is a result field (don't clear when result fields change)
+    const fieldId = $field.attr('id');
+    if (fieldId && (fieldId.includes('input_8_35') || fieldId.includes('input_8_36'))) {
+      return;
+    }
+
+    console.log(`INPUT CHANGE DETECTED: ${fieldName} = "${fieldValue}"`);
+
+    // Clear result fields immediately
+    clearAllResultFields(formId, `Input changed: ${fieldName}`);
+
+    // Clear stored results
+    clearStoredResults(formId);
+  });
+
+  console.log(`Input change monitoring active for form ${formId}`);
+
+  // Test it immediately
+  setTimeout(() => {
+    const testField = $form.find('#input_8_24'); // Income field
+    if (testField.length > 0) {
+      console.log(`Monitoring income field: ${testField.attr('name')}`);
+    }
+  }, 100);
+}
+
+/**
+ * Highlight cleared fields for visual feedback
+ */
+function highlightClearedField($field) {
+  if (!$ || !$field || $field.length === 0) return;
+
+  const originalBackground = $field.css('background-color');
+  const originalBorder = $field.css('border');
+
+  $field.css({
+    'background-color': '#fff3cd',
+    border: '2px solid #ffc107',
+    transition: 'all 0.3s ease',
+  });
+
+  setTimeout(() => {
+    $field.css({
+      'background-color': originalBackground,
+      border: originalBorder,
+    });
+  }, 2000);
+}
+
+/**
+ * Show clearing notification
+ */
+function showClearingNotification(message) {
+  const $ = window.jQuery || window.$;
+  if (!$) return;
+
+  $('.operaton-clearing-notification').remove();
+
+  const $notification = $(`<div class="operaton-clearing-notification">${message}</div>`);
+  $notification.css({
+    position: 'fixed',
+    top: '20px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: '#ffc107',
+    color: '#856404',
+    padding: '10px 20px',
+    'border-radius': '6px',
+    'box-shadow': '0 3px 15px rgba(0,0,0,0.1)',
+    'z-index': 99999,
+    'font-family': 'Arial, sans-serif',
+    'font-size': '14px',
+    'font-weight': 'bold',
+    'max-width': '400px',
+    'text-align': 'center',
+  });
+
+  $('body').append($notification);
+
+  setTimeout(() => {
+    $notification.fadeOut(300, function () {
+      $(this).remove();
+    });
+  }, 3000);
+}
+
+/**
+ * CRITICAL: Ensure this gets called in your form initialization
+ * Add this to your initializeFormEvaluation function
+ */
+function ensureInputChangeListenersAreSetup(formId) {
+  console.log(`Ensuring input change listeners are setup for form ${formId}`);
+
+  // Call the enhanced binding function
+  bindInputChangeListenersOptimized(formId);
+
+  // Verify it worked by testing if events are bound
+  setTimeout(() => {
+    const $form = getCachedElement(`#gform_${formId}`);
+    const events = $._data($form[0], 'events');
+
+    if (events && (events.change || events.input)) {
+      console.log(`SUCCESS: Input change listeners confirmed for form ${formId}`);
+      if (events.change) {
+        console.log(`- Change handlers: ${events.change.length}`);
+      }
+      if (events.input) {
+        console.log(`- Input handlers: ${events.input.length}`);
+      }
+    } else {
+      console.error(`FAILED: No input change listeners found for form ${formId}`);
+    }
+  }, 500);
 }
 
 // =============================================================================
@@ -2077,6 +2330,106 @@ if (typeof window !== 'undefined') {
     }, 100);
   };
 }
+
+/**
+ * Debug function to track form changes and clearing behavior
+ * Add this to your frontend.js for debugging
+ */
+window.debugFormClearing = function (formId) {
+  const $ = window.jQuery;
+  if (!$) {
+    console.error('jQuery not available for debugging');
+    return;
+  }
+
+  const form = formId || 8; // Default to form 8
+  const $form = $(`#gform_${form}`);
+
+  if ($form.length === 0) {
+    console.error(`Form ${form} not found`);
+    return;
+  }
+
+  console.log(`=== FORM ${form} DEBUGGING ===`);
+
+  // Check configuration-driven result fields
+  const resultFieldIds = getResultFieldIds ? getResultFieldIds(form) : [];
+
+  console.log(`Configuration-driven result field IDs: [${resultFieldIds.join(', ')}]`);
+
+  // Check current field values for result fields
+  resultFieldIds.forEach(fieldId => {
+    const $field = $form.find(`#input_${form}_${fieldId}`);
+    if ($field.length > 0) {
+      console.log(`Result Field ${fieldId} (${$field.attr('name')}): "${$field.val()}"`);
+    } else {
+      console.log(`Result Field ${fieldId}: NOT FOUND`);
+    }
+  });
+
+  // Check input fields (commonly used ones)
+  const inputFields = [24, 5, 6, 7]; // inkomen, geboortedatum, naam, gemeente
+  inputFields.forEach(fieldId => {
+    const $field = $form.find(`#input_${form}_${fieldId}`);
+    if ($field.length > 0) {
+      console.log(`Input Field ${fieldId} (${$field.attr('name')}): "${$field.val()}"`);
+    } else {
+      console.log(`Input Field ${fieldId}: NOT FOUND`);
+    }
+  });
+
+  // Check configuration
+  const config = window[`operaton_config_${form}`];
+  if (config) {
+    console.log('Form Configuration:', {
+      field_mappings: config.field_mappings,
+      result_mappings: config.result_mappings,
+      result_field_ids: config.result_field_ids,
+      clear_results_on_change: config.clear_results_on_change,
+    });
+  } else {
+    console.error(`No configuration found for form ${form}`);
+  }
+
+  // Check event handlers
+  const events = $._data($form[0], 'events');
+  if (events) {
+    console.log('Event handlers bound:', Object.keys(events));
+    if (events.change) {
+      console.log('Change event handlers:', events.change.length);
+    }
+    if (events.input) {
+      console.log('Input event handlers:', events.input.length);
+    }
+  }
+
+  // Test clearing
+  console.log('Testing clearAllResultFields...');
+  if (typeof clearAllResultFields === 'function') {
+    clearAllResultFields(form, 'DEBUG TEST');
+  } else {
+    console.error('clearAllResultFields function not found');
+  }
+
+  console.log('=== DEBUG COMPLETE ===');
+};
+
+// Automatic debug on field changes for testing
+window.enableFormChangeDebugging = function (formId) {
+  const $ = window.jQuery;
+  const form = formId || 8;
+
+  $(`#gform_${form}`).on('change.debug', 'input, select, textarea', function () {
+    console.log(`CHANGE DETECTED: ${$(this).attr('name')} = "${$(this).val()}"`);
+
+    // Log what should happen
+    setTimeout(() => {
+      window.debugFormClearing(form);
+    }, 100);
+  });
+
+  console.log(`Debug change monitoring enabled for form ${form}`);
+};
 
 // =============================================================================
 // PERFORMANCE MONITORING AND OPTIMIZATION
