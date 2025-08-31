@@ -563,20 +563,30 @@ function setupInputChangeMonitoring(formId) {
   const resultFieldIds = getResultFieldIds(formId);
   console.log(`Cached result field IDs for form ${formId}:`, resultFieldIds);
 
-  // Debounced clearing to avoid excessive operations
+  // FIXED: More conservative debounced clearing with navigation awareness
   let debounceTimer = null;
+  let lastClearTime = 0;
+
   function debouncedClear(reason) {
+    // Prevent rapid successive clears
+    const now = Date.now();
+    if (now - lastClearTime < 1000) {
+      console.log('Skipping clear - too soon after last clear');
+      return;
+    }
+
     if (debounceTimer) {
       window.clearTimeout(debounceTimer);
     }
     debounceTimer = window.setTimeout(() => {
+      console.log(`INPUT CHANGE CLEARING: ${reason}`);
       clearAllResultFields(formId, reason);
       clearStoredResults(formId);
-    }, 150);
+      lastClearTime = Date.now();
+    }, 500); // Longer debounce to avoid clearing during navigation transitions
   }
 
-  // Monitor regular form fields (text, select, textarea, number, date)
-  // Use both 'change' and 'input' but with different debounce timings
+  // Monitor regular form fields - but be more careful about when we clear
   $form.on(
     'change.operaton-clear',
     'input[type="text"], input[type="number"], input[type="email"], input[type="date"], select, textarea',
@@ -601,7 +611,7 @@ function setupInputChangeMonitoring(formId) {
     }
   );
 
-  // For text/number inputs, also monitor 'input' event but with longer debounce for typing
+  // For text/number inputs, also monitor 'input' event but with even longer debounce
   $form.on('input.operaton-clear', 'input[type="text"], input[type="number"], input[type="email"]', function () {
     const $field = $(this);
     const fieldId = $field.attr('id');
@@ -616,7 +626,7 @@ function setupInputChangeMonitoring(formId) {
       return; // Don't log for result fields
     }
 
-    // Longer debounce for typing (wait for user to finish)
+    // Much longer debounce for typing (wait for user to finish)
     if (debounceTimer) {
       window.clearTimeout(debounceTimer);
     }
@@ -625,7 +635,8 @@ function setupInputChangeMonitoring(formId) {
       console.log(`INPUT TYPING COMPLETE: ${fieldName} = "${finalValue}"`);
       clearAllResultFields(formId, `Input typing complete: ${fieldName}`);
       clearStoredResults(formId);
-    }, 800); // Wait 800ms after user stops typing
+      lastClearTime = Date.now();
+    }, 1500); // Even longer wait for typing
   });
 
   // Monitor radio buttons with improved logic
@@ -677,25 +688,29 @@ function bindNavigationEventsOptimized(formId) {
   }
 
   const $form = getCachedElement(`#gform_${formId}`);
-
-  // Cache result field IDs once to avoid repeated calls
   const resultFieldIds = getResultFieldIds(formId);
 
-  // Store form state for comparison
+  // Store form state for comparison - EXCLUDE result fields entirely
   let formStateSnapshot = null;
 
   function captureFormState() {
     const state = {};
-    // Only capture non-result fields for state comparison
+    // Only capture actual INPUT fields, completely exclude result fields
     $form.find('input, select, textarea').each(function () {
       const $field = $(this);
       const fieldName = $field.attr('name') || $field.attr('id');
 
       if (fieldName) {
-        // Skip result fields from state tracking using cached IDs
-        const isResultField = resultFieldIds.some(id => fieldName.includes(`input_${formId}_${id}`));
+        // Skip result fields completely from state tracking
+        const isResultField = resultFieldIds.some(
+          id => fieldName.includes(`input_${formId}_${id}`) || fieldName === `input_${formId}_${id}`
+        );
 
-        if (!isResultField) {
+        // Also skip hidden sync fields and other non-user fields
+        const isHiddenSyncField = fieldName.startsWith('input_') && $field.attr('type') === 'hidden';
+        const isSystemField = fieldName.includes('gform_') || fieldName.includes('honeypot');
+
+        if (!isResultField && !isHiddenSyncField && !isSystemField) {
           if ($field.is(':radio') || $field.is(':checkbox')) {
             state[fieldName] = $field.is(':checked') ? $field.val() : '';
           } else {
@@ -708,69 +723,74 @@ function bindNavigationEventsOptimized(formId) {
   }
 
   function hasFormChanged(oldState, newState) {
-    if (!oldState || !newState) return false; // Conservative approach
-
-    const oldKeys = Object.keys(oldState);
-    const newKeys = Object.keys(newState);
-
-    if (oldKeys.length !== newKeys.length) {
-      console.log('Form structure changed');
-      return true;
+    if (!oldState || !newState) {
+      console.log('No previous state to compare - treating as NO change for navigation');
+      return false; // FIXED: Conservative approach - no clearing on navigation without clear changes
     }
 
-    for (const key of oldKeys) {
-      if (oldState[key] !== newState[key]) {
-        console.log(`Form change detected: ${key} changed from "${oldState[key]}" to "${newState[key]}"`);
+    // Get all unique field names from both states
+    const allFields = new Set([...Object.keys(oldState), ...Object.keys(newState)]);
+
+    for (const fieldName of allFields) {
+      const oldValue = oldState[fieldName] || '';
+      const newValue = newState[fieldName] || '';
+
+      if (oldValue !== newValue) {
+        console.log(`ACTUAL form change detected: ${fieldName} changed from "${oldValue}" to "${newValue}"`);
         return true;
       }
     }
 
+    console.log('No actual form changes detected in input fields');
     return false;
   }
 
-  // Capture initial state after initialization completes (only once)
+  // FIXED: Capture initial state when document is ready, not delayed
   setTimeout(() => {
     if (!formStateSnapshot) {
       formStateSnapshot = captureFormState();
       console.log(
-        `Captured initial form state for form ${formId} with ${Object.keys(formStateSnapshot).length} fields`
+        `Captured initial form state for form ${formId} with ${Object.keys(formStateSnapshot).length} input fields`
       );
     }
-  }, 1000);
+  }, 500); // Reasonable delay for form to be ready
 
   // Remove existing navigation handlers
   $form.off(`.operaton-nav-${formId}`);
 
-  // Enhanced navigation handlers - ONLY for actual user actions
+  // FIXED: Conservative Previous button handler - only clear on REAL input changes
   $form.on(
     `click.operaton-nav-${formId}`,
     '.gform_previous_button input, .gform_previous_button button, input[value*="Previous"], button:contains("Previous")',
     function (e) {
       console.log('Previous button clicked for form:', formId);
 
-      // Check if form actually changed
-      const currentState = captureFormState();
-      const hasChanged = hasFormChanged(formStateSnapshot, currentState);
+      // CRITICAL FIX: Don't check for changes immediately on button click
+      // Instead, preserve results during navigation and only clear if there were actual input changes
 
-      if (hasChanged) {
-        console.log('Form has changes detected, clearing result fields');
-        clearAllResultFields(formId, 'Form changed before navigation');
-        clearStoredResults(formId);
-      } else {
-        console.log('No form changes detected, preserving result fields');
-      }
-
-      clearDOMCache(formId);
-
-      // Update snapshot AFTER navigation completes
+      // Wait a moment to see if there are any pending input changes
       setTimeout(() => {
-        formStateSnapshot = captureFormState();
-        console.log('Updated form state snapshot after navigation');
-      }, 1500);
+        const currentState = captureFormState();
+        const hasChanged = hasFormChanged(formStateSnapshot, currentState);
+
+        if (hasChanged) {
+          console.log('REAL form changes detected before navigation - clearing result fields');
+          clearAllResultFields(formId, 'Form changed before navigation');
+          clearStoredResults(formId);
+          // Update snapshot to current state
+          formStateSnapshot = currentState;
+        } else {
+          console.log('NO real changes detected - PRESERVING result fields during navigation');
+          // Don't clear anything - this is the key fix
+        }
+
+        // Always clear DOM cache for navigation (this is safe)
+        clearDOMCache(formId);
+      }, 50);
     }
   );
 
-  // CONSERVATIVE Gravity Forms page load handler
+  // FIXED: Much more conservative Gravity Forms page load handler
   if (typeof gform !== 'undefined' && gform.addAction) {
     if (gform.removeAction) {
       gform.removeAction('gform_page_loaded', `operaton_clear_${formId}`);
@@ -781,28 +801,23 @@ function bindNavigationEventsOptimized(formId) {
       function (loadedFormId, currentPage) {
         if (loadedFormId == formId) {
           console.log('Form page loaded for form:', formId, 'page:', currentPage);
-          clearDOMCache(formId);
+          clearDOMCache(formId); // Safe to clear DOM cache
 
-          // CONSERVATIVE: Only clear on page load if we have a clear indication of changes
+          // CRITICAL FIX: Don't automatically clear on page load
+          // Only update the state snapshot for future comparisons
           setTimeout(() => {
             const currentState = captureFormState();
 
-            // Only clear if we have significant changes OR if this is the first page load
             if (!formStateSnapshot) {
-              console.log(`First page load for form ${formId}, no clearing`);
-              formStateSnapshot = captureFormState();
+              console.log(`First page load for form ${formId} - capturing initial state`);
+              formStateSnapshot = currentState;
             } else {
-              const hasChanged = hasFormChanged(formStateSnapshot, currentState);
-              if (hasChanged) {
-                console.log(`Page ${currentPage} loaded with detected changes`);
-                clearAllResultFields(formId, `Page loaded with changes: ${currentPage}`);
-                clearStoredResults(formId);
-              } else {
-                console.log(`Page ${currentPage} loaded, no changes detected`);
-              }
+              // FIXED: Just update the snapshot, don't clear unless there are significant changes
+              // AND we can confirm they are user input changes (not navigation artifacts)
+              console.log(`Page ${currentPage} loaded - updating state snapshot without clearing`);
               formStateSnapshot = currentState;
             }
-          }, 800);
+          }, 100);
         }
       },
       10,
