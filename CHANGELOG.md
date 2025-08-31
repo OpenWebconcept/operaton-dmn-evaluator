@@ -1,9 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.0.0-beta.15] - 2025-08-xx
+## [1.0.0-beta.15] - 2025-08-15
 
 ## Issues
+- [Issue #10](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/10) - Changing values on the pages of the form doesn't delete decision results
 - [Issue #23](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/23) - Debug Tools in Admin Dashboard in wrong place
 - [Issue #24](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/24) - Debug Tools - Get Plugin Status must be able to be closed
 - [Issue #29](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/29) - Using a cached or hardcoded endpoint instead of respecting configuration changes
@@ -11,28 +12,34 @@ All notable changes to this project will be documented in this file.
 - [Issue #31](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/31) - No consitency using environment variables for testing
 - [Issue #32](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/32) - DMN health endpoint test is receiving a WordPress database error instead of a proper JSON response
 
+### Populated Result Fields
+- ✅ **Result Fields** cleared by changing input fields
+
+> Result fields are also cleared while navigating without changing input fields
+> Too be fixed in next release!
+
 ### Caching
 - ✅ **Cache Clearing Buttons** to manage cached decision flow data and configuration settings.
 
 ![Cache clearing buttons](./assets/images/Cache-clearing-buttons.png)
 
- - ✅ **Assets Management** simplification that works with, not against, WordPress patterns
- - ✅ **Redundant Asset Loading** eliminated in Gravity Forms Class
- - ✅ **Clear Decision Flow Cache** URL parameter handling code removed and replaced by new AJAX method
+- ✅ **Assets Management** simplification that works with, not against, WordPress patterns
+- ✅ **Redundant Asset Loading** eliminated in Gravity Forms Class
+- ✅ **Clear Decision Flow Cache** URL parameter handling code removed and replaced by new AJAX method
 
- ### Styling
- - ✅ **Consistent behavior** All three buttons now use the same AJAX pattern with temporary feedback
- - ✅ **Proper timer management** with a shared feedback system
+### Styling
+- ✅ **Consistent behavior** All three buttons now use the same AJAX pattern with temporary feedback
+- ✅ **Proper timer management** with a shared feedback system
 
- ### Debug Tools section
+### Debug Tools section
 - ✅ **Proper positioning** Debug Tools appears after the main header with consistent styling
 - ✅ **User-friendly status display** Shows key information (Plugin Version, WordPress, PHP, Active Managers, Performance, Health Status) in a readable format
 - ✅ **Persistent detailed view** The "Complete Debug Information" section stays visible and doesn't auto-fade, allowing thorough review of the comprehensive JSON data
 - ✅ **Clean functionality** All buttons work without jQuery deprecation warnings or JavaScript errors
 
- ### Tests
- - ✅ **DMN Health Endpoint** "Unknown column 'active'" error fixed using existing database migration system
- - ✅ **Unified environment variable** configuration across all test types
+### Tests
+- ✅ **DMN Health Endpoint** "Unknown column 'active'" error fixed using existing database migration system
+- ✅ **Unified environment variable** configuration across all test types
 
 ## [1.0.0-beta.14] - 2025-08-13
 
