@@ -1,54 +1,41 @@
 /**
- * OPTIMIZED: Enhanced Operaton DMN Frontend Script with Debounced Initialization
- *
- * PERFORMANCE OPTIMIZATIONS:
- * - Debounced form initialization with duplicate prevention
- * - Cached DOM queries and form detection
- * - Optimized event binding with delegation
- * - Smart state management with cleanup
- * - Reduced redundant processing cycles
+ * FIXED: Operaton DMN Frontend Script
+ * Single initialization, proper result field detection, smart navigation clearing
  *
  * @package OperatonDMN
  * @since 1.0.0
  */
 
-console.log('🚀 Operaton DMN OPTIMIZED frontend script loading with debounced initialization...');
+console.log('🚀 Operaton DMN FIXED frontend script loading...');
 
 // =============================================================================
-// OPTIMIZED GLOBAL STATE MANAGEMENT
+// FIXED GLOBAL STATE MANAGEMENT
 // =============================================================================
 
 /**
- * Enhanced global state with performance tracking
+ * Enhanced global state - better tracking without loops
  */
 window.operatonInitialized = window.operatonInitialized || {
   forms: new Set(),
-  scripts: new Set(),
   globalInit: false,
-  timers: {},
   jQueryReady: false,
+  initInProgress: false,
   performanceStats: {
     initializationAttempts: 0,
     successfulInits: 0,
-    duplicatePrevented: 0,
     totalProcessingTime: 0,
     cacheHits: 0,
   },
 };
 
 /**
- * OPTIMIZED: Debounced form initialization with stronger duplicate prevention
+ * Caching utilities (keeping the useful parts)
  */
-const formInitializationTimeouts = new Map();
-const formInitializationState = new Map();
-const initializationPromises = new Map();
-const formConfigCache = new Map();
 const domQueryCache = new Map();
-let globalPerformanceTimer = null;
+const formConfigCache = new Map();
 
 /**
- * CRITICAL: Define global functions FIRST for inline script compatibility
- * These functions include fallbacks in case caching isn't available yet
+ * Define global functions FIRST for inline script compatibility
  */
 window.showEvaluateButton = function (formId) {
   const $ = window.jQuery || window.$;
@@ -58,26 +45,14 @@ window.showEvaluateButton = function (formId) {
   }
 
   try {
-    // Try cached version first
-    if (typeof getCachedElement === 'function') {
-      const $button = getCachedElement(`#operaton-evaluate-${formId}`);
-      const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
+    const $button = getCachedElement(`#operaton-evaluate-${formId}`);
+    const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
 
-      console.log('✅ Showing evaluate button for form', formId);
-      $button.addClass('operaton-show-button').show();
-      $summary.removeClass('operaton-show-summary');
-    } else {
-      // Fallback to direct jQuery
-      const $button = $(`#operaton-evaluate-${formId}`);
-      const $summary = $(`#decision-flow-summary-${formId}`);
-
-      console.log('✅ Showing evaluate button for form (fallback)', formId);
-      $button.addClass('operaton-show-button').show();
-      $summary.removeClass('operaton-show-summary');
-    }
+    console.log('✅ Showing evaluate button for form', formId);
+    $button.addClass('operaton-show-button').show();
+    $summary.removeClass('operaton-show-summary');
   } catch (error) {
     console.error('Error in showEvaluateButton:', error);
-    // Final fallback
     $(`#operaton-evaluate-${formId}`).addClass('operaton-show-button').show();
     $(`#decision-flow-summary-${formId}`).removeClass('operaton-show-summary');
   }
@@ -91,23 +66,12 @@ window.showDecisionFlowSummary = function (formId) {
   }
 
   try {
-    // Hide evaluate button
-    if (typeof getCachedElement === 'function') {
-      const $button = getCachedElement(`#operaton-evaluate-${formId}`);
-      $button.removeClass('operaton-show-button');
-    } else {
-      $(`#operaton-evaluate-${formId}`).removeClass('operaton-show-button');
-    }
+    const $button = getCachedElement(`#operaton-evaluate-${formId}`);
+    $button.removeClass('operaton-show-button');
 
-    // Show decision flow summary container
-    if (typeof getCachedElement === 'function') {
-      const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
-      $summary.addClass('operaton-show-summary');
-    } else {
-      $(`#decision-flow-summary-${formId}`).addClass('operaton-show-summary');
-    }
+    const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
+    $summary.addClass('operaton-show-summary');
 
-    // Delegate actual loading to decision-flow.js
     if (typeof window.loadDecisionFlowSummary === 'function') {
       console.log('📊 Delegating decision flow loading to decision-flow.js for form', formId);
       window.loadDecisionFlowSummary(formId);
@@ -127,14 +91,12 @@ window.hideAllElements = function (formId) {
   }
 
   try {
-    // Try to get current page and config (with fallback)
     let currentPage = 1;
     let targetPage = 2;
 
     if (typeof getCurrentPageCached === 'function') {
       currentPage = getCurrentPageCached(formId);
     } else {
-      // Simple fallback page detection
       const urlParams = new URLSearchParams(window.location.search);
       const pageParam = urlParams.get('gf_page');
       if (pageParam) {
@@ -147,44 +109,28 @@ window.hideAllElements = function (formId) {
       targetPage = config ? parseInt(config.evaluation_step) || 2 : 2;
     }
 
-    // CHECK: Don't hide if we're on the target page
     if (currentPage === targetPage) {
-      console.log('❌ Skipping hide - we are on target page', currentPage);
+      console.log('⏱️ Skipping hide - we are on target page', currentPage);
       return;
     }
 
-    // Try cached version first
-    if (typeof getCachedElement === 'function') {
-      const $button = getCachedElement(`#operaton-evaluate-${formId}`);
-      const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
+    const $button = getCachedElement(`#operaton-evaluate-${formId}`);
+    const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
 
-      console.log('❌ Hiding all elements for form', formId);
-      $button.removeClass('operaton-show-button').hide();
-      $summary.removeClass('operaton-show-summary');
-    } else {
-      // Fallback to direct jQuery
-      const $button = $(`#operaton-evaluate-${formId}`);
-      const $summary = $(`#decision-flow-summary-${formId}`);
-
-      console.log('❌ Hiding all elements for form (fallback)', formId);
-      $button.removeClass('operaton-show-button').hide();
-      $summary.removeClass('operaton-show-summary');
-    }
+    console.log('❌ Hiding all elements for form', formId);
+    $button.removeClass('operaton-show-button').hide();
+    $summary.removeClass('operaton-show-summary');
   } catch (error) {
     console.error('Error in hideAllElements:', error);
-    // Final fallback
     $(`#operaton-evaluate-${formId}`).removeClass('operaton-show-button').hide();
     $(`#decision-flow-summary-${formId}`).removeClass('operaton-show-summary');
   }
 };
 
 // =============================================================================
-// OPTIMIZED CACHING UTILITIES
+// CACHING UTILITIES
 // =============================================================================
 
-/**
- * OPTIMIZED: Cached DOM element retrieval with automatic cleanup
- */
 function getCachedElement(selector, maxAge = 5000) {
   const $ = window.jQuery || window.$;
   if (!$) {
@@ -201,7 +147,6 @@ function getCachedElement(selector, maxAge = 5000) {
   }
 
   const element = $(selector);
-
   domQueryCache.set(cacheKey, {
     element: element,
     timestamp: Date.now(),
@@ -210,9 +155,6 @@ function getCachedElement(selector, maxAge = 5000) {
   return element;
 }
 
-/**
- * OPTIMIZED: Cached form configuration retrieval
- */
 function getFormConfigCached(formId) {
   const cacheKey = `config_${formId}`;
 
@@ -231,32 +173,7 @@ function getFormConfigCached(formId) {
   return config;
 }
 
-/**
- * OPTIMIZED: Cached current page detection
- */
 function getCurrentPageCached(formId) {
-  const cacheKey = `current_page_${formId}`;
-  const cached = domQueryCache.get(cacheKey);
-
-  if (cached && Date.now() - cached.timestamp < 1000) {
-    // 1 second cache
-    return cached.element;
-  }
-
-  const currentPage = getCurrentPageSimple(formId);
-
-  domQueryCache.set(cacheKey, {
-    element: currentPage,
-    timestamp: Date.now(),
-  });
-
-  return currentPage;
-}
-
-/**
- * Helper function for page detection
- */
-function getCurrentPageSimple(formId) {
   const urlParams = new URLSearchParams(window.location.search);
   const pageParam = urlParams.get('gf_page');
   if (pageParam) {
@@ -275,9 +192,6 @@ function getCurrentPageSimple(formId) {
   return 1;
 }
 
-/**
- * OPTIMIZED: Clear DOM cache for specific form or all
- */
 function clearDOMCache(formId = null) {
   if (formId) {
     const keysToDelete = Array.from(domQueryCache.keys()).filter(
@@ -291,16 +205,13 @@ function clearDOMCache(formId = null) {
 }
 
 // =============================================================================
-// ENHANCED BUTTON MANAGER WITH CACHING
+// BUTTON MANAGER
 // =============================================================================
 
 window.operatonButtonManager = window.operatonButtonManager || {
   originalTexts: new Map(),
   buttonCache: new Map(),
 
-  /**
-   * OPTIMIZED: Get cached button element
-   */
   getCachedButton: function (formId) {
     const cacheKey = `button_${formId}`;
     const cached = this.buttonCache.get(cacheKey);
@@ -310,7 +221,6 @@ window.operatonButtonManager = window.operatonButtonManager || {
     }
 
     const $button = getCachedElement(`#operaton-evaluate-${formId}`);
-
     this.buttonCache.set(cacheKey, {
       button: $button,
       timestamp: Date.now(),
@@ -319,19 +229,14 @@ window.operatonButtonManager = window.operatonButtonManager || {
     return $button;
   },
 
-  /**
-   * OPTIMIZED: Store original button text with validation
-   */
   storeOriginalText: function ($button, formId) {
     const buttonId = `form_${formId}`;
-
     if (this.originalTexts.has(buttonId)) {
       return this.originalTexts.get(buttonId);
     }
 
     let originalText = $button.attr('data-original-text') || $button.val() || $button.attr('value') || 'Evaluate';
 
-    // Clean up the text (remove evaluation states)
     if (
       originalText.includes('Evaluation') ||
       originalText.includes('Evaluating') ||
@@ -342,14 +247,9 @@ window.operatonButtonManager = window.operatonButtonManager || {
 
     this.originalTexts.set(buttonId, originalText);
     $button.attr('data-original-text', originalText);
-
-    console.log('📝 ButtonManager: Stored original text for form', formId + ':', originalText);
     return originalText;
   },
 
-  /**
-   * OPTIMIZED: Get original text with fallback chain
-   */
   getOriginalText: function (formId) {
     const buttonId = `form_${formId}`;
     let storedText = this.originalTexts.get(buttonId);
@@ -367,24 +267,13 @@ window.operatonButtonManager = window.operatonButtonManager || {
     return storedText;
   },
 
-  /**
-   * OPTIMIZED: Set evaluating state with atomic operations
-   */
   setEvaluatingState: function ($button, formId) {
     this.storeOriginalText($button, formId);
     $button.val('Evaluating...').prop('disabled', true).addClass('operaton-evaluating');
-    console.log('🔄 ButtonManager: Set evaluating state for form', formId);
   },
 
-  /**
-   * OPTIMIZED: Restore original state with multiple fallback attempts
-   */
   restoreOriginalState: function ($button, formId) {
     const originalText = this.getOriginalText(formId);
-
-    console.log('🔄 ButtonManager: Restoring button for form', formId, 'to:', originalText);
-
-    // Primary restoration
     $button
       .val(originalText)
       .prop('value', originalText)
@@ -392,26 +281,19 @@ window.operatonButtonManager = window.operatonButtonManager || {
       .prop('disabled', false)
       .removeClass('operaton-evaluating');
 
-    // Clear button cache to force refresh
     this.buttonCache.delete(`button_${formId}`);
 
-    // Failsafe restoration
     setTimeout(() => {
       $button.val(originalText).prop('disabled', false);
     }, 100);
 
-    // Final emergency fallback
     setTimeout(() => {
       if ($button.val() !== originalText || $button.prop('disabled')) {
         $button.val(originalText).prop('disabled', false);
-        console.log('🆘 ButtonManager: Emergency restoration triggered for form', formId);
       }
     }, 1000);
   },
 
-  /**
-   * Clear button cache for form
-   */
   clearCache: function (formId) {
     if (formId) {
       this.buttonCache.delete(`button_${formId}`);
@@ -422,426 +304,493 @@ window.operatonButtonManager = window.operatonButtonManager || {
 };
 
 // =============================================================================
-// OPTIMIZED DEBOUNCED INITIALIZATION SYSTEM
+// FIXED RESULT FIELD MANAGEMENT
 // =============================================================================
 
-/**
- * OPTIMIZED: Debounced form initialization with promise-based duplicate prevention
- */
-function debouncedFormInitialization(formId) {
-  formId = parseInt(formId);
+function getResultFieldIds(formId) {
+  const config = getFormConfigCached(formId);
+  const resultFieldIds = [];
 
-  // Start performance tracking
-  if (!globalPerformanceTimer) {
-    globalPerformanceTimer = performance.now();
+  if (!config) {
+    console.warn(`No configuration found for form ${formId}`);
+    return resultFieldIds;
   }
 
-  window.operatonInitialized.performanceStats.initializationAttempts++;
-
-  // Check if already initialized
-  if (window.operatonInitialized.forms.has(formId)) {
-    window.operatonInitialized.performanceStats.duplicatePrevented++;
-    console.log('🔄 Form', formId, 'already initialized, skipping duplicate');
-    return Promise.resolve();
+  // Primary: result_field_ids from config (most reliable)
+  if (config.result_field_ids && Array.isArray(config.result_field_ids)) {
+    config.result_field_ids.forEach(fieldId => {
+      const normalizedId = parseInt(fieldId);
+      if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
+        resultFieldIds.push(normalizedId);
+      }
+    });
   }
 
-  // Clear existing timeout
-  if (formInitializationTimeouts.has(formId)) {
-    clearTimeout(formInitializationTimeouts.get(formId));
-    formInitializationTimeouts.delete(formId);
-  }
-
-  // Return existing promise if initialization is in progress
-  if (initializationPromises.has(formId)) {
-    console.log('⏳ Form', formId, 'initialization in progress, returning existing promise');
-    return initializationPromises.get(formId);
-  }
-
-  // Create new initialization promise
-  const initPromise = new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      try {
-        // Clean up tracking
-        formInitializationTimeouts.delete(formId);
-        initializationPromises.delete(formId);
-
-        // Double-check initialization state
-        if (!window.operatonInitialized.forms.has(formId)) {
-          console.log('🚀 DEBOUNCED: Initializing form', formId);
-
-          const startTime = performance.now();
-          initializeFormEvaluation(formId);
-          const endTime = performance.now();
-
-          window.operatonInitialized.performanceStats.totalProcessingTime += endTime - startTime;
-          window.operatonInitialized.performanceStats.successfulInits++;
-
-          resolve(formId);
-        } else {
-          window.operatonInitialized.performanceStats.duplicatePrevented++;
-          resolve(formId);
+  // Secondary: result_mappings (more reliable than field_mappings for results)
+  if (config.result_mappings && typeof config.result_mappings === 'object') {
+    Object.values(config.result_mappings).forEach(mapping => {
+      if (mapping && mapping.field_id) {
+        const normalizedId = parseInt(mapping.field_id);
+        if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
+          resultFieldIds.push(normalizedId);
         }
-      } catch (error) {
-        console.error('❌ Form initialization error for form', formId, ':', error);
-        reject(error);
       }
-    }, 300); // Debounce delay
-
-    formInitializationTimeouts.set(formId, timeoutId);
-  });
-
-  initializationPromises.set(formId, initPromise);
-  return initPromise;
-}
-
-/**
- * OPTIMIZED: Batch form detection with intelligent caching
- */
-function batchFormDetection() {
-  const $ = window.jQuery || window.$;
-  if (!$) return;
-
-  console.log('🔍 Running OPTIMIZED batch form detection...');
-
-  const detectedForms = new Set();
-  const startTime = performance.now();
-
-  // Use cached form elements if available
-  let $forms = domQueryCache.get('all_gravity_forms');
-  if (!$forms || Date.now() - $forms.timestamp > 5000) {
-    $forms = $('form[id^="gform_"]');
-    domQueryCache.set('all_gravity_forms', {
-      element: $forms,
-      timestamp: Date.now(),
-    });
-  } else {
-    $forms = $forms.element;
-    window.operatonInitialized.performanceStats.cacheHits++;
-  }
-
-  const initPromises = [];
-
-  $forms.each(function () {
-    const $form = $(this);
-    const formId = parseInt($form.attr('id').replace('gform_', ''));
-
-    if (formId && !isNaN(formId)) {
-      detectedForms.add(formId);
-
-      // Check if form has DMN configuration (cached)
-      const config = getFormConfigCached(formId);
-      if (config) {
-        console.log('🎯 DMN-enabled form detected:', formId);
-        initPromises.push(debouncedFormInitialization(formId));
-      }
-    }
-  });
-
-  // Wait for all initializations to complete
-  if (initPromises.length > 0) {
-    Promise.allSettled(initPromises).then(results => {
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
-
-      const endTime = performance.now();
-      console.log(
-        `✅ Batch detection complete: ${successful} successful, ${failed} failed in ${(endTime - startTime).toFixed(
-          2
-        )}ms`
-      );
-
-      // Log performance stats
-      logPerformanceStats();
     });
   }
 
-  return detectedForms;
+  // Tertiary: STRICT filtering from field_mappings - only clear result variables
+  if (config.field_mappings && typeof config.field_mappings === 'object') {
+    Object.entries(config.field_mappings).forEach(([dmnVariable, mapping]) => {
+      if (mapping && mapping.field_id) {
+        // ONLY include variables that clearly start with result indicators
+        if (dmnVariable.startsWith('aanmerking')) {
+          const normalizedId = parseInt(mapping.field_id);
+          if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
+            resultFieldIds.push(normalizedId);
+          }
+        }
+      }
+    });
+  }
+
+  console.log(`Result field IDs for form ${formId}:`, resultFieldIds);
+  return resultFieldIds;
 }
 
-/**
- * OPTIMIZED: Smart form detection with multiple strategies
- */
-function smartFormDetection() {
+function clearAllResultFields(formId, reason) {
+  console.log(`CLEARING result fields for form ${formId}: ${reason}`);
+
   const $ = window.jQuery || window.$;
   if (!$) return;
 
-  // Strategy 1: Direct detection
-  batchFormDetection();
+  const $form = getCachedElement(`#gform_${formId}`);
+  const resultFieldIds = getResultFieldIds(formId);
 
-  // Strategy 2: Mutation observer for dynamic forms
-  if (window.MutationObserver) {
-    const observer = new MutationObserver(mutations => {
-      let shouldDetect = false;
+  if (resultFieldIds.length === 0) {
+    console.log(`No result fields configured for form ${formId}`);
+    return;
+  }
 
-      mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === 1) {
-            // Element node
-            if (node.tagName === 'FORM' && node.id && node.id.startsWith('gform_')) {
-              shouldDetect = true;
-            } else if ($(node).find('form[id^="gform_"]').length > 0) {
-              shouldDetect = true;
-            }
+  let clearedCount = 0;
+
+  // Enhanced clearing with multiple selector attempts
+  resultFieldIds.forEach(fieldId => {
+    let fieldCleared = false;
+
+    // Try multiple selectors for each field
+    const selectors = [
+      `#input_${formId}_${fieldId}`,
+      `input[name="input_${formId}_${fieldId}"]`,
+      `select[name="input_${formId}_${fieldId}"]`,
+      `textarea[name="input_${formId}_${fieldId}"]`,
+    ];
+
+    for (const selector of selectors) {
+      const $resultField = $form.find(selector);
+
+      if ($resultField.length > 0) {
+        $resultField.each(function () {
+          const $field = $(this);
+          const currentValue = $field.val();
+
+          if (currentValue && currentValue.trim() !== '') {
+            console.log(`Clearing field ${fieldId} (${selector}): "${currentValue}"`);
+            $field.val('');
+            $field.trigger('change');
+            $field.trigger('input');
+            clearedCount++;
+            fieldCleared = true;
           }
         });
-      });
 
-      if (shouldDetect) {
-        console.log('🔄 New form detected via mutation observer');
-        setTimeout(batchFormDetection, 100);
+        if (fieldCleared) break;
       }
-    });
+    }
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    if (!fieldCleared) {
+      console.log(`Result field ${fieldId} not found or already empty`);
+    }
+  });
+
+  if (clearedCount > 0) {
+    console.log(`Successfully cleared ${clearedCount} result fields`);
+
+    // Verification
+    setTimeout(() => {
+      let verifyCount = 0;
+      resultFieldIds.forEach(fieldId => {
+        const $field = $form.find(`#input_${formId}_${fieldId}`);
+        if ($field.length > 0 && $field.val() && $field.val().trim() !== '') {
+          console.warn(`Field ${fieldId} still has value after clearing: "${$field.val()}"`);
+        } else {
+          verifyCount++;
+        }
+      });
+      console.log(`Verified ${verifyCount}/${resultFieldIds.length} fields are properly cleared`);
+    }, 100);
+  } else {
+    console.log('No result fields needed clearing');
   }
 }
 
-// =============================================================================
-// OPTIMIZED MAIN INITIALIZATION FUNCTIONS
-// =============================================================================
+function clearResultFieldWithMessage(formId, reason) {
+  console.log('🧹 Clearing result field for form:', formId, 'Reason:', reason);
+  clearAllResultFields(formId, reason);
+  clearStoredResults(formId);
+  clearDOMCache(formId);
 
-/**
- * OPTIMIZED: Enhanced form initialization with strict duplicate prevention
- */
-function initializeFormEvaluation(formId) {
-  formId = parseInt(formId);
+  if (typeof window.OperatonDecisionFlow !== 'undefined') {
+    window.OperatonDecisionFlow.clearCache();
+  }
+}
 
-  // CRITICAL FIX: Check if already initializing or initialized
-  if (formInitializationState.has(formId)) {
-    const state = formInitializationState.get(formId);
-    if (state === 'initializing' || state === 'complete') {
-      console.log('🔄 Form', formId, 'initialization already in progress/complete');
-      return;
-    }
+function clearStoredResults(formId) {
+  if (typeof Storage !== 'undefined') {
+    const keysToRemove = [
+      `operaton_dmn_result_${formId}`,
+      `operaton_dmn_eval_page_${formId}`,
+      `operaton_dmn_data_${formId}`,
+      `operaton_dmn_eval_data_${formId}`,
+      `operaton_process_${formId}`,
+    ];
+
+    keysToRemove.forEach(key => sessionStorage.removeItem(key));
   }
 
-  // Mark as initializing immediately
-  formInitializationState.set(formId, 'initializing');
+  delete window[`operaton_process_${formId}`];
+  console.log('🧹 Cleared all stored results and process data for form:', formId);
+}
 
-  // Check if already initialized (double-check)
-  if (window.operatonInitialized.forms.has(formId)) {
-    console.log('🔄 Form', formId, 'already initialized at evaluation level');
-    formInitializationState.set(formId, 'complete');
-    return;
-  }
+// =============================================================================
+// BUTTON PLACEMENT AND VISIBILITY MANAGEMENT
+// =============================================================================
+
+function handleButtonPlacement(formId) {
+  const $ = window.jQuery || window.$;
+  if (!$) return;
 
   const config = getFormConfigCached(formId);
-  if (!config) {
-    console.log('❌ No configuration found for form:', formId);
-    formInitializationState.delete(formId);
-    return;
-  }
+  if (!config) return;
 
-  console.log('=== OPTIMIZED INITIALIZING FORM', formId, '===');
+  const currentPage = getCurrentPageCached(formId);
+  const targetPage = parseInt(config.evaluation_step) || 2;
+  const showDecisionFlow = config.show_decision_flow || false;
+  const useProcess = config.use_process || false;
 
-  try {
-    // Mark as initializing in both systems
-    window.operatonInitialized.forms.add(formId);
+  console.log(`Button placement check - Form: ${formId}, Current page: ${currentPage}, Target: ${targetPage}`);
 
-    // Your existing initialization code...
-    bindEvaluationEventsOptimized(formId);
-    bindNavigationEventsOptimized(formId);
-    bindInputChangeListenersOptimized(formId);
-
-    // Initialize decision flow summary if enabled (delegated to decision-flow.js)
-    if (config.show_decision_flow && typeof window.initializeDecisionFlowForForm === 'function') {
-      window.initializeDecisionFlowForForm(formId, config);
-    }
-
-    // Clear any existing results when form initializes
-    setTimeout(() => {
-      clearResultFieldWithMessage(formId, 'Form initialized');
-    }, 200);
-
-    formInitializationState.set(formId, 'complete');
-    console.log('=== FORM', formId, 'INITIALIZATION COMPLETE ===');
-  } catch (error) {
-    console.error('❌ Error initializing form', formId, ':', error);
-    // Clean up on error
-    window.operatonInitialized.forms.delete(formId);
-    formInitializationState.delete(formId);
+  if (currentPage === targetPage) {
+    console.log(`Showing evaluate button for form ${formId}`);
+    window.showEvaluateButton(formId);
+  } else if (currentPage === targetPage + 1 && showDecisionFlow && useProcess) {
+    console.log(`Showing decision flow for form ${formId}`);
+    window.showDecisionFlowSummary(formId);
+  } else {
+    console.log(`Hiding elements for form ${formId}`);
+    window.hideAllElements(formId);
   }
 }
 
-/**
- * OPTIMIZED: Enhanced waiting mechanism with timeout and retry logic
- */
-function waitForOperatonAjax(callback, maxAttempts = 50) {
-  let attempts = 0;
+// =============================================================================
+// PAGE CHANGE DETECTION AND HANDLING
+// =============================================================================
 
-  function check() {
-    attempts++;
+function setupPageChangeDetection(formId) {
+  const $ = window.jQuery || window.$;
+  if (!$) return;
 
-    if (typeof window.operaton_ajax !== 'undefined') {
-      console.log('✅ operaton_ajax found after', attempts, 'attempts');
-      callback();
-    } else if (attempts < maxAttempts) {
-      if (attempts % 10 === 0) {
-        console.log('⏳ Still waiting for operaton_ajax... attempt', attempts);
-      }
-      setTimeout(check, 100);
-    } else {
-      console.error('❌ operaton_ajax not found after', maxAttempts, 'attempts');
-      createEmergencyOperatonAjax();
-      callback();
-    }
-  }
-  check();
-}
+  // Initial button placement
+  setTimeout(() => {
+    handleButtonPlacement(formId);
+  }, 100);
 
-/**
- * Emergency operaton_ajax fallback
- */
-function createEmergencyOperatonAjax() {
-  if (typeof window.operaton_ajax === 'undefined') {
-    console.log('🆘 Creating emergency operaton_ajax fallback');
-    window.operaton_ajax = {
-      url: '/wp-json/operaton-dmn/v1/evaluate',
-      nonce: 'fallback',
-      debug: true,
-      strings: {
-        evaluating: 'Evaluating...',
-        error: 'Evaluation failed',
-        success: 'Evaluation completed',
-        loading: 'Loading...',
-        no_config: 'Configuration not found',
-        validation_failed: 'Please fill in all required fields',
-        connection_error: 'Connection error. Please try again.',
-      },
-      emergency_mode: true,
-    };
-  }
-}
-
-/**
- * OPTIMIZED: Initialize evaluation system with smart hook registration
- */
-function initOperatonDMN() {
-  console.log('🚀 Starting OPTIMIZED Operaton DMN initialization...');
-
-  // Hook into Gravity Forms events if available (optimized)
+  // Hook into Gravity Forms page events
   if (typeof gform !== 'undefined' && gform.addAction) {
-    // Remove any existing actions first
+    // Remove existing handler
     if (gform.removeAction) {
-      gform.removeAction('gform_post_render', 'operaton_form_render');
+      gform.removeAction('gform_page_loaded', `operaton_button_${formId}`);
     }
 
     gform.addAction(
-      'gform_post_render',
-      function (formId) {
-        console.log('📋 Gravity Form rendered via gform action, form:', formId);
-        // Clear cache for this form
-        clearDOMCache(formId);
-        debouncedFormInitialization(formId);
+      'gform_page_loaded',
+      function (loadedFormId, currentPage) {
+        if (loadedFormId == formId) {
+          console.log(`Page loaded for form ${formId}: page ${currentPage}`);
+          setTimeout(() => {
+            handleButtonPlacement(formId);
+          }, 200);
+        }
       },
       10,
-      'operaton_form_render'
+      `operaton_button_${formId}`
     );
-
-    console.log('✅ Hooked into gform_post_render action');
   }
 
-  // Smart form detection with batching
+  // URL change detection for manual navigation
+  let currentUrl = window.location.href;
+  const urlCheckInterval = setInterval(() => {
+    if (window.location.href !== currentUrl) {
+      currentUrl = window.location.href;
+      console.log(`URL changed for form ${formId}, updating button placement`);
+      setTimeout(() => {
+        handleButtonPlacement(formId);
+      }, 300);
+    }
+  }, 500);
+
+  // Store interval for cleanup
+  window[`operaton_url_check_${formId}`] = urlCheckInterval;
+
+  // Fallback button placement check
   setTimeout(() => {
-    smartFormDetection();
-  }, 100);
+    handleButtonPlacement(formId);
+  }, 2000);
+}
 
-  // Periodic cleanup and re-detection (less frequent)
-  setInterval(() => {
-    cleanupCaches();
-    if (document.querySelectorAll('form[id^="gform_"]').length > window.operatonInitialized.forms.size) {
-      console.log('🔄 Periodic re-detection triggered');
-      smartFormDetection();
+function setupInputChangeMonitoring(formId) {
+  const $ = window.jQuery || window.$;
+  const $form = $(`#gform_${formId}`);
+
+  if ($form.length === 0) {
+    console.log(`Form ${formId} not found for input monitoring`);
+    return;
+  }
+
+  // Remove ALL existing handlers first
+  $form.off('.operaton-clear');
+
+  // Cache result field IDs once to avoid repeated calls
+  const resultFieldIds = getResultFieldIds(formId);
+  console.log(`Cached result field IDs for form ${formId}:`, resultFieldIds);
+
+  // FIXED: More conservative debounced clearing with navigation awareness
+  let debounceTimer = null;
+  let lastClearTime = 0;
+
+  function debouncedClear(reason) {
+    // Prevent rapid successive clears
+    const now = Date.now();
+    if (now - lastClearTime < 1000) {
+      console.log('Skipping clear - too soon after last clear');
+      return;
     }
-  }, 5000);
-}
 
-/**
- * OPTIMIZED: Cleanup caches to prevent memory leaks
- */
-function cleanupCaches() {
-  const now = Date.now();
-  const maxAge = 10000; // 10 seconds
-
-  // Clean DOM cache
-  for (const [key, value] of domQueryCache.entries()) {
-    if (now - value.timestamp > maxAge) {
-      domQueryCache.delete(key);
+    if (debounceTimer) {
+      window.clearTimeout(debounceTimer);
     }
+    debounceTimer = window.setTimeout(() => {
+      console.log(`INPUT CHANGE CLEARING: ${reason}`);
+      clearAllResultFields(formId, reason);
+      clearStoredResults(formId);
+      lastClearTime = Date.now();
+    }, 500); // Longer debounce to avoid clearing during navigation transitions
   }
 
-  // Clean button cache
-  for (const [key, value] of window.operatonButtonManager.buttonCache.entries()) {
-    if (now - value.timestamp > maxAge) {
-      window.operatonButtonManager.buttonCache.delete(key);
-    }
-  }
-
-  // Clean form config cache (less frequent)
-  if (formConfigCache.size > 50) {
-    formConfigCache.clear();
-  }
-}
-
-/**
- * Performance statistics logging
- */
-function logPerformanceStats() {
-  if (window.operaton_ajax && window.operaton_ajax.debug) {
-    const stats = window.operatonInitialized.performanceStats;
-    console.log('📊 PERFORMANCE STATS:', {
-      initializationAttempts: stats.initializationAttempts,
-      successfulInits: stats.successfulInits,
-      duplicatePrevented: stats.duplicatePrevented,
-      cacheHits: stats.cacheHits,
-      totalProcessingTime: `${stats.totalProcessingTime.toFixed(2)}ms`,
-      efficiency: `${((stats.duplicatePrevented / stats.initializationAttempts) * 100).toFixed(1)}%`,
-    });
-  }
-}
-
-// =============================================================================
-// OPTIMIZED EVENT BINDING FUNCTIONS
-// =============================================================================
-
-/**
- * OPTIMIZED: Bind evaluation button events with efficient delegation
- */
-function bindEvaluationEventsOptimized(formId) {
-  const selector = `.operaton-evaluate-btn[data-form-id="${formId}"]`;
-
-  // Use single delegated event handler
-  $(document).off(`click.operaton-${formId}`, selector);
-  $(document).on(`click.operaton-${formId}`, selector, function (e) {
-    e.preventDefault();
-    console.log('🎯 Button clicked for form:', formId);
-    handleEvaluateClick($(this));
-  });
-
-  console.log('✅ Optimized event handler bound for form:', formId);
-}
-
-/**
- * OPTIMIZED: Bind navigation events with smart caching
- */
-function bindNavigationEventsOptimized(formId) {
-  const $form = getCachedElement(`#gform_${formId}`);
-
-  $form.off(`click.operaton-nav-${formId}`);
+  // Monitor regular form fields - but be more careful about when we clear
   $form.on(
-    `click.operaton-nav-${formId}`,
-    '.gform_previous_button, input[value="Previous"], button:contains("Previous")',
+    'change.operaton-clear',
+    'input[type="text"], input[type="number"], input[type="email"], input[type="date"], select, textarea',
     function () {
-      console.log('⬅️ Previous button clicked for form:', formId);
-      clearResultFieldWithMessage(formId, 'Previous button clicked');
-      clearDOMCache(formId); // Clear cache on navigation
+      const $field = $(this);
+      const fieldId = $field.attr('id');
+      const fieldName = $field.attr('name') || fieldId;
+
+      // Skip result fields using cached IDs
+      const isResultField = resultFieldIds.some(
+        id => fieldId && (fieldId.includes(`input_${formId}_${id}`) || fieldId === `input_${formId}_${id}`)
+      );
+
+      if (isResultField) {
+        console.log(`Skipping result field change: ${fieldName}`);
+        return;
+      }
+
+      const fieldValue = $field.val();
+      console.log(`INPUT CHANGE DETECTED (change): ${fieldName} = "${fieldValue}"`);
+      debouncedClear(`Input changed: ${fieldName}`);
     }
   );
 
-  // Optimized Gravity Forms page loaded event
+  // For text/number inputs, also monitor 'input' event but with even longer debounce
+  $form.on('input.operaton-clear', 'input[type="text"], input[type="number"], input[type="email"]', function () {
+    const $field = $(this);
+    const fieldId = $field.attr('id');
+    const fieldName = $field.attr('name') || fieldId;
+
+    // Skip result fields using cached IDs
+    const isResultField = resultFieldIds.some(
+      id => fieldId && (fieldId.includes(`input_${formId}_${id}`) || fieldId === `input_${formId}_${id}`)
+    );
+
+    if (isResultField) {
+      return; // Don't log for result fields
+    }
+
+    // Much longer debounce for typing (wait for user to finish)
+    if (debounceTimer) {
+      window.clearTimeout(debounceTimer);
+    }
+    debounceTimer = window.setTimeout(() => {
+      const finalValue = $field.val();
+      console.log(`INPUT TYPING COMPLETE: ${fieldName} = "${finalValue}"`);
+      clearAllResultFields(formId, `Input typing complete: ${fieldName}`);
+      clearStoredResults(formId);
+      lastClearTime = Date.now();
+    }, 1500); // Even longer wait for typing
+  });
+
+  // Monitor radio buttons with improved logic
+  $form.on('change.operaton-clear', 'input[type="radio"]', function () {
+    const $radio = $(this);
+    const radioName = $radio.attr('name');
+    const radioValue = $radio.val();
+
+    // Skip hidden sync fields
+    if (radioName && radioName.startsWith('input_')) {
+      console.log(`Skipping hidden radio sync field: ${radioName}`);
+      return;
+    }
+
+    // Ignore changes during radio sync
+    if (window.operatonRadioSyncInProgress) {
+      console.log(`Skipping radio change during sync: ${radioName}`);
+      return;
+    }
+
+    if (radioName) {
+      console.log(`RADIO CHANGE DETECTED: ${radioName} = "${radioValue}"`);
+      debouncedClear(`Radio changed: ${radioName}`);
+    }
+  });
+
+  // Monitor checkboxes
+  $form.on('change.operaton-clear', 'input[type="checkbox"]', function () {
+    const $checkbox = $(this);
+    const checkboxName = $checkbox.attr('name') || $checkbox.attr('id');
+    const isChecked = $checkbox.is(':checked');
+
+    console.log(`CHECKBOX CHANGE DETECTED: ${checkboxName} = ${isChecked}`);
+    debouncedClear(`Checkbox changed: ${checkboxName}`);
+  });
+
+  console.log(`Enhanced input monitoring active for form ${formId}`);
+}
+
+// =============================================================================
+// ENHANCED NAVIGATION HANDLING
+// =============================================================================
+
+function bindNavigationEventsOptimized(formId) {
+  const $ = window.jQuery || window.$;
+  if (!$) {
+    console.warn('jQuery not available for bindNavigationEventsOptimized');
+    return;
+  }
+
+  const $form = getCachedElement(`#gform_${formId}`);
+  const resultFieldIds = getResultFieldIds(formId);
+
+  // Store form state for comparison - EXCLUDE result fields entirely
+  let formStateSnapshot = null;
+
+  function captureFormState() {
+    const state = {};
+    // Only capture actual INPUT fields, completely exclude result fields
+    $form.find('input, select, textarea').each(function () {
+      const $field = $(this);
+      const fieldName = $field.attr('name') || $field.attr('id');
+
+      if (fieldName) {
+        // Skip result fields completely from state tracking
+        const isResultField = resultFieldIds.some(
+          id => fieldName.includes(`input_${formId}_${id}`) || fieldName === `input_${formId}_${id}`
+        );
+
+        // Also skip hidden sync fields and other non-user fields
+        const isHiddenSyncField = fieldName.startsWith('input_') && $field.attr('type') === 'hidden';
+        const isSystemField = fieldName.includes('gform_') || fieldName.includes('honeypot');
+
+        if (!isResultField && !isHiddenSyncField && !isSystemField) {
+          if ($field.is(':radio') || $field.is(':checkbox')) {
+            state[fieldName] = $field.is(':checked') ? $field.val() : '';
+          } else {
+            state[fieldName] = $field.val() || '';
+          }
+        }
+      }
+    });
+    return state;
+  }
+
+  function hasFormChanged(oldState, newState) {
+    if (!oldState || !newState) {
+      console.log('No previous state to compare - treating as NO change for navigation');
+      return false; // FIXED: Conservative approach - no clearing on navigation without clear changes
+    }
+
+    // Get all unique field names from both states
+    const allFields = new Set([...Object.keys(oldState), ...Object.keys(newState)]);
+
+    for (const fieldName of allFields) {
+      const oldValue = oldState[fieldName] || '';
+      const newValue = newState[fieldName] || '';
+
+      if (oldValue !== newValue) {
+        console.log(`ACTUAL form change detected: ${fieldName} changed from "${oldValue}" to "${newValue}"`);
+        return true;
+      }
+    }
+
+    console.log('No actual form changes detected in input fields');
+    return false;
+  }
+
+  // FIXED: Capture initial state when document is ready, not delayed
+  setTimeout(() => {
+    if (!formStateSnapshot) {
+      formStateSnapshot = captureFormState();
+      console.log(
+        `Captured initial form state for form ${formId} with ${Object.keys(formStateSnapshot).length} input fields`
+      );
+    }
+  }, 500); // Reasonable delay for form to be ready
+
+  // Remove existing navigation handlers
+  $form.off(`.operaton-nav-${formId}`);
+
+  // FIXED: Conservative Previous button handler - only clear on REAL input changes
+  $form.on(
+    `click.operaton-nav-${formId}`,
+    '.gform_previous_button input, .gform_previous_button button, input[value*="Previous"], button:contains("Previous")',
+    function (e) {
+      console.log('Previous button clicked for form:', formId);
+
+      // CRITICAL FIX: Don't check for changes immediately on button click
+      // Instead, preserve results during navigation and only clear if there were actual input changes
+
+      // Wait a moment to see if there are any pending input changes
+      setTimeout(() => {
+        const currentState = captureFormState();
+        const hasChanged = hasFormChanged(formStateSnapshot, currentState);
+
+        if (hasChanged) {
+          console.log('REAL form changes detected before navigation - clearing result fields');
+          clearAllResultFields(formId, 'Form changed before navigation');
+          clearStoredResults(formId);
+          // Update snapshot to current state
+          formStateSnapshot = currentState;
+        } else {
+          console.log('NO real changes detected - PRESERVING result fields during navigation');
+          // Don't clear anything - this is the key fix
+        }
+
+        // Always clear DOM cache for navigation (this is safe)
+        clearDOMCache(formId);
+      }, 50);
+    }
+  );
+
+  // FIXED: Much more conservative Gravity Forms page load handler
   if (typeof gform !== 'undefined' && gform.addAction) {
     if (gform.removeAction) {
       gform.removeAction('gform_page_loaded', `operaton_clear_${formId}`);
@@ -851,11 +800,24 @@ function bindNavigationEventsOptimized(formId) {
       'gform_page_loaded',
       function (loadedFormId, currentPage) {
         if (loadedFormId == formId) {
-          console.log('📄 Form page loaded for form:', formId, 'page:', currentPage);
-          clearDOMCache(formId); // Clear cache on page change
+          console.log('Form page loaded for form:', formId, 'page:', currentPage);
+          clearDOMCache(formId); // Safe to clear DOM cache
+
+          // CRITICAL FIX: Don't automatically clear on page load
+          // Only update the state snapshot for future comparisons
           setTimeout(() => {
-            clearResultFieldWithMessage(formId, `Page loaded: ${currentPage}`);
-          }, 300);
+            const currentState = captureFormState();
+
+            if (!formStateSnapshot) {
+              console.log(`First page load for form ${formId} - capturing initial state`);
+              formStateSnapshot = currentState;
+            } else {
+              // FIXED: Just update the snapshot, don't clear unless there are significant changes
+              // AND we can confirm they are user input changes (not navigation artifacts)
+              console.log(`Page ${currentPage} loaded - updating state snapshot without clearing`);
+              formStateSnapshot = currentState;
+            }
+          }, 100);
         }
       },
       10,
@@ -864,56 +826,289 @@ function bindNavigationEventsOptimized(formId) {
   }
 }
 
-/**
- * OPTIMIZED: Bind input change listeners with smart field detection
- */
-function bindInputChangeListenersOptimized(formId) {
-  const $form = getCachedElement(`#gform_${formId}`);
+// =============================================================================
+// FORM INITIALIZATION (SINGLE VERSION)
+// =============================================================================
+
+function simpleFormInitialization(formId) {
+  formId = parseInt(formId);
+
+  // Prevent concurrent initialization
+  const initKey = `init_${formId}`;
+  if (window.operatonInitialized[initKey]) {
+    console.log(`Form ${formId} initialization already in progress`);
+    return;
+  }
+
+  // Prevent duplicate initialization
+  if (window.operatonInitialized.forms.has(formId)) {
+    console.log(`Form ${formId} already initialized`);
+    return;
+  }
+
   const config = getFormConfigCached(formId);
+  if (!config) {
+    console.log(`No configuration found for form ${formId}`);
+    return;
+  }
 
-  if (!config || !config.field_mappings) return;
+  // Set progress flag
+  window.operatonInitialized[initKey] = true;
 
-  console.log('🔗 Binding optimized input change listeners for form:', formId);
+  console.log(`=== INITIALIZING FORM ${formId} ===`);
 
-  // Use single delegated handler for all mapped fields
-  const fieldSelectors = [];
+  try {
+    // Mark as initialized
+    window.operatonInitialized.forms.add(formId);
+    window.operatonInitialized.performanceStats.successfulInits++;
 
-  Object.entries(config.field_mappings).forEach(([dmnVariable, mapping]) => {
-    const fieldId = mapping.field_id;
-    fieldSelectors.push(
-      `#input_${formId}_${fieldId}`,
-      `input[name="input_${formId}_${fieldId}"]`,
-      `select[name="input_${formId}_${fieldId}"]`,
-      `input[name="input_${fieldId}"]`
+    const $ = window.jQuery || window.$;
+    const $form = $(`#gform_${formId}`);
+
+    if ($form.length > 0) {
+      // Use enhanced input monitoring
+      setupInputChangeMonitoring(formId);
+
+      // Set up evaluation button events
+      bindEvaluationEventsOptimized(formId);
+
+      // Set up enhanced navigation events
+      bindNavigationEventsOptimized(formId);
+
+      // Set up page change detection and button placement
+      setupPageChangeDetection(formId);
+
+      // Initialize decision flow if enabled
+      if (config.show_decision_flow && typeof window.initializeDecisionFlowForForm === 'function') {
+        window.initializeDecisionFlowForForm(formId, config);
+      }
+
+      // Clear any existing results after initialization - BUT NOT on decision flow page
+      setTimeout(() => {
+        const currentPage = getCurrentPageCached(formId);
+        const targetPage = parseInt(config.evaluation_step) || 2;
+        const isDecisionFlowPage = currentPage === targetPage + 1 && config.show_decision_flow;
+
+        if (!isDecisionFlowPage) {
+          console.log(`Clearing results on initialization - Form ${formId}, page ${currentPage}`);
+          clearResultFieldWithMessage(formId, 'Form initialized');
+        } else {
+          console.log(`PRESERVING results on decision flow page - Form ${formId}, page ${currentPage}`);
+          // Only clear stored data, not the actual result fields
+          clearStoredResults(formId);
+        }
+      }, 500);
+    }
+
+    console.log(`=== FORM ${formId} INITIALIZATION COMPLETE ===`);
+  } catch (error) {
+    console.error(`Error initializing form ${formId}:`, error);
+    window.operatonInitialized.forms.delete(formId);
+  } finally {
+    delete window.operatonInitialized[initKey];
+  }
+}
+
+function simplifiedFormDetection() {
+  const $ = window.jQuery || window.$;
+  if (!$) return;
+
+  // Prevent concurrent detection
+  if (window.operatonInitialized.initInProgress) {
+    console.log('Form detection already in progress, skipping');
+    return;
+  }
+
+  window.operatonInitialized.initInProgress = true;
+
+  try {
+    console.log('🔍 Running simplified form detection...');
+    window.operatonInitialized.performanceStats.initializationAttempts++;
+
+    $('form[id^="gform_"]').each(function () {
+      const $form = $(this);
+      const formId = parseInt($form.attr('id').replace('gform_', ''));
+
+      if (formId && !isNaN(formId)) {
+        const config = getFormConfigCached(formId);
+        if (config) {
+          console.log(`🎯 DMN-enabled form detected: ${formId}`);
+          simpleFormInitialization(formId);
+        }
+      }
+    });
+
+    console.log('✅ Simplified detection complete');
+  } finally {
+    window.operatonInitialized.initInProgress = false;
+  }
+}
+
+function initOperatonDMN() {
+  // Prevent duplicate global initialization
+  if (window.operatonInitialized.globalInit) {
+    console.log('Global initialization already complete, skipping');
+    return;
+  }
+
+  console.log('🚀 Starting Operaton DMN initialization...');
+
+  // Hook into Gravity Forms events if available
+  if (typeof gform !== 'undefined' && gform.addAction) {
+    // Remove any existing handlers first
+    if (gform.removeAction) {
+      gform.removeAction('gform_post_render', 'operaton_form_render');
+    }
+
+    gform.addAction(
+      'gform_post_render',
+      function (formId) {
+        console.log('📋 Gravity Form rendered:', formId);
+        clearDOMCache(formId);
+
+        // Small delay to ensure DOM is fully rendered
+        setTimeout(() => {
+          simpleFormInitialization(formId);
+        }, 100);
+      },
+      10,
+      'operaton_form_render'
     );
+
+    console.log('✅ Hooked into gform_post_render action');
+  }
+
+  // Initial form detection
+  setTimeout(() => {
+    simplifiedFormDetection();
+  }, 200);
+
+  // Set global flag
+  window.operatonInitialized.globalInit = true;
+}
+
+function resetFormSystem() {
+  console.log('🧹 Resetting form system...');
+
+  // Clear state
+  window.operatonInitialized.forms.clear();
+  window.operatonInitialized.globalInit = false;
+  window.operatonInitialized.initInProgress = false;
+
+  // Clear progress flags
+  Object.keys(window.operatonInitialized).forEach(key => {
+    if (key.startsWith('init_')) {
+      delete window.operatonInitialized[key];
+    }
   });
 
-  const combinedSelector = fieldSelectors.join(', ');
+  // Clear caches
+  domQueryCache.clear();
+  formConfigCache.clear();
+  if (window.operatonButtonManager) {
+    window.operatonButtonManager.clearCache();
+  }
 
-  $form.off(`change.operaton-${formId}`);
-  $form.on(`change.operaton-${formId}`, combinedSelector, function () {
-    console.log('🔄 Input field changed:', $(this).attr('name'), 'New value:', $(this).val());
+  // Reset stats
+  window.operatonInitialized.performanceStats = {
+    initializationAttempts: 0,
+    successfulInits: 0,
+    totalProcessingTime: 0,
+    cacheHits: 0,
+  };
 
-    // Clear caches related to this form
-    clearDOMCache(formId);
+  // Re-initialize
+  setTimeout(() => {
+    simplifiedFormDetection();
+  }, 500);
 
-    setTimeout(() => {
-      clearResultFieldWithMessage(formId, 'Input changed - result cleared');
-    }, 100);
-  });
+  console.log('✅ System reset complete');
 }
 
 // =============================================================================
-// OPTIMIZED FORM EVALUATION FUNCTIONS
+// EVALUATION HANDLING
 // =============================================================================
 
-/**
- * OPTIMIZED: Handle evaluate button click with enhanced error handling
- */
+function findResultFieldOnCurrentPageOptimized(formId) {
+  const $ = window.jQuery || window.$;
+  if (!$) return null;
+
+  const cacheKey = `result_field_${formId}`;
+  const cached = domQueryCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.timestamp < 3000) {
+    return cached.element;
+  }
+
+  const $form = getCachedElement(`#gform_${formId}`);
+  const config = getFormConfigCached(formId);
+
+  if (config && config.result_display_field) {
+    const selectors = [
+      `#input_${formId}_${config.result_display_field}`,
+      `input[name="input_${formId}_${config.result_display_field}"]`,
+      `select[name="input_${formId}_${config.result_display_field}"]`,
+      `textarea[name="input_${formId}_${config.result_display_field}"]`,
+    ];
+
+    for (const selector of selectors) {
+      const $field = $form.find(`${selector}:visible`);
+      if ($field.length > 0) {
+        domQueryCache.set(cacheKey, {
+          element: $field.first(),
+          timestamp: Date.now(),
+        });
+        return $field.first();
+      }
+    }
+  }
+
+  // Fallback detection strategies
+  const detectionStrategies = [
+    () =>
+      $form
+        .find('label:visible')
+        .filter(function () {
+          const text = $(this).text().toLowerCase().trim();
+          return text === 'desired dish' || text === 'result' || text === 'desireddish';
+        })
+        .closest('.gfield')
+        .find('input:visible, select:visible, textarea:visible')
+        .first(),
+
+    () =>
+      $form
+        .find(
+          'input:visible[name*="dish"], input:visible[id*="dish"], select:visible[name*="dish"], select:visible[id*="dish"], textarea:visible[name*="dish"], textarea:visible[id*="dish"]'
+        )
+        .first(),
+
+    () =>
+      $form
+        .find(
+          'input:visible[name*="result"], input:visible[id*="result"], select:visible[name*="result"], select:visible[id*="result"], textarea:visible[name*="result"], textarea:visible[id*="result"]'
+        )
+        .first(),
+  ];
+
+  for (const strategy of detectionStrategies) {
+    const $field = strategy();
+    if ($field && $field.length > 0) {
+      domQueryCache.set(cacheKey, {
+        element: $field,
+        timestamp: Date.now(),
+      });
+      return $field;
+    }
+  }
+
+  return null;
+}
+
 function handleEvaluateClick($button) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.error('❌ jQuery not available for handleEvaluateClick');
+    console.error('jQuery not available for handleEvaluateClick');
     showError('System error: jQuery not available. Please refresh the page.');
     return;
   }
@@ -921,11 +1116,11 @@ function handleEvaluateClick($button) {
   const formId = $button.data('form-id');
   const configId = $button.data('config-id');
 
-  console.log('🎯 OPTIMIZED evaluate button clicked for form:', formId, 'config:', configId);
+  console.log('Button clicked for form:', formId, 'config:', configId);
 
   const config = getFormConfigCached(formId);
   if (!config) {
-    console.error('❌ Configuration not found for form:', formId);
+    console.error('Configuration not found for form:', formId);
     showError('Configuration error. Please contact the administrator.');
     return;
   }
@@ -948,17 +1143,17 @@ function handleEvaluateClick($button) {
       return;
     }
 
-    // Collect form data with optimized field access
+    // Collect form data
     const formData = {};
     let hasRequiredData = true;
     const missingFields = [];
 
     Object.entries(fieldMappings).forEach(([dmnVariable, mapping]) => {
       const fieldId = mapping.field_id;
-      console.log('🔍 Processing variable:', dmnVariable, 'Field ID:', fieldId);
+      console.log('Processing variable:', dmnVariable, 'Field ID:', fieldId);
 
       let value = getGravityFieldValueOptimized(formId, fieldId);
-      console.log('📥 Found raw value for field', fieldId + ':', value);
+      console.log('Found raw value for field', fieldId + ':', value);
 
       // Handle date field conversions
       if (
@@ -971,16 +1166,16 @@ function handleEvaluateClick($button) {
         }
       }
 
-      console.log('✅ Processed value for', dmnVariable + ':', value);
+      console.log('Processed value for', dmnVariable + ':', value);
       formData[dmnVariable] = value;
     });
 
     // Apply conditional logic for partner-related fields
     const isAlleenstaand = formData['aanvragerAlleenstaand'];
-    console.log('👤 User is single (alleenstaand):', isAlleenstaand);
+    console.log('User is single (alleenstaand):', isAlleenstaand);
 
     if (isAlleenstaand === 'true' || isAlleenstaand === true) {
-      console.log('👤 User is single, setting geboortedatumPartner to null');
+      console.log('User is single, setting geboortedatumPartner to null');
       formData['geboortedatumPartner'] = null;
     }
 
@@ -1016,23 +1211,15 @@ function handleEvaluateClick($button) {
 
     // Check if operaton_ajax is available
     if (typeof window.operaton_ajax === 'undefined') {
-      console.error('❌ operaton_ajax not available');
+      console.error('operaton_ajax not available');
       showError('System error: AJAX configuration not loaded. Please refresh the page.');
       window.operatonButtonManager.restoreOriginalState($button, formId);
       return;
     }
 
-    console.log('🚀 Making AJAX call to:', window.operaton_ajax.url);
+    console.log('Making AJAX call to:', window.operaton_ajax.url);
 
-    // Make AJAX call with optimized error handling
-    const $ = window.jQuery || window.$;
-    if (!$) {
-      console.error('❌ jQuery not available for AJAX call');
-      showError('System error: jQuery not available. Please refresh the page.');
-      window.operatonButtonManager.restoreOriginalState($button, formId);
-      return;
-    }
-
+    // Make AJAX call
     $.ajax({
       url: window.operaton_ajax.url,
       type: 'POST',
@@ -1045,10 +1232,10 @@ function handleEvaluateClick($button) {
         xhr.setRequestHeader('X-WP-Nonce', window.operaton_ajax.nonce);
       },
       success: function (response) {
-        console.log('✅ AJAX success:', response);
+        console.log('AJAX success:', response);
 
         if (response.success && response.results) {
-          console.log('📊 Results received:', response.results);
+          console.log('Results received:', response.results);
 
           let populatedCount = 0;
           const resultSummary = [];
@@ -1057,7 +1244,7 @@ function handleEvaluateClick($button) {
             const resultValue = resultData.value;
             const fieldId = resultData.field_id;
 
-            console.log('🔄 Processing result:', dmnResultField, 'Value:', resultValue, 'Field ID:', fieldId);
+            console.log('Processing result:', dmnResultField, 'Value:', resultValue, 'Field ID:', fieldId);
 
             let $resultField = null;
 
@@ -1076,23 +1263,23 @@ function handleEvaluateClick($button) {
               resultSummary.push(`${dmnResultField}: ${resultValue}`);
 
               highlightField($resultField);
-              console.log('✅ Populated field', fieldId, 'with result:', resultValue);
+              console.log('Populated field', fieldId, 'with result:', resultValue);
             } else {
-              console.warn('⚠️ No field found for result:', dmnResultField, 'Field ID:', fieldId);
+              console.warn('No field found for result:', dmnResultField, 'Field ID:', fieldId);
             }
           });
 
           // Store process instance ID if provided
           if (response.process_instance_id) {
             storeProcessInstanceId(formId, response.process_instance_id);
-            console.log('💾 Stored process instance ID:', response.process_instance_id);
+            console.log('Stored process instance ID:', response.process_instance_id);
           }
 
           if (populatedCount > 0) {
-            let message = `✅ Results populated (${populatedCount}): ${resultSummary.join(', ')}`;
+            let message = `Results populated (${populatedCount}): ${resultSummary.join(', ')}`;
 
             if (response.process_instance_id && config.show_decision_flow) {
-              message += '\n\n📋 Complete the form to see the detailed decision flow summary on the final page.';
+              message += '\n\nComplete the form to see the detailed decision flow summary on the final page.';
 
               // Notify decision flow manager about new process instance
               if (typeof window.OperatonDecisionFlow !== 'undefined') {
@@ -1119,12 +1306,12 @@ function handleEvaluateClick($button) {
             sessionStorage.setItem(`operaton_dmn_eval_data_${formId}`, JSON.stringify(evalData));
           }
         } else {
-          console.error('❌ Invalid response structure:', response);
+          console.error('Invalid response structure:', response);
           showError('No results received from evaluation.');
         }
       },
       error: function (xhr, status, error) {
-        console.error('❌ AJAX Error:', error);
+        console.error('AJAX Error:', error);
         console.error('XHR Status:', xhr.status);
         console.error('XHR Response:', xhr.responseText);
 
@@ -1158,139 +1345,115 @@ function handleEvaluateClick($button) {
 }
 
 // =============================================================================
-// OPTIMIZED UTILITY FUNCTIONS
+// VALIDATION AND UTILITIES
 // =============================================================================
 
-/**
- * OPTIMIZED: Store process instance ID with caching
- */
-function storeProcessInstanceId(formId, processInstanceId) {
-  if (typeof Storage !== 'undefined') {
-    sessionStorage.setItem(`operaton_process_${formId}`, processInstanceId);
-  }
-  window[`operaton_process_${formId}`] = processInstanceId;
-  console.log('💾 Stored process instance ID for form', formId + ':', processInstanceId);
-}
-
-/**
- * OPTIMIZED: Get stored process instance ID with fallback chain
- */
-function getStoredProcessInstanceId(formId) {
-  if (window[`operaton_process_${formId}`]) {
-    return window[`operaton_process_${formId}`];
+function validateForm(formId) {
+  const $ = window.jQuery || window.$;
+  if (!$) {
+    console.warn('jQuery not available for validateForm');
+    return true;
   }
 
-  if (typeof Storage !== 'undefined') {
-    const processId = sessionStorage.getItem(`operaton_process_${formId}`);
-    if (processId) {
-      return processId;
-    }
-
-    const evalData = sessionStorage.getItem(`operaton_dmn_eval_data_${formId}`);
-    if (evalData) {
-      try {
-        const parsed = JSON.parse(evalData);
-        if (parsed.processInstanceId) {
-          return parsed.processInstanceId;
-        }
-      } catch (e) {
-        console.error('❌ Error parsing evaluation data:', e);
-      }
-    }
-  }
-
-  return null;
-}
-
-/**
- * OPTIMIZED: Clear result field with message and cache cleanup
- */
-function clearResultFieldWithMessage(formId, reason) {
-  console.log('🧹 Clearing result field for form:', formId, 'Reason:', reason);
-
-  const $resultField = findResultFieldOnCurrentPageOptimized(formId);
-  if ($resultField && $resultField.length > 0) {
-    const currentValue = $resultField.val();
-    if (currentValue && currentValue.trim() !== '') {
-      console.log('🧹 Clearing result field value:', currentValue);
-      $resultField.val('');
-      $resultField.trigger('change');
-      $resultField.trigger('input');
-    }
-  }
-
-  clearStoredResults(formId);
-  clearDOMCache(formId);
-  // Clear decision flow cache when results are cleared
-  if (typeof window.OperatonDecisionFlow !== 'undefined') {
-    window.OperatonDecisionFlow.clearCache();
-  }
-}
-
-/**
- * OPTIMIZED: Clear stored results with comprehensive cleanup
- */
-function clearStoredResults(formId) {
-  if (typeof Storage !== 'undefined') {
-    const keysToRemove = [
-      `operaton_dmn_result_${formId}`,
-      `operaton_dmn_eval_page_${formId}`,
-      `operaton_dmn_data_${formId}`,
-      `operaton_dmn_eval_data_${formId}`,
-      `operaton_process_${formId}`,
-    ];
-
-    keysToRemove.forEach(key => sessionStorage.removeItem(key));
-  }
-
-  delete window[`operaton_process_${formId}`];
-  console.log('🧹 Cleared all stored results and process data for form:', formId);
-}
-
-/**
- * OPTIMIZED: Get current page with enhanced caching
- */
-function getCurrentPage(formId) {
-  return getCurrentPageCached(formId);
-}
-
-/**
- * OPTIMIZED: Get total pages with caching
- */
-function getTotalPages(formId) {
-  const cacheKey = `total_pages_${formId}`;
-  const cached = domQueryCache.get(cacheKey);
-
-  if (cached && Date.now() - cached.timestamp < 10000) {
-    return cached.element;
+  if (typeof gform !== 'undefined' && gform.validators && gform.validators[formId]) {
+    return gform.validators[formId]();
   }
 
   const $form = getCachedElement(`#gform_${formId}`);
-  let totalPages = 1;
+  let allValid = true;
 
-  $form.find('.gfield').each(function () {
-    if ($(this).hasClass('gfield_page')) {
-      totalPages++;
-    }
-  });
+  $form
+    .find('.gfield_contains_required input, .gfield_contains_required select, .gfield_contains_required textarea')
+    .each(function () {
+      const $field = $(this);
+      const value = getFieldValue($field);
 
-  domQueryCache.set(cacheKey, {
-    element: totalPages,
-    timestamp: Date.now(),
-  });
+      if (!value || value.trim() === '') {
+        allValid = false;
+        return false;
+      }
+    });
 
-  return totalPages;
+  return allValid;
 }
 
-/**
- * OPTIMIZED: Convert date format with validation
- */
+function getFieldValue($field) {
+  if ($field.length === 0) return null;
+
+  const tagName = $field.prop('tagName').toLowerCase();
+  const fieldType = $field.attr('type');
+
+  if (tagName === 'select') {
+    return $field.val();
+  } else if (fieldType === 'checkbox' || fieldType === 'radio') {
+    return $field.is(':checked') ? $field.val() : null;
+  } else if (
+    tagName === 'textarea' ||
+    fieldType === 'text' ||
+    fieldType === 'email' ||
+    fieldType === 'number' ||
+    fieldType === 'hidden'
+  ) {
+    const val = $field.val();
+    return val && val.trim() !== '' ? val : null;
+  }
+
+  return $field.val();
+}
+
+function validateFieldType(value, expectedType) {
+  switch (expectedType) {
+    case 'Integer':
+      return /^-?\d+$/.test(value);
+    case 'Double':
+      return /^-?\d*\.?\d+$/.test(value);
+    case 'Boolean':
+      return ['true', 'false', '1', '0', 'yes', 'no'].includes(value.toString().toLowerCase());
+    case 'String':
+    default:
+      return true;
+  }
+}
+
+function forceSyncRadioButtons(formId) {
+  const $ = window.jQuery || window.$;
+  if (!$) {
+    console.warn('jQuery not available for forceSyncRadioButtons');
+    return;
+  }
+
+  const $form = getCachedElement(`#gform_${formId}`);
+  const config = getFormConfigCached(formId);
+
+  if (!config || !config.field_mappings) {
+    return;
+  }
+
+  Object.entries(config.field_mappings).forEach(([dmnVariable, mapping]) => {
+    const fieldId = mapping.field_id;
+    const $hiddenField = $form.find(`#input_${formId}_${fieldId}`);
+
+    if ($hiddenField.length > 0) {
+      const $radioChecked = $(`input[name="${dmnVariable}"]:checked`);
+      if ($radioChecked.length > 0) {
+        const radioValue = $radioChecked.val();
+        const hiddenValue = $hiddenField.val();
+
+        if (radioValue !== hiddenValue) {
+          $hiddenField.val(radioValue);
+          $hiddenField.trigger('change');
+        }
+      }
+    }
+  });
+}
+
 function convertDateFormat(dateStr, fieldName) {
   if (!dateStr || dateStr === null) {
     return null;
   }
 
-  console.log('📅 Converting date for field:', fieldName, 'Input:', dateStr);
+  console.log('Converting date for field:', fieldName, 'Input:', dateStr);
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     return dateStr;
@@ -1318,15 +1481,12 @@ function convertDateFormat(dateStr, fieldName) {
       );
     }
   } catch (e) {
-    console.error('❌ Error parsing date:', dateStr, e);
+    console.error('Error parsing date:', dateStr, e);
   }
 
   return dateStr;
 }
 
-/**
- * OPTIMIZED: Find field on current page with smart caching
- */
 function findFieldOnCurrentPageOptimized(formId, fieldId) {
   const cacheKey = `field_${formId}_${fieldId}`;
   const cached = domQueryCache.get(cacheKey);
@@ -1335,6 +1495,7 @@ function findFieldOnCurrentPageOptimized(formId, fieldId) {
     return cached.element;
   }
 
+  const $ = window.jQuery || window.$;
   const $form = getCachedElement(`#gform_${formId}`);
 
   const selectors = [
@@ -1358,97 +1519,8 @@ function findFieldOnCurrentPageOptimized(formId, fieldId) {
   return null;
 }
 
-/**
- * OPTIMIZED: Find result field on current page with intelligent detection
- */
-function findResultFieldOnCurrentPageOptimized(formId) {
-  const cacheKey = `result_field_${formId}`;
-  const cached = domQueryCache.get(cacheKey);
-
-  if (cached && Date.now() - cached.timestamp < 3000) {
-    return cached.element;
-  }
-
-  const $form = getCachedElement(`#gform_${formId}`);
-  const config = getFormConfigCached(formId);
-
-  if (config && config.result_display_field) {
-    const selectors = [
-      `#input_${formId}_${config.result_display_field}`,
-      `input[name="input_${formId}_${config.result_display_field}"]`,
-      `select[name="input_${formId}_${config.result_display_field}"]`,
-      `textarea[name="input_${formId}_${config.result_display_field}"]`,
-    ];
-
-    for (const selector of selectors) {
-      const $field = $form.find(`${selector}:visible`);
-      if ($field.length > 0) {
-        domQueryCache.set(cacheKey, {
-          element: $field.first(),
-          timestamp: Date.now(),
-        });
-        return $field.first();
-      }
-    }
-  }
-
-  // Fallback detection strategies (cached)
-  const detectionStrategies = [
-    () =>
-      $form
-        .find('label:visible')
-        .filter(function () {
-          const text = $(this).text().toLowerCase().trim();
-          return text === 'desired dish' || text === 'result' || text === 'desireddish';
-        })
-        .closest('.gfield')
-        .find('input:visible, select:visible, textarea:visible')
-        .first(),
-
-    () =>
-      $form
-        .find('label:visible')
-        .filter(function () {
-          const text = $(this).text().toLowerCase();
-          return (text.includes('desired') && text.includes('dish')) || text.includes('result');
-        })
-        .closest('.gfield')
-        .find('input:visible, select:visible, textarea:visible')
-        .first(),
-
-    () =>
-      $form
-        .find(
-          'input:visible[name*="dish"], input:visible[id*="dish"], select:visible[name*="dish"], select:visible[id*="dish"], textarea:visible[name*="dish"], textarea:visible[id*="dish"]'
-        )
-        .first(),
-
-    () =>
-      $form
-        .find(
-          'input:visible[name*="result"], input:visible[id*="result"], select:visible[name*="result"], select:visible[id*="result"], textarea:visible[name*="result"], textarea:visible[id*="result"]'
-        )
-        .first(),
-  ];
-
-  for (const strategy of detectionStrategies) {
-    const $field = strategy();
-    if ($field && $field.length > 0) {
-      domQueryCache.set(cacheKey, {
-        element: $field,
-        timestamp: Date.now(),
-      });
-      return $field;
-    }
-  }
-
-  return null;
-}
-
-/**
- * OPTIMIZED: Get Gravity field value with comprehensive field type handling
- */
 function getGravityFieldValueOptimized(formId, fieldId) {
+  const $ = window.jQuery || window.$;
   const $form = getCachedElement(`#gform_${formId}`);
   let value = null;
 
@@ -1494,9 +1566,6 @@ function getGravityFieldValueOptimized(formId, fieldId) {
   return null;
 }
 
-/**
- * OPTIMIZED: Find custom radio value with enhanced detection
- */
 function findCustomRadioValueOptimized(formId, fieldId) {
   const $ = window.jQuery || window.$;
   if (!$) {
@@ -1505,8 +1574,8 @@ function findCustomRadioValueOptimized(formId, fieldId) {
   }
 
   const $form = getCachedElement(`#gform_${formId}`);
-
   const $hiddenField = $form.find(`#input_${formId}_${fieldId}`);
+
   if ($hiddenField.length > 0) {
     const $fieldContainer = $hiddenField.closest('.gfield');
     if ($fieldContainer.length > 0) {
@@ -1529,7 +1598,7 @@ function findCustomRadioValueOptimized(formId, fieldId) {
     }
   }
 
-  // Check using DMN variable name (optimized)
+  // Check using DMN variable name
   const config = getFormConfigCached(formId);
   if (config && config.field_mappings) {
     let targetDmnVariable = null;
@@ -1558,9 +1627,6 @@ function findCustomRadioValueOptimized(formId, fieldId) {
   return null;
 }
 
-/**
- * Generate possible radio names
- */
 function generatePossibleRadioNames(fieldLabel, fieldId) {
   const possibilities = [];
 
@@ -1583,155 +1649,23 @@ function generatePossibleRadioNames(fieldLabel, fieldId) {
   return possibilities;
 }
 
-/**
- * OPTIMIZED: Force sync radio buttons with cached field detection
- */
-function forceSyncRadioButtons(formId) {
-  const $ = window.jQuery || window.$;
-  if (!$) {
-    console.warn('jQuery not available for forceSyncRadioButtons');
-    return;
+function storeProcessInstanceId(formId, processInstanceId) {
+  if (typeof Storage !== 'undefined') {
+    sessionStorage.setItem(`operaton_process_${formId}`, processInstanceId);
   }
-
-  const $form = getCachedElement(`#gform_${formId}`);
-  const config = getFormConfigCached(formId);
-
-  if (!config || !config.field_mappings) {
-    return;
-  }
-
-  Object.entries(config.field_mappings).forEach(([dmnVariable, mapping]) => {
-    const fieldId = mapping.field_id;
-    const $hiddenField = $form.find(`#input_${formId}_${fieldId}`);
-
-    if ($hiddenField.length > 0) {
-      const $radioChecked = $(`input[name="${dmnVariable}"]:checked`);
-      if ($radioChecked.length > 0) {
-        const radioValue = $radioChecked.val();
-        const hiddenValue = $hiddenField.val();
-
-        if (radioValue !== hiddenValue) {
-          $hiddenField.val(radioValue);
-          $hiddenField.trigger('change');
-        }
-      }
-    }
-  });
-
-  // Sync any other custom radio buttons
-  $form.find('input[type="radio"]:checked').each(function () {
-    const $radio = $(this);
-    const radioName = $radio.attr('name');
-    const radioValue = $radio.val();
-
-    if (radioName && !radioName.startsWith('input_')) {
-      const correspondingFieldId = findFieldIdForRadioName(formId, radioName);
-      if (correspondingFieldId) {
-        const $hiddenField = $form.find(`#input_${formId}_${correspondingFieldId}`);
-        if ($hiddenField.length > 0 && $hiddenField.val() !== radioValue) {
-          $hiddenField.val(radioValue);
-          $hiddenField.trigger('change');
-        }
-      }
-    }
-  });
+  window[`operaton_process_${formId}`] = processInstanceId;
+  console.log('Stored process instance ID for form', formId + ':', processInstanceId);
 }
 
-/**
- * Find field ID for radio name (cached)
- */
-function findFieldIdForRadioName(formId, radioName) {
-  const config = getFormConfigCached(formId);
-  if (config && config.field_mappings && config.field_mappings[radioName]) {
-    return config.field_mappings[radioName].field_id;
-  }
-  return null;
-}
+// =============================================================================
+// UI FEEDBACK FUNCTIONS
+// =============================================================================
 
-/**
- * Get field value (optimized)
- */
-function getFieldValue($field) {
-  if ($field.length === 0) return null;
-
-  const tagName = $field.prop('tagName').toLowerCase();
-  const fieldType = $field.attr('type');
-
-  if (tagName === 'select') {
-    return $field.val();
-  } else if (fieldType === 'checkbox' || fieldType === 'radio') {
-    return $field.is(':checked') ? $field.val() : null;
-  } else if (
-    tagName === 'textarea' ||
-    fieldType === 'text' ||
-    fieldType === 'email' ||
-    fieldType === 'number' ||
-    fieldType === 'hidden'
-  ) {
-    const val = $field.val();
-    return val && val.trim() !== '' ? val : null;
-  }
-
-  return $field.val();
-}
-
-/**
- * Validate field type
- */
-function validateFieldType(value, expectedType) {
-  switch (expectedType) {
-    case 'Integer':
-      return /^-?\d+$/.test(value);
-    case 'Double':
-      return /^-?\d*\.?\d+$/.test(value);
-    case 'Boolean':
-      return ['true', 'false', '1', '0', 'yes', 'no'].includes(value.toString().toLowerCase());
-    case 'String':
-    default:
-      return true;
-  }
-}
-
-/**
- * OPTIMIZED: Validate form with cached element access
- */
-function validateForm(formId) {
-  const $ = window.jQuery || window.$;
-  if (!$) {
-    console.warn('jQuery not available for validateForm');
-    return true; // Default to valid if jQuery not available
-  }
-
-  if (typeof gform !== 'undefined' && gform.validators && gform.validators[formId]) {
-    return gform.validators[formId]();
-  }
-
-  const $form = getCachedElement(`#gform_${formId}`);
-  let allValid = true;
-
-  $form
-    .find('.gfield_contains_required input, .gfield_contains_required select, .gfield_contains_required textarea')
-    .each(function () {
-      const $field = $(this);
-      const value = getFieldValue($field);
-
-      if (!value || value.trim() === '') {
-        allValid = false;
-        return false;
-      }
-    });
-
-  return allValid;
-}
-
-/**
- * OPTIMIZED: Show success notification with cleanup
- */
 function showSuccessNotification(message) {
   const $ = window.jQuery || window.$;
   if (!$) {
     console.warn('jQuery not available for showSuccessNotification');
-    alert(message); // Fallback to alert
+    alert(message);
     return;
   }
 
@@ -1764,20 +1698,17 @@ function showSuccessNotification(message) {
   }, 6000);
 }
 
-/**
- * OPTIMIZED: Show error with cleanup
- */
 function showError(message) {
   const $ = window.jQuery || window.$;
   if (!$) {
     console.warn('jQuery not available for showError');
-    alert('❌ ' + message); // Fallback to alert
+    alert('Error: ' + message);
     return;
   }
 
   $('.operaton-notification').remove();
 
-  const $notification = $(`<div class="operaton-notification">❌ ${message}</div>`);
+  const $notification = $(`<div class="operaton-notification">Error: ${message}</div>`);
   $notification.css({
     position: 'fixed',
     top: '20px',
@@ -1803,9 +1734,6 @@ function showError(message) {
   }, 8000);
 }
 
-/**
- * OPTIMIZED: Highlight field with performance considerations
- */
 function highlightField($field) {
   const $ = window.jQuery || window.$;
   if (!$ || !$field || $field.length === 0) {
@@ -1838,273 +1766,226 @@ function highlightField($field) {
 }
 
 // =============================================================================
-// OPTIMIZED MAIN INITIALIZATION SEQUENCE
+// EVENT BINDING
 // =============================================================================
 
-/**
- * OPTIMIZED: Main jQuery-based initialization with performance tracking
- */
-(function ($) {
-  'use strict';
-
-  // Enhanced jQuery availability check
-  if (typeof $ === 'undefined') {
-    console.error('❌ Operaton DMN CRITICAL: jQuery not available despite dependency declaration');
-
-    // Try window.jQuery as fallback
-    if (typeof window.jQuery !== 'undefined') {
-      $ = window.jQuery;
-      console.log('✅ Operaton DMN: Using window.jQuery as fallback');
-    } else {
-      console.error('❌ Operaton DMN FATAL: No jQuery available, plugin will not work');
-      return;
-    }
-  } else {
-    console.log('✅ Operaton DMN: jQuery available immediately, version:', $.fn.jquery);
+function bindEvaluationEventsOptimized(formId) {
+  const $ = window.jQuery || window.$;
+  if (!$) {
+    console.warn('jQuery not available for bindEvaluationEventsOptimized');
+    return;
   }
 
-  // Wait for operaton_ajax and initialize with performance tracking
-  waitForOperatonAjax(() => {
-    const initStartTime = performance.now();
-    console.log('🚀 Initializing OPTIMIZED Operaton DMN with debounced initialization...');
+  const selector = `.operaton-evaluate-btn[data-form-id="${formId}"]`;
 
-    // Set global initialization flag
-    window.operatonInitialized.globalInit = true;
-    window.operatonInitialized.jQueryReady = true;
-
-    // Initialize the main system
-    initOperatonDMN();
-
-    // Initial batch form detection
-    setTimeout(() => {
-      batchFormDetection();
-    }, 200);
-
-    const initEndTime = performance.now();
-    window.operatonInitialized.performanceStats.totalProcessingTime += initEndTime - initStartTime;
-
-    console.log(`🎉 OPTIMIZED Operaton DMN initialization complete in ${(initEndTime - initStartTime).toFixed(2)}ms`);
-
-    // Log initial performance stats
-    setTimeout(logPerformanceStats, 1000);
+  $(document).off(`click.operaton-${formId}`, selector);
+  $(document).on(`click.operaton-${formId}`, selector, function (e) {
+    e.preventDefault();
+    console.log('🎯 Button clicked for form:', formId);
+    handleEvaluateClick($(this));
   });
 
-  // Enhanced cleanup on page unload with cache clearing
-  $(window).on('beforeunload', () => {
-    console.log('🧹 Cleaning up OPTIMIZED Operaton DMN initialization state...');
-
-    // Clear form initialization state
-    window.operatonInitialized.forms.clear();
-    window.operatonInitialized.globalInit = false;
-
-    // Clear all pending timers
-    Object.keys(window.operatonInitialized.timers).forEach(formId => {
-      clearTimeout(window.operatonInitialized.timers[formId]);
-    });
-    window.operatonInitialized.timers = {};
-
-    // Clear all promises and timeouts
-    formInitializationTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
-    formInitializationTimeouts.clear();
-    initializationPromises.clear();
-
-    // Clear all caches
-    domQueryCache.clear();
-    formConfigCache.clear();
-    window.operatonButtonManager.clearCache();
-
-    // Final performance log
-    logPerformanceStats();
-  });
-})(jQuery);
-
-// =============================================================================
-// DOCUMENT READY AND INITIALIZATION STRATEGIES
-// =============================================================================
-
-/**
- * OPTIMIZED: Multiple initialization strategies with performance considerations
- */
-
-// Strategy 1: Immediate jQuery check with optimized timing
-if (typeof jQuery !== 'undefined') {
-  console.log('✅ Operaton DMN: jQuery available immediately - OPTIMIZED path');
-  jQuery(document).ready(() => {
-    // Main initialization handled in jQuery wrapper above
-    console.log('📋 Document ready - OPTIMIZED initialization active');
-  });
-} else {
-  console.log('⏳ Operaton DMN: jQuery not immediately available - using OPTIMIZED polling...');
-
-  // Strategy 2: Optimized polling for jQuery with exponential backoff
-  let jqueryCheckAttempts = 0;
-  const maxAttempts = 50;
-
-  function checkForJQuery() {
-    jqueryCheckAttempts++;
-
-    if (typeof jQuery !== 'undefined') {
-      console.log(`✅ Operaton DMN: jQuery found after ${jqueryCheckAttempts} attempts`);
-
-      // Initialize immediately
-      jQuery(document).ready(() => {
-        console.log('📋 Late jQuery initialization - OPTIMIZED path active');
-      });
-    } else if (jqueryCheckAttempts < maxAttempts) {
-      // Exponential backoff for less aggressive polling
-      const delay = Math.min(100 * Math.pow(1.1, jqueryCheckAttempts), 1000);
-      setTimeout(checkForJQuery, delay);
-    } else {
-      console.error(`❌ Operaton DMN: jQuery not found after ${maxAttempts} attempts`);
-    }
-  }
-
-  checkForJQuery();
+  console.log('✅ Event handler bound for form:', formId);
 }
 
-// Strategy 3: Window load fallback with optimization check
+// =============================================================================
+// AJAX SETUP
+// =============================================================================
+
+function waitForOperatonAjax(callback, maxAttempts = 50) {
+  let attempts = 0;
+
+  function check() {
+    attempts++;
+
+    if (typeof window.operaton_ajax !== 'undefined') {
+      console.log('✅ operaton_ajax found after', attempts, 'attempts');
+      callback();
+    } else if (attempts < maxAttempts) {
+      if (attempts % 10 === 0) {
+        console.log('⏳ Still waiting for operaton_ajax... attempt', attempts);
+      }
+      setTimeout(check, 100);
+    } else {
+      console.error('❌ operaton_ajax not found after', maxAttempts, 'attempts');
+      createEmergencyOperatonAjax();
+      callback();
+    }
+  }
+  check();
+}
+
+function createEmergencyOperatonAjax() {
+  if (typeof window.operaton_ajax === 'undefined') {
+    console.log('🆘 Creating emergency operaton_ajax fallback');
+    window.operaton_ajax = {
+      url: '/wp-json/operaton-dmn/v1/evaluate',
+      nonce: 'fallback',
+      debug: true,
+      strings: {
+        evaluating: 'Evaluating...',
+        error: 'Evaluation failed',
+        success: 'Evaluation completed',
+        loading: 'Loading...',
+        no_config: 'Configuration not found',
+        validation_failed: 'Please fill in all required fields',
+        connection_error: 'Connection error. Please try again.',
+      },
+      emergency_mode: true,
+    };
+  }
+}
+
+// =============================================================================
+// MAIN INITIALIZATION (SINGLE VERSION)
+// =============================================================================
+
+function waitForJQuery(callback, maxAttempts = 50) {
+  let attempts = 0;
+
+  function check() {
+    attempts++;
+
+    if (typeof jQuery !== 'undefined') {
+      console.log(`✅ jQuery found after ${attempts} attempts`);
+      callback();
+    } else if (attempts < maxAttempts) {
+      if (attempts % 10 === 0) {
+        console.log(`⏳ Still waiting for jQuery... attempt ${attempts}`);
+      }
+      const delay = Math.min(100 * Math.pow(1.1, attempts), 1000);
+      setTimeout(check, delay);
+    } else {
+      console.error(`❌ jQuery not found after ${maxAttempts} attempts`);
+    }
+  }
+  check();
+}
+
+// SINGLE MAIN INITIALIZATION - NO DUPLICATES
+(function () {
+  'use strict';
+
+  // Ensure we only run once per page load
+  if (window.operatonMainInitCalled) {
+    console.log('Main initialization already called, skipping');
+    return;
+  }
+  window.operatonMainInitCalled = true;
+
+  function performInitialization($) {
+    console.log('✅ jQuery available, version:', $.fn.jquery);
+
+    // Wait for operaton_ajax and initialize
+    waitForOperatonAjax(() => {
+      const initStartTime = performance.now();
+      console.log('🚀 Initializing Operaton DMN...');
+
+      window.operatonInitialized.jQueryReady = true;
+      initOperatonDMN();
+
+      // Secondary detection for late-loading forms
+      setTimeout(() => {
+        if (!window.operatonInitialized.initInProgress) {
+          simplifiedFormDetection();
+        }
+      }, 1000);
+
+      const initEndTime = performance.now();
+      window.operatonInitialized.performanceStats.totalProcessingTime += initEndTime - initStartTime;
+
+      console.log(`🎉 Operaton DMN initialization complete in ${(initEndTime - initStartTime).toFixed(2)}ms`);
+    });
+
+    // Cleanup on page unload
+    $(window).on('beforeunload', () => {
+      console.log('🧹 Cleaning up Operaton DMN...');
+      window.operatonInitialized.forms.clear();
+      window.operatonInitialized.globalInit = false;
+      window.operatonInitialized.initInProgress = false;
+      domQueryCache.clear();
+      formConfigCache.clear();
+      if (window.operatonButtonManager) {
+        window.operatonButtonManager.clearCache();
+      }
+    });
+
+    $(document).ready(() => {
+      console.log('📋 Document ready - initialization active');
+    });
+  }
+
+  // Initialize based on jQuery availability
+  if (typeof jQuery !== 'undefined') {
+    console.log('✅ jQuery available immediately');
+    performInitialization(jQuery);
+  } else {
+    console.log('⏳ jQuery not immediately available - waiting...');
+    waitForJQuery(() => {
+      performInitialization(jQuery);
+    });
+  }
+})();
+
+// =============================================================================
+// ADDITIONAL EVENT LISTENERS
+// =============================================================================
+
 window.addEventListener('load', () => {
   setTimeout(() => {
     if (!window.operatonInitialized.globalInit) {
-      console.log('🔄 Window load: Attempting OPTIMIZED late initialization...');
-
+      console.log('Window load: Attempting late initialization...');
       if (typeof jQuery !== 'undefined') {
-        console.log('jQuery available on window load - initializing');
-        // Trigger batch detection if not already done
-        batchFormDetection();
+        simplifiedFormDetection();
       } else {
-        console.warn('⚠️ Window load: jQuery still not available');
+        console.warn('Window load: jQuery still not available');
       }
     } else {
-      // If already initialized, just do a health check
-      console.log('✅ Window load: Initialization already complete, running health check');
-      logPerformanceStats();
+      console.log('Window load: Initialization already complete');
     }
   }, 1000);
 });
 
-// Strategy 4: DOM Content Loaded for early initialization
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('📄 DOM Content Loaded - checking OPTIMIZED initialization state');
-
-  // Early form detection if jQuery is available
+  console.log('DOM Content Loaded - checking initialization state');
   if (typeof jQuery !== 'undefined' && !window.operatonInitialized.globalInit) {
-    console.log('🚀 Early DOM initialization trigger');
-    setTimeout(smartFormDetection, 100);
+    console.log('Early DOM initialization trigger');
+    setTimeout(simplifiedFormDetection, 100);
   }
 });
 
 // =============================================================================
-// GLOBAL DEBUGGING AND UTILITY FUNCTIONS
+// GLOBAL DEBUGGING FUNCTIONS
 // =============================================================================
 
-/**
- * OPTIMIZED: Global debugging function with performance insights
- */
 if (typeof window !== 'undefined') {
-  window.operatonDebugOptimized = function () {
+  window.operatonDebugFixed = function () {
     const stats = window.operatonInitialized.performanceStats;
-    const cacheStats = {
-      domCache: domQueryCache.size,
-      configCache: formConfigCache.size,
-      buttonCache: window.operatonButtonManager.buttonCache.size,
-      initPromises: initializationPromises.size,
-      timeouts: formInitializationTimeouts.size,
-    };
 
-    console.log('🔍 OPTIMIZED Operaton DMN Debug Info:', {
+    console.log('Debug Info:', {
       initializationState: window.operatonInitialized,
       performanceStats: stats,
-      cacheStats: cacheStats,
-      efficiency: `${((stats.duplicatePrevented / Math.max(stats.initializationAttempts, 1)) * 100).toFixed(1)}%`,
-      memoryOptimization: 'Active',
-      cachingStrategy: 'Multi-level with TTL',
-      initializationStrategy: 'Debounced with promise-based deduplication',
+      cacheStats: {
+        domCache: domQueryCache.size,
+        configCache: formConfigCache.size,
+        buttonCache: window.operatonButtonManager.buttonCache.size,
+      },
+      status: 'fixed - single initialization, smart clearing',
     });
 
     return {
-      status: 'optimized',
+      status: 'fixed',
       initialized: window.operatonInitialized.globalInit,
       performance: stats,
-      caches: cacheStats,
     };
   };
 
-  /**
-   * OPTIMIZED: Force cleanup function for debugging
-   */
-  window.operatonForceCleanup = function () {
-    console.log('🧹 FORCE CLEANUP: Clearing all caches and state');
+  window.operatonForceCleanup = resetFormSystem;
 
-    // Clear all caches
-    domQueryCache.clear();
-    formConfigCache.clear();
-    window.operatonButtonManager.clearCache();
-
-    // Clear initialization state
-    window.operatonInitialized.forms.clear();
-    formInitializationTimeouts.forEach(id => clearTimeout(id));
-    formInitializationTimeouts.clear();
-    initializationPromises.clear();
-
-    // Reset performance stats
-    window.operatonInitialized.performanceStats = {
-      initializationAttempts: 0,
-      successfulInits: 0,
-      duplicatePrevented: 0,
-      totalProcessingTime: 0,
-      cacheHits: 0,
-    };
-
-    console.log('✅ FORCE CLEANUP: Complete');
-  };
-
-  /**
-   * OPTIMIZED: Manual re-initialization function
-   */
   window.operatonReinitialize = function () {
-    console.log('🔄 MANUAL REINIT: Starting optimized re-initialization');
-
-    window.operatonForceCleanup();
-
-    setTimeout(() => {
-      if (typeof jQuery !== 'undefined') {
-        smartFormDetection();
-        console.log('✅ MANUAL REINIT: Complete');
-      } else {
-        console.error('❌ MANUAL REINIT: jQuery not available');
-      }
-    }, 100);
+    console.log('MANUAL REINIT: Starting re-initialization');
+    resetFormSystem();
   };
 }
 
-// =============================================================================
-// PERFORMANCE MONITORING AND OPTIMIZATION
-// =============================================================================
-
-/**
- * OPTIMIZED: Periodic performance monitoring (development only)
- */
-if (window.operaton_ajax && window.operaton_ajax.debug) {
-  setInterval(() => {
-    const stats = window.operatonInitialized.performanceStats;
-
-    // Log performance issues if detected
-    if (stats.initializationAttempts > 20) {
-      console.warn('⚠️ HIGH INITIALIZATION ATTEMPTS:', stats.initializationAttempts);
-    }
-
-    if (domQueryCache.size > 100) {
-      console.warn('⚠️ LARGE DOM CACHE:', domQueryCache.size, 'entries');
-      cleanupCaches();
-    }
-
-    if (stats.totalProcessingTime > 5000) {
-      console.warn('⚠️ HIGH PROCESSING TIME:', stats.totalProcessingTime.toFixed(2), 'ms');
-    }
-  }, 30000); // Check every 30 seconds
-}
-
-console.log(
-  '🎉 OPTIMIZED Operaton DMN frontend script loaded with debounced initialization and performance monitoring'
-);
+console.log('Operaton DMN frontend script loaded - FIXED VERSION');

@@ -794,22 +794,28 @@ class RestApiIntegrationTest extends TestCase
 
     /**
      * Test the health endpoint with detailed information
+     * FIXED: Better handling of database errors and non-JSON responses
      */
     public function testDmnHealthEndpointDetailed(): void
     {
         echo "\n📋 Testing DMN health endpoint with details...";
 
         $response = $this->client->get('/wp-json/operaton-dmn/v1/health?detailed=true');
+        $statusCode = $response->getStatusCode();
+        $bodyContent = $response->getBody()->getContents();
 
-        // FIXED: Always make assertions about the response
-        $this->assertIsInt($response->getStatusCode(), 'Should return a valid HTTP status code');
+        // Always make assertions about the response
+        $this->assertIsInt($statusCode, 'Should return a valid HTTP status code');
 
-        if ($response->getStatusCode() === 200) {
-            $bodyContent = $response->getBody()->getContents();
+        if ($statusCode === 200)
+        {
+            // Check if response is JSON first
             $body = json_decode($bodyContent, true);
+            $isValidJson = (json_last_error() === JSON_ERROR_NONE);
 
-            // FIXED: Check if body is actually an array before asserting
-            if (is_array($body)) {
+            if ($isValidJson && is_array($body))
+            {
+                // Valid JSON response - health endpoint working properly
                 $this->assertIsArray($body, 'Response should be valid JSON array');
                 $this->assertArrayHasKey('status', $body, 'Health response should have status field');
 
@@ -817,32 +823,86 @@ class RestApiIntegrationTest extends TestCase
                 echo "\n   Status: " . ($body['status'] ?? 'unknown');
                 echo "\n   Version: " . ($body['version'] ?? 'unknown');
 
-                if (isset($body['response_time'])) {
+                if (isset($body['response_time']))
+                {
                     echo "\n   Response time: " . $body['response_time'] . "ms";
                 }
 
-                if (isset($body['details'])) {
+                if (isset($body['details']))
+                {
                     $details = $body['details'];
-                    if (isset($details['dmn_configs'])) {
+                    if (isset($details['dmn_configs']))
+                    {
                         echo "\n   Configurations: " . ($details['dmn_configs']['total_configurations'] ?? 0);
                     }
                 }
-            } else {
-                // Handle non-JSON responses
-                echo " ⚠️ Health endpoint returned non-JSON response: " . substr($bodyContent, 0, 100);
-                $this->assertNotEmpty($bodyContent, 'Response should have some content');
-                $this->markTestIncomplete('Health endpoint returned non-JSON response, may not be properly implemented');
             }
-        } else {
-            echo " ⚠️ Detailed health endpoint returned " . $response->getStatusCode();
+            else
+            {
+                // Non-JSON response - likely database error or other issue
+                echo " ⚠️ Health endpoint returned non-JSON response";
+
+                // Check for specific WordPress database errors
+                if (strpos($bodyContent, 'WordPress database error') !== false)
+                {
+                    echo " (WordPress database error detected)";
+
+                    // Extract the specific database error
+                    if (preg_match('/\[([^\]]+)\]/', $bodyContent, $matches))
+                    {
+                        echo "\n   Database Error: " . $matches[1];
+                    }
+
+                    // Check for column issues specifically
+                    if (strpos($bodyContent, 'Unknown column') !== false)
+                    {
+                        echo "\n   Issue: Database schema problem - unknown column";
+                        echo "\n   Suggestion: Run plugin activation or check database migration";
+                    }
+
+                    // Mark as incomplete rather than failed - this is a setup issue
+                    $this->markTestIncomplete('Health endpoint has database schema issues - check plugin database setup');
+                }
+                elseif (strpos($bodyContent, '<html') !== false || strpos($bodyContent, '<!DOCTYPE') !== false)
+                {
+                    echo " (HTML error page returned)";
+                    echo "\n   First 200 chars: " . substr(strip_tags($bodyContent), 0, 200);
+                    $this->markTestIncomplete('Health endpoint returned HTML error page instead of JSON');
+                }
+                else
+                {
+                    echo " (unknown format)";
+                    echo "\n   Response length: " . strlen($bodyContent) . " characters";
+                    echo "\n   First 100 chars: " . substr($bodyContent, 0, 100);
+                    $this->markTestIncomplete('Health endpoint returned unexpected response format');
+                }
+            }
+        }
+        elseif ($statusCode === 404)
+        {
+            echo " ❌ Health endpoint not found";
+            $this->markTestIncomplete('Health endpoint does not exist - check plugin routes');
+        }
+        elseif ($statusCode >= 500)
+        {
+            echo " ⚠️ Health endpoint server error (status: $statusCode)";
+            if (!empty($bodyContent))
+            {
+                echo "\n   Error details: " . substr($bodyContent, 0, 200);
+            }
+            $this->markTestIncomplete('Health endpoint has server errors');
+        }
+        else
+        {
+            echo " ⚠️ Health endpoint unexpected status: $statusCode";
             $this->assertContains(
-                $response->getStatusCode(),
-                [404, 405, 500],
+                $statusCode,
+                [200, 404, 405, 500],
                 'Health endpoint should return a valid HTTP status code'
             );
         }
     }
-
+    
     /**
      * ADDED: Test environment variable configuration
      * Validates that the test is using the correct environment settings

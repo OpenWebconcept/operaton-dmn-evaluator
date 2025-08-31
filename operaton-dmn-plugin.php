@@ -4,7 +4,7 @@
  * Plugin Name: Operaton DMN Evaluator
  * Plugin URI: https://git.open-regels.nl/showcases/operaton-dmn-evaluator
  * Description: WordPress plugin to integrate Gravity Forms with Operaton for dynamic form evaluations.
- * Version: 1.0.0-beta.14
+ * Version: 1.0.0-beta.15
  * Author: Steven Gort
  * Author URI: https://git.open-regels.nl/showcases/operaton-dmn-evaluator
  * License: EU PL v1.2
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('OPERATON_DMN_VERSION', '1.0.0-beta.14');
+define('OPERATON_DMN_VERSION', '1.0.0-beta.15');
 define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('OPERATON_DMN_PLUGIN_PATH', plugin_dir_path(__FILE__));
 
@@ -894,30 +894,26 @@ class OperatonDMNEvaluator
  */
 function operaton_dmn_handle_cache_clear_url()
 {
-    if (!current_user_can('manage_options'))
-    {
+    if (!current_user_can('manage_options')) {
         return;
     }
 
     // Comprehensive cache clear (new functionality)
-    if (isset($_GET['operaton_clear_all_cache']))
-    {
+    if (isset($_GET['operaton_clear_all_cache'])) {
         global $wpdb;
 
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_operaton_%'");
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_operaton_%'");
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%operaton_config_%'");
 
-        if (function_exists('wp_cache_flush'))
-        {
+        if (function_exists('wp_cache_flush')) {
             wp_cache_flush();
         }
 
         // Force database manager to reload
         $plugin_instance = OperatonDMNEvaluator::get_instance();
         $database = $plugin_instance->get_database_instance();
-        if ($database && method_exists($database, 'force_reload_all_configurations'))
-        {
+        if ($database && method_exists($database, 'force_reload_all_configurations')) {
             $database->force_reload_all_configurations();
         }
 

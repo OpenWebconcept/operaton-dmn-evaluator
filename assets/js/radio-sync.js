@@ -42,6 +42,9 @@
      * Initialize radio button synchronization
      */
     init: function () {
+      // At start of radio sync operations
+      window.operatonRadioSyncInProgress = true;
+
       if (this.initialized) {
         console.log('🔄 Radio Sync: Already initialized');
         return;
@@ -58,6 +61,11 @@
 
         console.log('✅ Simplified radio button synchronization initialized');
       });
+
+      // At end of radio sync operations
+      setTimeout(() => {
+        window.operatonRadioSyncInProgress = false;
+      }, 1000);
     },
 
     /**

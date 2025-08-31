@@ -14,8 +14,7 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH'))
-{
+if (!defined('ABSPATH')) {
     exit;
 }
 
@@ -49,14 +48,12 @@ class Operaton_DMN_Assets
         $this->version = $version;
 
         // Initialize cache timestamp properly
-        if (self::$cache_timestamp === null)
-        {
+        if (self::$cache_timestamp === null) {
             self::$cache_timestamp = time();
         }
 
         // Get performance monitor if available
-        if (class_exists('Operaton_DMN_Performance_Monitor'))
-        {
+        if (class_exists('Operaton_DMN_Performance_Monitor')) {
             $this->performance = Operaton_DMN_Performance_Monitor::get_instance();
         }
 
@@ -83,8 +80,7 @@ class Operaton_DMN_Assets
         add_action('wp_head', array($this, 'output_compatibility_check'), 1);
 
         // Performance logging
-        if ($this->performance)
-        {
+        if ($this->performance) {
             add_action('shutdown', array($this, 'log_performance'), 999);
         }
     }
@@ -111,14 +107,12 @@ class Operaton_DMN_Assets
     {
         global $post;
 
-        if (!$post)
-        {
+        if (!$post) {
             return false;
         }
 
         // Cache by post ID
-        if (isset(self::$detection_cache['content_' . $post->ID]))
-        {
+        if (isset(self::$detection_cache['content_' . $post->ID])) {
             return self::$detection_cache['content_' . $post->ID];
         }
 
@@ -149,8 +143,7 @@ class Operaton_DMN_Assets
      */
     public function maybe_enqueue_frontend_assets()
     {
-        if (is_admin() || !self::should_load_frontend_assets())
-        {
+        if (is_admin() || !self::should_load_frontend_assets()) {
             return;
         }
 
@@ -163,8 +156,7 @@ class Operaton_DMN_Assets
     public function enqueue_frontend_assets()
     {
         // Trust WordPress - if already enqueued, it won't duplicate
-        if (wp_script_is('operaton-dmn-frontend', 'done'))
-        {
+        if (wp_script_is('operaton-dmn-frontend', 'done')) {
             return;
         }
 
@@ -190,8 +182,7 @@ class Operaton_DMN_Assets
         );
 
         // Register and enqueue decision flow if needed
-        if ($this->should_load_decision_flow_assets())
-        {
+        if ($this->should_load_decision_flow_assets()) {
             wp_enqueue_script(
                 'operaton-dmn-decision-flow',
                 $this->plugin_url . 'assets/js/decision-flow.js',
@@ -212,8 +203,7 @@ class Operaton_DMN_Assets
         // Localize script once
         $this->localize_frontend_script();
 
-        if ($timer_id)
-        {
+        if ($timer_id) {
             $this->performance->stop_timer($timer_id, 'Frontend assets loaded');
         }
 
@@ -226,8 +216,7 @@ class Operaton_DMN_Assets
     private function localize_frontend_script()
     {
         // Check if already localized
-        if (wp_scripts()->get_data('operaton-dmn-frontend', 'data'))
-        {
+        if (wp_scripts()->get_data('operaton-dmn-frontend', 'data')) {
             return;
         }
 
@@ -262,8 +251,7 @@ class Operaton_DMN_Assets
         $handle = 'operaton_config_form_' . $form_id;
 
         // Check if this form's config is already localized
-        if (wp_scripts()->get_data('operaton-dmn-gravity-integration', $handle))
-        {
+        if (wp_scripts()->get_data('operaton-dmn-gravity-integration', $handle)) {
             return;
         }
 
@@ -274,8 +262,7 @@ class Operaton_DMN_Assets
         $this->localize_form_config($form_id, $fresh_config, $handle);
 
         // Enqueue radio sync if needed
-        if ($this->form_needs_radio_sync($form_id))
-        {
+        if ($this->form_needs_radio_sync($form_id)) {
             $this->enqueue_radio_sync_assets($form_id);
         }
 
@@ -287,14 +274,12 @@ class Operaton_DMN_Assets
      */
     private function get_fresh_form_config($form_id, $fallback_config)
     {
-        if (!$this->gravity_forms_manager)
-        {
+        if (!$this->gravity_forms_manager) {
             return $fallback_config;
         }
 
         $database = $this->gravity_forms_manager->get_database_instance();
-        if (!$database)
-        {
+        if (!$database) {
             return $fallback_config;
         }
 
@@ -334,8 +319,7 @@ class Operaton_DMN_Assets
      */
     private function safe_json_decode($json_string, $default = array())
     {
-        if (empty($json_string))
-        {
+        if (empty($json_string)) {
             return $default;
         }
 
@@ -352,8 +336,7 @@ class Operaton_DMN_Assets
      */
     public function maybe_enqueue_admin_assets($hook)
     {
-        if (strpos($hook, 'operaton-dmn') === false)
-        {
+        if (strpos($hook, 'operaton-dmn') === false) {
             return;
         }
 
@@ -405,14 +388,12 @@ class Operaton_DMN_Assets
     {
         global $post;
 
-        if (!$post || !$this->gravity_forms_manager)
-        {
+        if (!$post || !$this->gravity_forms_manager) {
             return false;
         }
 
         // Only load if we're loading frontend assets
-        if (!self::should_load_frontend_assets())
-        {
+        if (!self::should_load_frontend_assets()) {
             return false;
         }
 
@@ -420,15 +401,13 @@ class Operaton_DMN_Assets
         $form_ids = $this->get_page_form_ids($post);
 
         // Check if any forms have decision flow enabled
-        foreach ($form_ids as $form_id)
-        {
+        foreach ($form_ids as $form_id) {
             $config = $this->gravity_forms_manager->get_form_configuration($form_id);
             if (
                 $config &&
                 isset($config->show_decision_flow) && $config->show_decision_flow &&
                 isset($config->use_process) && $config->use_process
-            )
-            {
+            ) {
                 return true;
             }
         }
@@ -444,18 +423,15 @@ class Operaton_DMN_Assets
         $form_ids = array();
 
         // Extract from shortcodes
-        if (has_shortcode($post->post_content, 'gravityform'))
-        {
+        if (has_shortcode($post->post_content, 'gravityform')) {
             preg_match_all('/\[gravityform[^\]]*id=["\'](\d+)["\']/', $post->post_content, $matches);
-            if (!empty($matches[1]))
-            {
+            if (!empty($matches[1])) {
                 $form_ids = array_merge($form_ids, array_map('intval', $matches[1]));
             }
         }
 
         // Extract from blocks
-        if (has_block('gravityforms/form', $post))
-        {
+        if (has_block('gravityforms/form', $post)) {
             $blocks = parse_blocks($post->post_content);
             $form_ids = array_merge($form_ids, $this->extract_form_ids_from_blocks($blocks));
         }
@@ -470,15 +446,12 @@ class Operaton_DMN_Assets
     {
         $form_ids = array();
 
-        foreach ($blocks as $block)
-        {
-            if ($block['blockName'] === 'gravityforms/form' && isset($block['attrs']['formId']))
-            {
+        foreach ($blocks as $block) {
+            if ($block['blockName'] === 'gravityforms/form' && isset($block['attrs']['formId'])) {
                 $form_ids[] = intval($block['attrs']['formId']);
             }
 
-            if (!empty($block['innerBlocks']))
-            {
+            if (!empty($block['innerBlocks'])) {
                 $inner_ids = $this->extract_form_ids_from_blocks($block['innerBlocks']);
                 $form_ids = array_merge($form_ids, $inner_ids);
             }
@@ -496,8 +469,7 @@ class Operaton_DMN_Assets
      */
     public function enqueue_radio_sync_assets($form_id)
     {
-        if (!$this->form_needs_radio_sync($form_id))
-        {
+        if (!$this->form_needs_radio_sync($form_id)) {
             return;
         }
 
@@ -531,34 +503,26 @@ class Operaton_DMN_Assets
     private function form_needs_radio_sync($form_id)
     {
         // Form 8 specifically needs radio sync
-        if ($form_id == 8)
-        {
+        if ($form_id == 8) {
             return true;
         }
 
         // Check if form has HTML fields with radio buttons
-        if ($this->gravity_forms_manager && class_exists('GFAPI'))
-        {
-            try
-            {
+        if ($this->gravity_forms_manager && class_exists('GFAPI')) {
+            try {
                 $form = GFAPI::get_form($form_id);
-                if ($form && isset($form['fields']))
-                {
-                    foreach ($form['fields'] as $field)
-                    {
+                if ($form && isset($form['fields'])) {
+                    foreach ($form['fields'] as $field) {
                         if (
                             $field->type === 'html' &&
                             strpos($field->content, 'type="radio"') !== false &&
                             strpos($field->content, 'aanvrager') !== false
-                        )
-                        {
+                        ) {
                             return true;
                         }
                     }
                 }
-            }
-            catch (Exception $e)
-            {
+            } catch (Exception $e) {
                 $this->log_debug('Error checking form for radio sync: ' . $e->getMessage());
             }
         }
@@ -571,8 +535,7 @@ class Operaton_DMN_Assets
      */
     private function get_radio_sync_mappings($form_id)
     {
-        if ($form_id == 8)
-        {
+        if ($form_id == 8) {
             return array(
                 'aanvragerDitKalenderjaarAlAangevraagd' => 'input_8_25',
                 'aanvragerAanmerkingStudieFinanciering' => 'input_8_26',
@@ -596,12 +559,11 @@ class Operaton_DMN_Assets
      */
     public function output_compatibility_check()
     {
-        if (is_admin() || !self::should_load_frontend_assets())
-        {
+        if (is_admin() || !self::should_load_frontend_assets()) {
             return;
         }
 
-?>
+        ?>
         <script type="text/javascript">
             (function() {
                 window.operatonCompatibilityInfo = {
@@ -612,12 +574,12 @@ class Operaton_DMN_Assets
                     timestamp: Date.now()
                 };
 
-                <?php if (defined('WP_DEBUG') && WP_DEBUG): ?>
+                <?php if (defined('WP_DEBUG') && WP_DEBUG) : ?>
                     console.log('Operaton DMN Compatibility:', window.operatonCompatibilityInfo);
                 <?php endif; ?>
             })();
         </script>
-<?php
+        <?php
     }
 
     /**
@@ -627,28 +589,23 @@ class Operaton_DMN_Assets
     {
         $css = '';
 
-        if (!empty($styles['theme']))
-        {
+        if (!empty($styles['theme'])) {
             $css .= ':root {';
-            foreach ($styles['theme'] as $property => $value)
-            {
+            foreach ($styles['theme'] as $property => $value) {
                 $css .= '--operaton-' . esc_attr($property) . ': ' . esc_attr($value) . ';';
             }
             $css .= '}';
         }
 
-        if ($form_id && !empty($styles['form']))
-        {
+        if ($form_id && !empty($styles['form'])) {
             $css .= "#operaton-evaluate-{$form_id} {";
-            foreach ($styles['form'] as $property => $value)
-            {
+            foreach ($styles['form'] as $property => $value) {
                 $css .= esc_attr($property) . ': ' . esc_attr($value) . ' !important;';
             }
             $css .= '}';
         }
 
-        if (!empty($css))
-        {
+        if (!empty($css)) {
             $handle = is_admin() ? 'operaton-dmn-admin' : 'operaton-dmn-frontend';
             wp_add_inline_style($handle, $css);
         }
@@ -663,12 +620,9 @@ class Operaton_DMN_Assets
      */
     public function clear_form_cache($form_id = null)
     {
-        if ($form_id)
-        {
+        if ($form_id) {
             unset(self::$detection_cache['content_' . $form_id]);
-        }
-        else
-        {
+        } else {
             self::$detection_cache = array();
             self::$detection_complete = false;
             self::$cache_timestamp = time();
@@ -715,8 +669,7 @@ class Operaton_DMN_Assets
      */
     public function force_enqueue($asset_group)
     {
-        switch ($asset_group)
-        {
+        switch ($asset_group) {
             case 'frontend':
                 $this->enqueue_frontend_assets();
                 break;
@@ -742,8 +695,7 @@ class Operaton_DMN_Assets
      */
     public function log_performance()
     {
-        if (!defined('WP_DEBUG') || !WP_DEBUG)
-        {
+        if (!defined('WP_DEBUG') || !WP_DEBUG) {
             return;
         }
 
@@ -762,8 +714,7 @@ class Operaton_DMN_Assets
      */
     private function log_debug($message)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Assets: ' . $message);
         }
     }
@@ -782,49 +733,40 @@ class Operaton_DMN_Assets
             self::$detection_complete &&
             self::$cache_timestamp &&
             (time() - self::$cache_timestamp) < 300
-        )
-        {
+        ) {
             return self::$detection_cache['should_load'] ?? false;
         }
 
         $should_load = false;
 
         // Method 1: Gravity Forms class exists (most reliable)
-        if (class_exists('GFForms'))
-        {
+        if (class_exists('GFForms')) {
             $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Operaton DMN Assets: Detection: GFForms class available');
             }
         }
 
         // Method 2: Admin GF pages
-        elseif (is_admin() && self::is_gravity_forms_admin_page_static())
-        {
+        elseif (is_admin() && self::is_gravity_forms_admin_page_static()) {
             $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Operaton DMN Assets: Detection: GF admin page');
             }
         }
 
         // Method 3: Content analysis (frontend only)
-        elseif (!is_admin() && self::has_gravity_forms_in_content_static())
-        {
+        elseif (!is_admin() && self::has_gravity_forms_in_content_static()) {
             $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Operaton DMN Assets: Detection: GF content found');
             }
         }
 
         // Method 4: URL indicators
-        elseif (self::has_gravity_forms_url_indicators_static())
-        {
+        elseif (self::has_gravity_forms_url_indicators_static()) {
             $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Operaton DMN Assets: Detection: GF URL indicators');
             }
         }
@@ -834,8 +776,7 @@ class Operaton_DMN_Assets
         self::$detection_complete = true;
         self::$cache_timestamp = time();
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN Assets: Detection complete: ' . ($should_load ? 'LOAD' : 'SKIP'));
         }
 
@@ -855,14 +796,12 @@ class Operaton_DMN_Assets
     {
         global $post;
 
-        if (!$post)
-        {
+        if (!$post) {
             return false;
         }
 
         // Cache by post ID
-        if (isset(self::$detection_cache['content_' . $post->ID]))
-        {
+        if (isset(self::$detection_cache['content_' . $post->ID])) {
             return self::$detection_cache['content_' . $post->ID];
         }
 
@@ -884,8 +823,7 @@ class Operaton_DMN_Assets
     public static function get_coordinator_status()
     {
         static $temp_instance = null;
-        if ($temp_instance === null)
-        {
+        if ($temp_instance === null) {
             $temp_instance = new self('', '1.0.0');
         }
         return $temp_instance->get_status();

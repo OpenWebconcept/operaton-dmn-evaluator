@@ -1,23 +1,41 @@
 /**
- * Fixed K6 Load Testing Script for Operaton DMN Evaluator
- * Replace your existing tests/load/dmn-load-test.js with this version
+ * K6 Load Testing Script for Operaton DMN Evaluator
+ * FIXED: Now properly uses environment variables from .env.testing
  *
- * Usage: k6 run tests/load/dmn-load-test.js
+ * Save as: tests/load/dmn-load-test.js
+ *
+ * Usage:
+ *   k6 run tests/load/dmn-load-test.js
+ *   npm run test:load:smoke
+ *   npm run test:load:stress
  */
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { Rate, Trend, Counter } from 'k6/metrics';
+import { Rate, Trend } from 'k6/metrics';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 
-// Custom metrics for DMN-specific testing
-export const dmnEvaluationRate = new Rate('dmn_evaluation_success_rate');
-export const dmnResponseTime = new Trend('dmn_response_time');
-export const dmnErrors = new Counter('dmn_errors');
+// FIXED: Get environment variables from K6 environment
+// These are passed via npm scripts or command line
+const testUrl = __ENV.DMN_TEST_URL || 'https://owc-gemeente.test.open-regels.nl';
+const engineUrl = __ENV.DMN_ENGINE_URL || 'http://localhost:8080';
+const apiKey = __ENV.DMN_API_KEY || '';
 
-// Test configuration - adjusted for initial implementation
-export const options = {
+console.log(`🚀 Starting DMN Load Testing`);
+console.log(`Base URL: ${testUrl}`);
+console.log(`DMN Engine URL: ${engineUrl}`); // This should now show
+console.log(`API Key: ${apiKey ? 'configured' : 'Not configured'}`);
+
+// Custom metrics
+const dmnEvaluationRate = new Rate('dmn_evaluation_success');
+const dmnEvaluationDuration = new Trend('dmn_evaluation_duration');
+const wordpressApiRate = new Rate('wordpress_api_success');
+const dmnEngineRate = new Rate('dmn_engine_success');
+
+// Test configuration
+export let options = {
   scenarios: {
-    // Start with a simple smoke test
+    // Smoke test - basic functionality
     smoke_test: {
       executor: 'constant-vus',
       vus: 1,
@@ -25,246 +43,220 @@ export const options = {
       tags: { test_type: 'smoke' },
     },
 
-    // Basic load test - conservative for first implementation
-    basic_load_test: {
+    // DMN evaluation load test
+    dmn_evaluation_load: {
       executor: 'ramping-vus',
-      startVUs: 0,
       stages: [
-        { duration: '1m', target: 3 }, // Ramp up slowly
-        { duration: '2m', target: 3 }, // Stay at 3 users
-        { duration: '1m', target: 0 }, // Ramp down
+        { duration: '1m', target: 1 }, // Warm up
+        { duration: '2m', target: 3 }, // Normal load
+        { duration: '1m', target: 0 }, // Cool down
       ],
       tags: { test_type: 'load' },
     },
+
+    // Stress test - higher load
+    stress_test: {
+      executor: 'ramping-vus',
+      stages: [
+        { duration: '30s', target: 2 },
+        { duration: '1m', target: 5 },
+        { duration: '30s', target: 8 },
+        { duration: '1m', target: 5 },
+        { duration: '30s', target: 0 },
+      ],
+      tags: { test_type: 'stress' },
+      startTime: '5m', // Start after other scenarios
+    },
   },
 
-  // Conservative thresholds for initial testing
   thresholds: {
-    http_req_duration: ['p(95)<2000'], // 95% of requests under 2 seconds
-    http_req_failed: ['rate<0.05'], // Error rate under 5%
-    dmn_evaluation_success_rate: ['rate>0.8'], // 80% success rate
-    dmn_response_time: ['p(90)<1500'], // 90% under 1.5 seconds
+    // HTTP request duration should be less than 500ms for 95% of requests
+    http_req_duration: ['p(95)<500'],
+
+    // HTTP request failure rate should be less than 5%
+    http_req_failed: ['rate<0.05'],
+
+    // DMN evaluation success rate should be at least 90%
+    dmn_evaluation_success: ['rate>0.9'],
+
+    // WordPress API success rate should be at least 95%
+    wordpress_api_success: ['rate>0.95'],
+
+    // DMN Engine success rate should be at least 90%
+    dmn_engine_success: ['rate>0.9'],
   },
 };
 
-// Configuration
-const BASE_URL = __ENV.BASE_URL || 'https://owc-gemeente.test.open-regels.nl';
-const API_KEY = __ENV.DMN_API_KEY || '';
+// Test data for DMN evaluations
+const dmnTestCases = [
+  {
+    name: 'Summer 8 guests',
+    season: 'Summer',
+    guestCount: 8,
+    expected: 'light salad',
+  },
+  {
+    name: 'Winter 4 guests',
+    season: 'Winter',
+    guestCount: 4,
+    expected: 'roastbeef',
+  },
+  {
+    name: 'Fall 6 guests',
+    season: 'Fall',
+    guestCount: 6,
+    expected: 'spareribs',
+  },
+  {
+    name: 'Spring 3 guests',
+    season: 'Spring',
+    guestCount: 3,
+    expected: 'gourmet steak',
+  },
+  {
+    name: 'Winter 12 guests',
+    season: 'Winter',
+    guestCount: 12,
+    expected: 'stew',
+  },
+  {
+    name: 'Spring 7 guests',
+    season: 'Spring',
+    guestCount: 7,
+    expected: 'steak',
+  },
+];
 
-// Test data generators
-function generateTestData() {
-  const scenarios = [
-    // Simple credit approval scenarios
-    {
-      config_id: 1,
-      form_data: {
-        age: 25 + Math.floor(Math.random() * 40),
-        income: 30000 + Math.floor(Math.random() * 50000),
-        credit_score: ['poor', 'fair', 'good', 'excellent'][Math.floor(Math.random() * 4)],
-        scenario: 'credit_approval',
-      },
-    },
+export default function () {
+  const testCase = dmnTestCases[Math.floor(Math.random() * dmnTestCases.length)];
 
-    // Municipality benefits scenarios
-    {
-      config_id: 2,
-      form_data: {
-        geboortedatumAanvrager: `19${50 + Math.floor(Math.random() * 50)}-01-01`,
-        maandelijksBrutoInkomenAanvrager: 1000 + Math.floor(Math.random() * 3000),
-        scenario: 'municipality_benefits',
-      },
-    },
-  ];
+  // Test WordPress API health
+  testWordPressApi();
 
-  return scenarios[Math.floor(Math.random() * scenarios.length)];
+  // Test DMN Plugin endpoint
+  testDmnPluginEndpoint();
+
+  // Test DMN evaluation
+  testDmnEvaluation(testCase);
+
+  // Test DMN Engine directly (now uses the correct engine URL)
+  testDmnEngineHealth();
+
+  // Sleep between iterations
+  sleep(1 + Math.random() * 2);
 }
 
-// Main test function
-export default function () {
-  // Choose test type based on environment variable
-  const testType = __ENV.TEST_TYPE || 'mixed';
+function testWordPressApi() {
+  const response = http.get(`${testUrl}/wp-json/`);
 
-  switch (testType) {
-    case 'health_only':
-      testHealthEndpoints();
-      break;
-    case 'evaluation_only':
-      testDmnEvaluation();
-      break;
-    default:
-      // Mixed testing - mostly health checks for initial implementation
-      const rand = Math.random();
-      if (rand < 0.7) {
-        testHealthEndpoints();
-      } else {
-        testDmnEvaluation();
-      }
+  const success = check(response, {
+    'WordPress API is accessible': r => r.status === 200,
+    'WordPress API response time < 1000ms': r => r.timings.duration < 1000,
+  });
+
+  wordpressApiRate.add(success);
+}
+
+function testDmnPluginEndpoint() {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  if (apiKey) {
+    headers['X-API-Key'] = apiKey;
   }
 
-  // Simulate realistic user behavior
-  sleep(Math.random() * 2 + 1); // 1-3 seconds think time
-}
-
-function testHealthEndpoints() {
-  // Test basic WordPress and DMN endpoints
-  const endpoints = ['/wp-json/', '/wp-json/operaton-dmn/v1/test', '/wp-json/operaton-dmn/v1/health'];
-
-  const endpoint = endpoints[Math.floor(Math.random() * endpoints.length)];
-
-  const response = http.get(`${BASE_URL}${endpoint}`, {
-    timeout: '10s',
-    tags: { endpoint: endpoint, test_type: 'health' },
+  const response = http.get(`${testUrl}/wp-json/operaton-dmn/v1/test`, {
+    headers: headers,
   });
 
   check(response, {
-    'Health endpoint accessible': r => r.status === 200 || r.status === 404,
-    'Health response time OK': r => r.timings.duration < 1000,
+    'DMN Plugin endpoint responds': r => [200, 404, 405].includes(r.status),
+    'DMN Plugin response time < 2000ms': r => r.timings.duration < 2000,
   });
 }
 
-function testDmnEvaluation() {
-  const testData = generateTestData();
+function testDmnEvaluation(testCase) {
+  const payload = {
+    config_id: 1,
+    form_data: {
+      season: testCase.season,
+      guestCount: testCase.guestCount,
+    },
+  };
 
   const headers = {
     'Content-Type': 'application/json',
   };
 
-  if (API_KEY) {
-    headers['X-API-Key'] = API_KEY;
+  if (apiKey) {
+    headers['X-API-Key'] = apiKey;
   }
 
-  const startTime = Date.now();
-
-  const response = http.post(`${BASE_URL}/wp-json/operaton-dmn/v1/evaluate`, JSON.stringify(testData), {
+  const startTime = new Date().getTime();
+  const response = http.post(`${testUrl}/wp-json/operaton-dmn/v1/evaluate`, JSON.stringify(payload), {
     headers: headers,
-    timeout: '15s',
-    tags: {
-      endpoint: 'evaluate',
-      test_type: 'dmn_evaluation',
-      scenario: testData.form_data.scenario,
+  });
+  const endTime = new Date().getTime();
+  const duration = endTime - startTime;
+
+  const success = check(response, {
+    'DMN evaluation request succeeds': r => r.status === 200 || r.status === 201,
+    'DMN evaluation response time < 3000ms': r => r.timings.duration < 3000,
+    'DMN evaluation returns valid JSON': r => {
+      try {
+        const body = JSON.parse(r.body);
+        return typeof body === 'object';
+      } catch (e) {
+        return false;
+      }
     },
   });
 
-  const endTime = Date.now();
-  const responseTime = endTime - startTime;
-
-  // Record DMN-specific metrics
-  dmnResponseTime.add(responseTime);
-
-  const success = check(response, {
-    'DMN evaluation status acceptable': r =>
-      r.status === 200 || r.status === 400 || r.status === 404 || r.status === 500,
-    'DMN evaluation response time reasonable': r => responseTime < 3000,
-    'DMN evaluation has response body': r => r.body.length > 0,
-  });
-
   dmnEvaluationRate.add(success);
+  dmnEvaluationDuration.add(duration);
 
   if (!success) {
-    dmnErrors.add(1);
-    console.log(`DMN Evaluation failed: ${response.status} - ${response.body.substring(0, 100)}`);
-  }
-
-  // For successful responses, try to parse and validate
-  if (response.status === 200) {
-    try {
-      const body = JSON.parse(response.body);
-      check(body, {
-        'Response has expected structure': b =>
-          b.hasOwnProperty('success') || b.hasOwnProperty('decision') || b.hasOwnProperty('error'),
-      });
-    } catch (e) {
-      console.log('Failed to parse response JSON');
-    }
+    console.log(`DMN evaluation failed for ${testCase.name}: Status ${response.status}`);
   }
 }
 
-// Setup function - runs once at the beginning
-export function setup() {
-  console.log('🚀 Starting DMN Load Testing');
-  console.log(`Base URL: ${BASE_URL}`);
-  console.log(`API Key: ${API_KEY ? 'Configured' : 'Not configured'}`);
-  console.log(`Test Type: ${__ENV.TEST_TYPE || 'mixed'}`);
+function testDmnEngineHealth() {
+  // FIXED: Now uses the correct engine URL from environment variables
+  const response = http.get(`${engineUrl}/engine-rest/version`, {
+    timeout: '5s',
+  });
 
-  // Verify the target is accessible
-  const response = http.get(`${BASE_URL}/wp-json/`);
-  if (response.status !== 200) {
-    console.error(`⚠️ Target ${BASE_URL} returned status ${response.status}`);
-    console.error('Load test will continue but may have limited functionality');
-  } else {
-    console.log('✅ Target is accessible');
+  const success = check(response, {
+    'DMN Engine is accessible': r => r.status === 200,
+    'DMN Engine response time < 2000ms': r => r.timings.duration < 2000,
+  });
+
+  dmnEngineRate.add(success);
+
+  if (!success) {
+    console.log(`DMN Engine health check failed: Status ${response.status} at ${engineUrl}`);
   }
-
-  return { baseUrl: BASE_URL };
 }
 
-// Teardown function - runs once at the end
-export function teardown(data) {
-  console.log('🏁 Load testing completed');
-  console.log('📊 Check the summary above for detailed results');
-}
-
-// FIXED: Custom summary function with proper null checking
 export function handleSummary(data) {
-  // Helper function to safely get metric values
-  function getMetricValue(metrics, metricName, valueName, defaultValue = 0) {
-    if (!metrics || !metrics[metricName] || !metrics[metricName].values) {
-      return defaultValue;
-    }
-    return metrics[metricName].values[valueName] || defaultValue;
-  }
+  // Create a basic summary object for JSON output
+  const summary = {
+    testRunId: `load-test-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    environment: {
+      testUrl: testUrl,
+      engineUrl: engineUrl,
+      apiKeyConfigured: !!apiKey,
+    },
+    metrics: data.metrics,
+    thresholds: data.thresholds,
+  };
 
-  // Safely extract metric values
-  const avgResponseTime = getMetricValue(data.metrics, 'http_req_duration', 'avg');
-  const p95ResponseTime = getMetricValue(data.metrics, 'http_req_duration', 'p(95)');
-  const failureRate = getMetricValue(data.metrics, 'http_req_failed', 'rate');
-  const successRate = (1 - failureRate) * 100;
-
-  const dmnSuccessRate = getMetricValue(data.metrics, 'dmn_evaluation_success_rate', 'rate') * 100;
-  const avgDmnResponse = getMetricValue(data.metrics, 'dmn_response_time', 'avg');
-  const dmnErrorCount = getMetricValue(data.metrics, 'dmn_errors', 'count');
-
-  const totalRequests = getMetricValue(data.metrics, 'http_reqs', 'count');
-  const failedRequests = getMetricValue(data.metrics, 'http_req_failed', 'count');
-
-  // Generate summary text
-  const summary = `
-🎯 DMN LOAD TEST RESULTS
-========================
-
-📈 Performance Metrics:
-- Average Response Time: ${avgResponseTime.toFixed(2)}ms
-- 95th Percentile: ${p95ResponseTime.toFixed(2)}ms
-- Success Rate: ${successRate.toFixed(2)}%
-
-🔄 DMN Specific Metrics:
-- DMN Evaluation Success: ${dmnSuccessRate.toFixed(2)}%
-- Average DMN Response: ${avgDmnResponse > 0 ? avgDmnResponse.toFixed(2) + 'ms' : 'N/A'}
-- DMN Errors: ${dmnErrorCount}
-
-📊 Request Summary:
-- Total Requests: ${totalRequests}
-- Failed Requests: ${failedRequests}
-
-🎯 Thresholds Status:
-${
-  data.thresholds
-    ? Object.entries(data.thresholds)
-        .map(([key, value]) => `- ${key}: ${value.ok ? '✅ PASS' : '❌ FAIL'}`)
-        .join('\n')
-    : '- No thresholds data available'
-}
-
-${
-  data.thresholds && data.thresholds.http_req_duration && !data.thresholds.http_req_duration.ok
-    ? '⚠️  Performance threshold exceeded - consider optimization'
-    : '✅ Performance looks good'
-}
-`;
-
+  // Return both file outputs AND the default K6 console output
   return {
-    'test-results/load-test-summary.txt': summary,
-    'test-results/load-test-results.json': JSON.stringify(data, null, 2),
-    stdout: summary,
+    stdout: textSummary(data, { indent: ' ', enableColors: true }), // This restores the default output
+    'test-results/load-test-summary.json': JSON.stringify(summary, null, 2),
+    'test-results/load-test-detailed.json': JSON.stringify(data, null, 2),
   };
 }

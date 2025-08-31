@@ -644,8 +644,7 @@ class Operaton_DMN_API
         // Make API call
         $operaton_data = array('variables' => $variables);
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN API: About to make HTTP request to: ' . $evaluation_endpoint);
             error_log('Operaton DMN API: Request data: ' . wp_json_encode($operaton_data));
         }
@@ -657,15 +656,11 @@ class Operaton_DMN_API
             'sslverify' => $this->ssl_verify,
         ));
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            if (is_wp_error($response))
-            {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            if (is_wp_error($response)) {
                 error_log('Operaton DMN API: HTTP request failed: ' . $response->get_error_message());
                 error_log('Operaton DMN API: Error codes: ' . print_r($response->get_error_codes(), true));
-            }
-            else
-            {
+            } else {
                 $response_code = wp_remote_retrieve_response_code($response);
                 $response_body = wp_remote_retrieve_body($response);
                 error_log('Operaton DMN API: HTTP response code: ' . $response_code);
@@ -673,15 +668,14 @@ class Operaton_DMN_API
             }
         }
 
-        if (is_wp_error($response))
-        {
+        if (is_wp_error($response)) {
             return new WP_Error(
                 'api_error',
                 sprintf(__('Failed to connect to Operaton API: %s', 'operaton-dmn'), $response->get_error_message()),
                 array('status' => 500)
             );
         }
-        
+
         $http_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
 
