@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - [Issue #24](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/24) - Debug Tools - Get Plugin Status must be able to be closed
 - [Issue #29](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/29) - Using a cached or hardcoded endpoint instead of respecting configuration changes
 - [Issue #30](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/30) - Feedback button Clear Decision Flow Cach sync with both others
-- [Issue #31](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/31) - FNo consitency using environment variables for testing
+- [Issue #31](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/31) - No consitency using environment variables for testing
 - [Issue #32](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/32) - DMN health endpoint test is receiving a WordPress database error instead of a proper JSON response
 
 ### Caching
