@@ -41,9 +41,9 @@ This plugin is part of the [OpenWebconcept](https://github.com/OpenWebconcept) e
 
 All notable changes to this project are documented in the [CHANGELOG.md](./CHANGELOG.md).
 
-## What's New in v1.0.0-beta.14 ✨
+## What's New in v1.0.0-beta.15 ✨
 
-### 🏆 **Enterprise-Grade Testing Infrastructure Complete**
+### 🏆 **Testing Infrastructure Complete**
 
 #### **Comprehensive Testing Foundation**
 - ✅ **59+ total automated tests** covering all critical functionality across multiple layers

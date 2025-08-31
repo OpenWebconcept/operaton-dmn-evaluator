@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.0.0-beta.15] - 2025-08-15
+## [1.0.0-beta.15] - 2025-08-31
 
 ## Issues
 - [Issue #10](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/10) - Changing values on the pages of the form doesn't delete decision results
