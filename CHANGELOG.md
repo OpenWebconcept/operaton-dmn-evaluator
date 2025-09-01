@@ -1,6 +1,17 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.0.0-beta.16] - 2025-09-XX
+
+## Issues
+- [Issue #37](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/37) - Result fields clearing too agressive
+
+### Plugin now correctly distinguishes between
+- ✅ **Navigation** - preserves results
+- ✅ **Actual user input changes** - clears results as expected
+- ✅ **Result field population** - protected by safeguards
+- ✅ **Form re-initialization** - detects existing results and preserves them
+
 ## [1.0.0-beta.15] - 2025-08-31
 
 ## Issues
