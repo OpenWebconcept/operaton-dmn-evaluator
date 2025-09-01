@@ -574,6 +574,12 @@ function setupInputChangeMonitoring(formId) {
       return;
     }
 
+    // NEW: Skip clearing during field logic updates
+    if (window.operatonFieldLogicUpdating) {
+      console.log('Skipping clear - field logic updating');
+      return;
+    }
+
     // Prevent rapid successive clears
     const now = Date.now();
     if (now - lastClearTime < 1000) {
@@ -991,6 +997,13 @@ function simpleFormInitialization(formId) {
         window.initializeDecisionFlowForForm(formId, config);
       }
 
+      // Initialize field logic BEFORE the result field management
+      if (window.OperatonFieldLogic) {
+        setTimeout(() => {
+          window.OperatonFieldLogic.initializeForm(formId);
+        }, 100); // Earlier timing, separate from result field logic
+      }
+
       // Clear any existing results after initialization - BUT NOT on decision flow page
       setTimeout(() => {
         const currentPage = getCurrentPageCached(formId);
@@ -1158,6 +1171,216 @@ function resetFormSystem() {
 
   console.log('✅ System reset complete');
 }
+
+// =============================================================================
+// INTEGRATED FIELD LOGIC - Works with your existing frontend.js system
+// Add this to your form initialization or create a separate file
+// =============================================================================
+
+/**
+ * Enhanced field logic that integrates with your existing form system
+ * Handles partner/alleenstaand and children logic without interfering with result fields
+ */
+window.OperatonFieldLogic = window.OperatonFieldLogic || {
+  // Track forms that have been initialized
+  initializedForms: new Set(),
+
+  // Form-specific field mappings
+  fieldMappings: {
+    8: {
+      partnerField: 14,
+      alleenstaandField: 33,
+      childField: 16,
+      childrenField: 34,
+      // No radio mappings needed - we update the fields directly
+    },
+  },
+  
+  /**
+   * Initialize field logic for a specific form
+   */
+  initializeForm: function (formId) {
+    if (this.initializedForms.has(formId)) {
+      console.log(`Field logic already initialized for form ${formId}`);
+      return;
+    }
+
+    const mapping = this.fieldMappings[formId];
+    if (!mapping) {
+      console.log(`No field logic mapping for form ${formId}`);
+      return;
+    }
+
+    console.log(`Initializing field logic for form ${formId}`);
+
+    const $ = window.jQuery || window.$;
+    const $form = $(`#gform_${formId}`);
+
+    if ($form.length === 0) {
+      console.log(`Form ${formId} not found for field logic`);
+      return;
+    }
+
+    // Set initial values based on current field content
+    this.updateAlleenstaandLogic(formId, mapping, $form);
+    this.updateChildrenLogic(formId, mapping, $form);
+
+    // Setup event listeners with proper namespacing
+    this.setupEventListeners(formId, mapping, $form);
+
+    this.initializedForms.add(formId);
+    console.log(`Field logic initialized for form ${formId}`);
+  },
+
+  /**
+   * Update alleenstaand field based on partner surname
+   */
+  updateAlleenstaandLogic: function (formId, mapping, $form) {
+    const $partnerField = $form.find(`#input_${formId}_${mapping.partnerField}`);
+
+    if ($partnerField.length === 0) {
+      console.log(`Partner field not found: #input_${formId}_${mapping.partnerField}`);
+      return;
+    }
+
+    const partnerValue = $partnerField.val();
+    const isEmpty = !partnerValue || partnerValue.trim() === '';
+    const isAlleenstaand = isEmpty;
+
+    console.log(`Partner field "${partnerValue}" -> alleenstaand: ${isAlleenstaand}`);
+
+    // Update the radio field directly (field 33 is the actual radio field)
+    const radioSelector = `input[name="input_${mapping.alleenstaandField}"][value="${
+      isAlleenstaand ? 'true' : 'false'
+    }"]`;
+    const $radio = $form.find(radioSelector);
+
+    console.log(`Looking for radio: ${radioSelector}`);
+    console.log(`Found radio buttons: ${$radio.length}`);
+
+    if ($radio.length > 0) {
+      // Set flag to prevent interference
+      window.operatonFieldLogicUpdating = true;
+
+      $radio.prop('checked', true).trigger('change');
+      console.log(`Updated alleenstaand radio to: ${isAlleenstaand ? 'true' : 'false'}`);
+
+      setTimeout(() => {
+        window.operatonFieldLogicUpdating = false;
+      }, 100);
+    } else {
+      console.log(`No radio button found for alleenstaand`);
+    }
+  },
+
+  /**
+   * Update children field based on child birthplace
+   */
+  updateChildrenLogic: function (formId, mapping, $form) {
+    const $childField = $form.find(`#input_${formId}_${mapping.childField}`);
+
+    if ($childField.length === 0) {
+      console.log(`Child field not found: #input_${formId}_${mapping.childField}`);
+      return;
+    }
+
+    const childValue = $childField.val();
+    const hasValue = childValue && childValue.trim() !== '';
+    const hasChildren = hasValue;
+
+    console.log(`Child field "${childValue}" -> has children: ${hasChildren}`);
+
+    // Update the radio field directly (field 34 is the actual radio field)
+    const radioSelector = `input[name="input_${mapping.childrenField}"][value="${hasChildren ? 'true' : 'false'}"]`;
+    const $radio = $form.find(radioSelector);
+
+    console.log(`Looking for radio: ${radioSelector}`);
+    console.log(`Found radio buttons: ${$radio.length}`);
+
+    if ($radio.length > 0) {
+      // Set flag to prevent interference
+      window.operatonFieldLogicUpdating = true;
+
+      $radio.prop('checked', true).trigger('change');
+      console.log(`Updated children radio to: ${hasChildren ? 'true' : 'false'}`);
+
+      setTimeout(() => {
+        window.operatonFieldLogicUpdating = false;
+      }, 100);
+    } else {
+      console.log(`No radio button found for children`);
+    }
+  },
+
+  /**
+   * Setup event listeners with proper integration
+   */
+  setupEventListeners: function (formId, mapping, $form) {
+    const self = this;
+
+    // Partner field listener
+    const $partnerField = $form.find(`#input_${formId}_${mapping.partnerField}`);
+    if ($partnerField.length > 0) {
+      // Remove existing listeners to prevent duplicates
+      $partnerField.off('.fieldlogic');
+
+      // Add debounced listener
+      let partnerTimeout;
+      $partnerField.on('input.fieldlogic change.fieldlogic', function () {
+        clearTimeout(partnerTimeout);
+        partnerTimeout = setTimeout(() => {
+          if (!window.operatonPopulatingResults && !window.operatonFieldLogicUpdating) {
+            console.log('Partner field changed - updating alleenstaand logic');
+            self.updateAlleenstaandLogic(formId, mapping, $form);
+          }
+        }, 150);
+      });
+    }
+
+    // Child field listener
+    const $childField = $form.find(`#input_${formId}_${mapping.childField}`);
+    if ($childField.length > 0) {
+      // Remove existing listeners to prevent duplicates
+      $childField.off('.fieldlogic');
+
+      // Add debounced listener
+      let childTimeout;
+      $childField.on('input.fieldlogic change.fieldlogic', function () {
+        clearTimeout(childTimeout);
+        childTimeout = setTimeout(() => {
+          if (!window.operatonPopulatingResults && !window.operatonFieldLogicUpdating) {
+            console.log('Child field changed - updating children logic');
+            self.updateChildrenLogic(formId, mapping, $form);
+          }
+        }, 150);
+      });
+    }
+  },
+
+  /**
+   * Clear initialization for a form (useful for cleanup)
+   */
+  clearForm: function (formId) {
+    const $ = window.jQuery || window.$;
+    const $form = $(`#gform_${formId}`);
+
+    // Remove event listeners
+    $form.find('input').off('.fieldlogic');
+
+    // Remove from initialized set
+    this.initializedForms.delete(formId);
+
+    console.log(`Field logic cleared for form ${formId}`);
+  },
+
+  /**
+   * Add new form mapping
+   */
+  addFormMapping: function (formId, mapping) {
+    this.fieldMappings[formId] = mapping;
+    console.log(`Added field mapping for form ${formId}:`, mapping);
+  },
+};
 
 // =============================================================================
 // EVALUATION HANDLING
