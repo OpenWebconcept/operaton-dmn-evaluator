@@ -2041,21 +2041,55 @@ function waitForJQuery(callback, maxAttempts = 50) {
       console.log(`🎉 Operaton DMN initialization complete in ${(initEndTime - initStartTime).toFixed(2)}ms`);
     });
 
-    //    $(window).on('beforeunload', e => {
-    //      // For Gravity Forms, ONLY clean up on actual site navigation, not form navigation
-    //      const isGravityFormNavigation = document.querySelector('.gform_previous_button, .gform_next_button');
-    //      const hasGfPage = window.location.href.includes('gf_page=');
+    $(window).on('beforeunload', e => {
+      // Only perform minimal cleanup that doesn't interfere with form functionality
 
-    //      if (isGravityFormNavigation || hasGfPage) {
-    //        console.log('🔄 Gravity Forms context - PRESERVING all state');
-    //        return; // Don't clean up anything
-    //      }
+      // Check if this might be form navigation rather than actual page unload
+      const hasActiveForm = document.querySelector('form[id^="gform_"]');
+      const isGravityFormsPage = window.location.href.includes('gf_page=') || document.querySelector('.gform_wrapper');
 
-    //      console.log('🧹 Actual site navigation - minimal cleanup');
-    //      // Only clear caches, preserve form state
-    //      domQueryCache.clear();
-    //      formConfigCache.clear();
-    //    });
+      if (hasActiveForm && isGravityFormsPage) {
+        // This looks like form navigation - do minimal cleanup only
+        console.log('🔄 Form navigation detected - minimal cleanup only');
+
+        // Only clear performance-related caches that are safe to clear
+        if (domQueryCache && domQueryCache.size > 100) {
+          domQueryCache.clear();
+        }
+
+        // Don't clear form state, initialization flags, or button manager
+        return;
+      }
+
+      // This appears to be actual page navigation - safe to do full cleanup
+      console.log('🧹 Page navigation detected - performing cleanup');
+
+      // Clear caches
+      domQueryCache.clear();
+      formConfigCache.clear();
+
+      // Clear button manager cache but preserve core functionality
+      if (window.operatonButtonManager) {
+        window.operatonButtonManager.clearCache();
+        // Don't clear originalTexts - that should persist
+      }
+
+      // Clear performance stats but not core initialization state
+      if (window.operatonInitialized && window.operatonInitialized.performanceStats) {
+        window.operatonInitialized.performanceStats = {
+          initializationAttempts: 0,
+          successfulInits: 0,
+          totalProcessingTime: 0,
+          cacheHits: 0,
+        };
+      }
+
+      // CRITICAL: Don't clear these as they break form functionality:
+      // - window.operatonInitialized.forms
+      // - window.operatonInitialized.globalInit
+      // - window.operatonInitialized.jQueryReady
+      // - Form configurations or state
+    });
 
     $(document).ready(() => {
       console.log('📋 Document ready - initialization active');
