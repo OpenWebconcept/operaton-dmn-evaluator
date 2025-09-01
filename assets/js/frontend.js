@@ -677,7 +677,7 @@ function setupInputChangeMonitoring(formId) {
 }
 
 // =============================================================================
-// ENHANCED NAVIGATION HANDLING
+// FIXED ENHANCED NAVIGATION HANDLING - Preserves results during navigation
 // =============================================================================
 
 function bindNavigationEventsOptimized(formId) {
@@ -692,6 +692,7 @@ function bindNavigationEventsOptimized(formId) {
 
   // Store form state for comparison - EXCLUDE result fields entirely
   let formStateSnapshot = null;
+  let navigationInProgress = false;
 
   function captureFormState() {
     const state = {};
@@ -722,30 +723,47 @@ function bindNavigationEventsOptimized(formId) {
     return state;
   }
 
-  function hasFormChanged(oldState, newState) {
+  function hasActualFormChanges(oldState, newState) {
     if (!oldState || !newState) {
       console.log('No previous state to compare - treating as NO change for navigation');
-      return false; // FIXED: Conservative approach - no clearing on navigation without clear changes
+      return false; // Conservative approach - no clearing on navigation without clear changes
     }
 
     // Get all unique field names from both states
     const allFields = new Set([...Object.keys(oldState), ...Object.keys(newState)]);
+    const changedFields = [];
 
     for (const fieldName of allFields) {
       const oldValue = oldState[fieldName] || '';
       const newValue = newState[fieldName] || '';
 
       if (oldValue !== newValue) {
-        console.log(`ACTUAL form change detected: ${fieldName} changed from "${oldValue}" to "${newValue}"`);
-        return true;
+        // Additional check: ignore changes that might be due to page navigation artifacts
+        const isLikelyNavigationArtifact = (
+          (oldValue === '' && newValue !== '') ||
+          (oldValue !== '' && newValue === '')
+        ) && navigationInProgress;
+
+        if (!isLikelyNavigationArtifact) {
+          changedFields.push({
+            field: fieldName,
+            from: oldValue,
+            to: newValue
+          });
+        }
       }
+    }
+
+    if (changedFields.length > 0) {
+      console.log('ACTUAL form changes detected:', changedFields);
+      return true;
     }
 
     console.log('No actual form changes detected in input fields');
     return false;
   }
 
-  // FIXED: Capture initial state when document is ready, not delayed
+  // FIXED: Capture initial state when document is ready
   setTimeout(() => {
     if (!formStateSnapshot) {
       formStateSnapshot = captureFormState();
@@ -753,40 +771,44 @@ function bindNavigationEventsOptimized(formId) {
         `Captured initial form state for form ${formId} with ${Object.keys(formStateSnapshot).length} input fields`
       );
     }
-  }, 500); // Reasonable delay for form to be ready
+  }, 500);
 
   // Remove existing navigation handlers
   $form.off(`.operaton-nav-${formId}`);
 
-  // FIXED: Conservative Previous button handler - only clear on REAL input changes
+  // FIXED: Conservative Previous button handler - preserve results during navigation
   $form.on(
     `click.operaton-nav-${formId}`,
     '.gform_previous_button input, .gform_previous_button button, input[value*="Previous"], button:contains("Previous")',
     function (e) {
       console.log('Previous button clicked for form:', formId);
+      navigationInProgress = true;
 
-      // CRITICAL FIX: Don't check for changes immediately on button click
-      // Instead, preserve results during navigation and only clear if there were actual input changes
+      // CRITICAL FIX: Don't automatically clear on navigation
+      // Only clear if there were actual meaningful input changes BEFORE navigation
 
-      // Wait a moment to see if there are any pending input changes
+      const currentState = captureFormState();
+      const hasChanged = hasActualFormChanges(formStateSnapshot, currentState);
+
+      if (hasChanged) {
+        console.log('REAL form changes detected before navigation - clearing result fields');
+        clearAllResultFields(formId, 'Form changed before navigation');
+        clearStoredResults(formId);
+        // Update snapshot to current state
+        formStateSnapshot = currentState;
+      } else {
+        console.log('NO real changes detected - PRESERVING result fields during navigation');
+        // KEY FIX: Don't clear result fields during navigation
+        // Only clear DOM cache which is safe
+      }
+
+      // Always safe to clear DOM cache for navigation
+      clearDOMCache(formId);
+
+      // Reset navigation flag after a delay
       setTimeout(() => {
-        const currentState = captureFormState();
-        const hasChanged = hasFormChanged(formStateSnapshot, currentState);
-
-        if (hasChanged) {
-          console.log('REAL form changes detected before navigation - clearing result fields');
-          clearAllResultFields(formId, 'Form changed before navigation');
-          clearStoredResults(formId);
-          // Update snapshot to current state
-          formStateSnapshot = currentState;
-        } else {
-          console.log('NO real changes detected - PRESERVING result fields during navigation');
-          // Don't clear anything - this is the key fix
-        }
-
-        // Always clear DOM cache for navigation (this is safe)
-        clearDOMCache(formId);
-      }, 50);
+        navigationInProgress = false;
+      }, 1000);
     }
   );
 
@@ -801,6 +823,8 @@ function bindNavigationEventsOptimized(formId) {
       function (loadedFormId, currentPage) {
         if (loadedFormId == formId) {
           console.log('Form page loaded for form:', formId, 'page:', currentPage);
+          navigationInProgress = true;
+
           clearDOMCache(formId); // Safe to clear DOM cache
 
           // CRITICAL FIX: Don't automatically clear on page load
@@ -815,7 +839,12 @@ function bindNavigationEventsOptimized(formId) {
               // FIXED: Just update the snapshot, don't clear unless there are significant changes
               // AND we can confirm they are user input changes (not navigation artifacts)
               console.log(`Page ${currentPage} loaded - updating state snapshot without clearing`);
-              formStateSnapshot = currentState;
+
+              // Only update snapshot after navigation is complete
+              setTimeout(() => {
+                formStateSnapshot = captureFormState();
+                navigationInProgress = false;
+              }, 200);
             }
           }, 100);
         }
@@ -824,6 +853,49 @@ function bindNavigationEventsOptimized(formId) {
       `operaton_clear_${formId}`
     );
   }
+
+  // Additional safeguard: Listen for actual form changes during non-navigation periods
+  let changeTimeout;
+
+  $form.on('change input', 'input, select, textarea', function() {
+    const $field = $(this);
+    const fieldName = $field.attr('name') || $field.attr('id');
+
+    // 🚩 Skip clears if we are in the middle of populating results
+    if (window.operatonPopulatingResults) {
+      console.log('Skipping clear - currently populating results');
+      return;
+    }
+
+    // Skip if it's a result field or during navigation
+    const isResultField = resultFieldIds.some(
+      id => fieldName && (fieldName.includes(`input_${formId}_${id}`) || fieldName === `input_${formId}_${id}`)
+    );
+
+    if (isResultField || navigationInProgress) {
+      return;
+    }
+
+    // Clear any existing timeout
+    if (changeTimeout) {
+      clearTimeout(changeTimeout);
+    }
+
+    // Set a debounced check for actual changes
+    changeTimeout = setTimeout(() => {
+      if (!navigationInProgress) {
+        const currentState = captureFormState();
+        const hasChanged = hasActualFormChanges(formStateSnapshot, currentState);
+
+        if (hasChanged) {
+          console.log('Input change detected outside navigation - clearing results');
+          clearAllResultFields(formId, `Input changed: ${fieldName}`);
+          clearStoredResults(formId);
+          formStateSnapshot = currentState;
+        }
+      }
+    }, 300);
+  });
 }
 
 // =============================================================================
@@ -1237,6 +1309,9 @@ function handleEvaluateClick($button) {
         if (response.success && response.results) {
           console.log('Results received:', response.results);
 
+          // 🚩 Set safeguard flag
+          window.operatonPopulatingResults = true;
+
           let populatedCount = 0;
           const resultSummary = [];
 
@@ -1268,6 +1343,11 @@ function handleEvaluateClick($button) {
               console.warn('No field found for result:', dmnResultField, 'Field ID:', fieldId);
             }
           });
+
+          // 🚩 Reset safeguard flag shortly after population
+          setTimeout(() => {
+            window.operatonPopulatingResults = false;
+          }, 100);
 
           // Store process instance ID if provided
           if (response.process_instance_id) {
