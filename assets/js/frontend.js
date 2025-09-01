@@ -563,11 +563,17 @@ function setupInputChangeMonitoring(formId) {
   const resultFieldIds = getResultFieldIds(formId);
   console.log(`Cached result field IDs for form ${formId}:`, resultFieldIds);
 
-  // FIXED: More conservative debounced clearing with navigation awareness
+  // ENHANCED: More conservative debounced clearing with safeguard checks
   let debounceTimer = null;
   let lastClearTime = 0;
 
   function debouncedClear(reason) {
+    // 🚩 CRITICAL: Check if we're currently populating results
+    if (window.operatonPopulatingResults) {
+      console.log('🛡️ SAFEGUARD: Skipping clear during result population');
+      return;
+    }
+
     // Prevent rapid successive clears
     const now = Date.now();
     if (now - lastClearTime < 1000) {
@@ -579,14 +585,20 @@ function setupInputChangeMonitoring(formId) {
       window.clearTimeout(debounceTimer);
     }
     debounceTimer = window.setTimeout(() => {
+      // Double-check the safeguard flag right before clearing
+      if (window.operatonPopulatingResults) {
+        console.log('🛡️ SAFEGUARD: Last-second skip of clear during result population');
+        return;
+      }
+
       console.log(`INPUT CHANGE CLEARING: ${reason}`);
       clearAllResultFields(formId, reason);
       clearStoredResults(formId);
       lastClearTime = Date.now();
-    }, 500); // Longer debounce to avoid clearing during navigation transitions
+    }, 500);
   }
 
-  // Monitor regular form fields - but be more careful about when we clear
+  // Monitor regular form fields with safeguard checks
   $form.on(
     'change.operaton-clear',
     'input[type="text"], input[type="number"], input[type="email"], input[type="date"], select, textarea',
@@ -605,13 +617,19 @@ function setupInputChangeMonitoring(formId) {
         return;
       }
 
+      // 🚩 Skip if we're populating results
+      if (window.operatonPopulatingResults) {
+        console.log('🛡️ SAFEGUARD: Skipping change handler during result population');
+        return;
+      }
+
       const fieldValue = $field.val();
       console.log(`INPUT CHANGE DETECTED (change): ${fieldName} = "${fieldValue}"`);
       debouncedClear(`Input changed: ${fieldName}`);
     }
   );
 
-  // For text/number inputs, also monitor 'input' event but with even longer debounce
+  // For text/number inputs, also monitor 'input' event with safeguards
   $form.on('input.operaton-clear', 'input[type="text"], input[type="number"], input[type="email"]', function () {
     const $field = $(this);
     const fieldId = $field.attr('id');
@@ -622,24 +640,28 @@ function setupInputChangeMonitoring(formId) {
       id => fieldId && (fieldId.includes(`input_${formId}_${id}`) || fieldId === `input_${formId}_${id}`)
     );
 
-    if (isResultField) {
-      return; // Don't log for result fields
+    if (isResultField || window.operatonPopulatingResults) {
+      return; // Don't log for result fields or during population
     }
 
-    // Much longer debounce for typing (wait for user to finish)
+    // Much longer debounce for typing
     if (debounceTimer) {
       window.clearTimeout(debounceTimer);
     }
     debounceTimer = window.setTimeout(() => {
+      if (window.operatonPopulatingResults) {
+        return; // Final safeguard check
+      }
+
       const finalValue = $field.val();
       console.log(`INPUT TYPING COMPLETE: ${fieldName} = "${finalValue}"`);
       clearAllResultFields(formId, `Input typing complete: ${fieldName}`);
       clearStoredResults(formId);
       lastClearTime = Date.now();
-    }, 1500); // Even longer wait for typing
+    }, 1500);
   });
 
-  // Monitor radio buttons with improved logic
+  // Monitor radio buttons with safeguards
   $form.on('change.operaton-clear', 'input[type="radio"]', function () {
     const $radio = $(this);
     const radioName = $radio.attr('name');
@@ -651,9 +673,9 @@ function setupInputChangeMonitoring(formId) {
       return;
     }
 
-    // Ignore changes during radio sync
-    if (window.operatonRadioSyncInProgress) {
-      console.log(`Skipping radio change during sync: ${radioName}`);
+    // Ignore changes during radio sync or result population
+    if (window.operatonRadioSyncInProgress || window.operatonPopulatingResults) {
+      console.log(`🛡️ SAFEGUARD: Skipping radio change during sync/population: ${radioName}`);
       return;
     }
 
@@ -663,8 +685,13 @@ function setupInputChangeMonitoring(formId) {
     }
   });
 
-  // Monitor checkboxes
+  // Monitor checkboxes with safeguards
   $form.on('change.operaton-clear', 'input[type="checkbox"]', function () {
+    if (window.operatonPopulatingResults) {
+      console.log('🛡️ SAFEGUARD: Skipping checkbox change during result population');
+      return;
+    }
+
     const $checkbox = $(this);
     const checkboxName = $checkbox.attr('name') || $checkbox.attr('id');
     const isChecked = $checkbox.is(':checked');
@@ -673,11 +700,12 @@ function setupInputChangeMonitoring(formId) {
     debouncedClear(`Checkbox changed: ${checkboxName}`);
   });
 
-  console.log(`Enhanced input monitoring active for form ${formId}`);
+  console.log(`Enhanced input monitoring with safeguards active for form ${formId}`);
 }
 
 // =============================================================================
 // FIXED ENHANCED NAVIGATION HANDLING - Preserves results during navigation
+// The issue was that result fields are being included in state comparison
 // =============================================================================
 
 function bindNavigationEventsOptimized(formId) {
@@ -702,16 +730,25 @@ function bindNavigationEventsOptimized(formId) {
       const fieldName = $field.attr('name') || $field.attr('id');
 
       if (fieldName) {
-        // Skip result fields completely from state tracking
-        const isResultField = resultFieldIds.some(
-          id => fieldName.includes(`input_${formId}_${id}`) || fieldName === `input_${formId}_${id}`
-        );
+        // CRITICAL FIX: More thorough result field exclusion
+        const isResultField = resultFieldIds.some(id => {
+          // Check multiple patterns for result field identification
+          return (
+            fieldName.includes(`input_${formId}_${id}`) ||
+            fieldName === `input_${formId}_${id}` ||
+            fieldName === `input_${id}` ||
+            fieldName.endsWith(`_${id}`)
+          );
+        });
 
         // Also skip hidden sync fields and other non-user fields
         const isHiddenSyncField = fieldName.startsWith('input_') && $field.attr('type') === 'hidden';
         const isSystemField = fieldName.includes('gform_') || fieldName.includes('honeypot');
 
-        if (!isResultField && !isHiddenSyncField && !isSystemField) {
+        // ADDITIONAL: Skip fields that contain result variable names
+        const isResultVariableField = fieldName.includes('aanmerking') || fieldName.includes('result');
+
+        if (!isResultField && !isHiddenSyncField && !isSystemField && !isResultVariableField) {
           if ($field.is(':radio') || $field.is(':checkbox')) {
             state[fieldName] = $field.is(':checked') ? $field.val() : '';
           } else {
@@ -720,13 +757,15 @@ function bindNavigationEventsOptimized(formId) {
         }
       }
     });
+
+    console.log('Captured form state (excluding result fields):', Object.keys(state));
     return state;
   }
 
   function hasActualFormChanges(oldState, newState) {
     if (!oldState || !newState) {
       console.log('No previous state to compare - treating as NO change for navigation');
-      return false; // Conservative approach - no clearing on navigation without clear changes
+      return false;
     }
 
     // Get all unique field names from both states
@@ -738,37 +777,42 @@ function bindNavigationEventsOptimized(formId) {
       const newValue = newState[fieldName] || '';
 
       if (oldValue !== newValue) {
-        // Additional check: ignore changes that might be due to page navigation artifacts
-        const isLikelyNavigationArtifact = (
-          (oldValue === '' && newValue !== '') ||
-          (oldValue !== '' && newValue === '')
-        ) && navigationInProgress;
+        // ADDITIONAL FILTER: Ignore changes that are likely navigation artifacts
+        const isLikelyNavigationArtifact =
+          ((oldValue === '' && newValue !== '') || (oldValue !== '' && newValue === '')) && navigationInProgress;
 
-        if (!isLikelyNavigationArtifact) {
+        // ADDITIONAL FILTER: Double-check this isn't a result field
+        const isResultFieldChange = resultFieldIds.some(
+          id => fieldName.includes(`_${id}`) || fieldName.includes(`input_${formId}_${id}`)
+        );
+
+        if (!isLikelyNavigationArtifact && !isResultFieldChange) {
           changedFields.push({
             field: fieldName,
             from: oldValue,
-            to: newValue
+            to: newValue,
           });
         }
       }
     }
 
     if (changedFields.length > 0) {
-      console.log('ACTUAL form changes detected:', changedFields);
+      console.log('ACTUAL form changes detected (non-result fields):', changedFields);
       return true;
     }
 
-    console.log('No actual form changes detected in input fields');
+    console.log('No actual USER INPUT changes detected');
     return false;
   }
 
-  // FIXED: Capture initial state when document is ready
+  // Capture initial state when document is ready
   setTimeout(() => {
     if (!formStateSnapshot) {
       formStateSnapshot = captureFormState();
       console.log(
-        `Captured initial form state for form ${formId} with ${Object.keys(formStateSnapshot).length} input fields`
+        `Captured initial form state for form ${formId} with ${
+          Object.keys(formStateSnapshot).length
+        } input fields (result fields excluded)`
       );
     }
   }, 500);
@@ -776,7 +820,7 @@ function bindNavigationEventsOptimized(formId) {
   // Remove existing navigation handlers
   $form.off(`.operaton-nav-${formId}`);
 
-  // FIXED: Conservative Previous button handler - preserve results during navigation
+  // FIXED: Conservative Previous button handler
   $form.on(
     `click.operaton-nav-${formId}`,
     '.gform_previous_button input, .gform_previous_button button, input[value*="Previous"], button:contains("Previous")',
@@ -784,35 +828,29 @@ function bindNavigationEventsOptimized(formId) {
       console.log('Previous button clicked for form:', formId);
       navigationInProgress = true;
 
-      // CRITICAL FIX: Don't automatically clear on navigation
-      // Only clear if there were actual meaningful input changes BEFORE navigation
-
       const currentState = captureFormState();
       const hasChanged = hasActualFormChanges(formStateSnapshot, currentState);
 
       if (hasChanged) {
-        console.log('REAL form changes detected before navigation - clearing result fields');
-        clearAllResultFields(formId, 'Form changed before navigation');
+        console.log('REAL USER INPUT changes detected before navigation - clearing result fields');
+        clearAllResultFields(formId, 'User input changed before navigation');
         clearStoredResults(formId);
-        // Update snapshot to current state
         formStateSnapshot = currentState;
       } else {
-        console.log('NO real changes detected - PRESERVING result fields during navigation');
-        // KEY FIX: Don't clear result fields during navigation
-        // Only clear DOM cache which is safe
+        console.log('NO user input changes detected - PRESERVING result fields during navigation');
       }
 
-      // Always safe to clear DOM cache for navigation
+      // Always safe to clear DOM cache
       clearDOMCache(formId);
 
-      // Reset navigation flag after a delay
+      // Reset navigation flag after delay
       setTimeout(() => {
         navigationInProgress = false;
       }, 1000);
     }
   );
 
-  // FIXED: Much more conservative Gravity Forms page load handler
+  // FIXED: Conservative Gravity Forms page load handler
   if (typeof gform !== 'undefined' && gform.addAction) {
     if (gform.removeAction) {
       gform.removeAction('gform_page_loaded', `operaton_clear_${formId}`);
@@ -827,8 +865,7 @@ function bindNavigationEventsOptimized(formId) {
 
           clearDOMCache(formId); // Safe to clear DOM cache
 
-          // CRITICAL FIX: Don't automatically clear on page load
-          // Only update the state snapshot for future comparisons
+          // Update state snapshot without clearing result fields
           setTimeout(() => {
             const currentState = captureFormState();
 
@@ -836,11 +873,9 @@ function bindNavigationEventsOptimized(formId) {
               console.log(`First page load for form ${formId} - capturing initial state`);
               formStateSnapshot = currentState;
             } else {
-              // FIXED: Just update the snapshot, don't clear unless there are significant changes
-              // AND we can confirm they are user input changes (not navigation artifacts)
-              console.log(`Page ${currentPage} loaded - updating state snapshot without clearing`);
+              console.log(`Page ${currentPage} loaded - updating state snapshot WITHOUT clearing results`);
 
-              // Only update snapshot after navigation is complete
+              // Just update snapshot after navigation completes
               setTimeout(() => {
                 formStateSnapshot = captureFormState();
                 navigationInProgress = false;
@@ -854,25 +889,26 @@ function bindNavigationEventsOptimized(formId) {
     );
   }
 
-  // Additional safeguard: Listen for actual form changes during non-navigation periods
+  // ENHANCED: Input change monitoring that excludes result fields
   let changeTimeout;
 
-  $form.on('change input', 'input, select, textarea', function() {
+  $form.on('change input', 'input, select, textarea', function () {
     const $field = $(this);
     const fieldName = $field.attr('name') || $field.attr('id');
 
-    // 🚩 Skip clears if we are in the middle of populating results
-    if (window.operatonPopulatingResults) {
-      console.log('Skipping clear - currently populating results');
-      return;
-    }
-
     // Skip if it's a result field or during navigation
     const isResultField = resultFieldIds.some(
-      id => fieldName && (fieldName.includes(`input_${formId}_${id}`) || fieldName === `input_${formId}_${id}`)
+      id =>
+        fieldName &&
+        (fieldName.includes(`input_${formId}_${id}`) ||
+          fieldName === `input_${formId}_${id}` ||
+          fieldName.includes(`_${id}`))
     );
 
-    if (isResultField || navigationInProgress) {
+    if (isResultField || navigationInProgress || window.operatonPopulatingResults) {
+      console.log(
+        `Skipping change handler: ${fieldName} (result field: ${isResultField}, navigation: ${navigationInProgress}, populating: ${window.operatonPopulatingResults})`
+      );
       return;
     }
 
@@ -883,13 +919,13 @@ function bindNavigationEventsOptimized(formId) {
 
     // Set a debounced check for actual changes
     changeTimeout = setTimeout(() => {
-      if (!navigationInProgress) {
+      if (!navigationInProgress && !window.operatonPopulatingResults) {
         const currentState = captureFormState();
         const hasChanged = hasActualFormChanges(formStateSnapshot, currentState);
 
         if (hasChanged) {
-          console.log('Input change detected outside navigation - clearing results');
-          clearAllResultFields(formId, `Input changed: ${fieldName}`);
+          console.log(`USER INPUT change detected: ${fieldName} - clearing results`);
+          clearAllResultFields(formId, `User input changed: ${fieldName}`);
           clearStoredResults(formId);
           formStateSnapshot = currentState;
         }
@@ -961,9 +997,35 @@ function simpleFormInitialization(formId) {
         const targetPage = parseInt(config.evaluation_step) || 2;
         const isDecisionFlowPage = currentPage === targetPage + 1 && config.show_decision_flow;
 
+        // CRITICAL: Check if result fields already have values (indicating navigation back from evaluation)
+        const resultFieldIds = getResultFieldIds(formId);
+        let hasExistingResults = false;
+
+        if (resultFieldIds.length > 0) {
+          const $form = $(`#gform_${formId}`);
+          resultFieldIds.forEach(fieldId => {
+            const $field = $form.find(`#input_${formId}_${fieldId}`);
+            if ($field.length > 0 && $field.val() && $field.val().trim() !== '') {
+              hasExistingResults = true;
+              console.log(`Found existing result in field ${fieldId}: "${$field.val()}"`);
+            }
+          });
+        }
+
+        if (hasExistingResults) {
+          console.log(`PRESERVING existing results during re-initialization - Form ${formId}, page ${currentPage}`);
+          // Only clear stored process data, keep the visible results
+          if (typeof Storage !== 'undefined') {
+            sessionStorage.removeItem(`operaton_process_${formId}`);
+          }
+          return; // Don't clear anything else
+        }
+
         if (!isDecisionFlowPage) {
-          console.log(`Clearing results on initialization - Form ${formId}, page ${currentPage}`);
-          clearResultFieldWithMessage(formId, 'Form initialized');
+          console.log(
+            `Clearing results on fresh initialization - Form ${formId}, page ${currentPage} (no existing results found)`
+          );
+          clearResultFieldWithMessage(formId, 'Form initialized (no existing results)');
         } else {
           console.log(`PRESERVING results on decision flow page - Form ${formId}, page ${currentPage}`);
           // Only clear stored data, not the actual result fields
@@ -1311,6 +1373,7 @@ function handleEvaluateClick($button) {
 
           // 🚩 Set safeguard flag
           window.operatonPopulatingResults = true;
+          console.log('🛡️ SAFEGUARD: Result population started - blocking change handlers');
 
           let populatedCount = 0;
           const resultSummary = [];
@@ -1347,7 +1410,8 @@ function handleEvaluateClick($button) {
           // 🚩 Reset safeguard flag shortly after population
           setTimeout(() => {
             window.operatonPopulatingResults = false;
-          }, 100);
+            console.log('🛡️ SAFEGUARD: Result population completed - change handlers re-enabled');
+          }, 200);
 
           // Store process instance ID if provided
           if (response.process_instance_id) {
@@ -1977,18 +2041,21 @@ function waitForJQuery(callback, maxAttempts = 50) {
       console.log(`🎉 Operaton DMN initialization complete in ${(initEndTime - initStartTime).toFixed(2)}ms`);
     });
 
-    // Cleanup on page unload
-    $(window).on('beforeunload', () => {
-      console.log('🧹 Cleaning up Operaton DMN...');
-      window.operatonInitialized.forms.clear();
-      window.operatonInitialized.globalInit = false;
-      window.operatonInitialized.initInProgress = false;
-      domQueryCache.clear();
-      formConfigCache.clear();
-      if (window.operatonButtonManager) {
-        window.operatonButtonManager.clearCache();
-      }
-    });
+    //    $(window).on('beforeunload', e => {
+    //      // For Gravity Forms, ONLY clean up on actual site navigation, not form navigation
+    //      const isGravityFormNavigation = document.querySelector('.gform_previous_button, .gform_next_button');
+    //      const hasGfPage = window.location.href.includes('gf_page=');
+
+    //      if (isGravityFormNavigation || hasGfPage) {
+    //        console.log('🔄 Gravity Forms context - PRESERVING all state');
+    //        return; // Don't clean up anything
+    //      }
+
+    //      console.log('🧹 Actual site navigation - minimal cleanup');
+    //      // Only clear caches, preserve form state
+    //      domQueryCache.clear();
+    //      formConfigCache.clear();
+    //    });
 
     $(document).ready(() => {
       console.log('📋 Document ready - initialization active');
