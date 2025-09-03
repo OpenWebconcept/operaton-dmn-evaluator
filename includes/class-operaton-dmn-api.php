@@ -91,6 +91,10 @@ class Operaton_DMN_API
         add_action('wp_ajax_operaton_test_full_config', array($this, 'ajax_test_full_config'));
         add_action('wp_ajax_operaton_clear_update_cache', array($this, 'ajax_clear_update_cache'));
 
+        // API Debug tests
+        add_action('wp_ajax_operaton_dmn_debug', array($this, 'run_operaton_dmn_debug'));
+        add_action('wp_ajax_nopriv_operaton_dmn_debug', array($this, 'run_operaton_dmn_debug'));
+
         // Decision flow REST endpoint
         add_action('rest_api_init', array($this, 'register_decision_flow_endpoint'));
     }
@@ -2349,5 +2353,119 @@ class Operaton_DMN_API
     public function get_database_instance()
     {
         return $this->database;
+    }
+
+    /**
+     * AJAX handler for debug tests
+     */
+    public function run_operaton_dmn_debug()
+    {
+        if (!current_user_can('manage_options'))
+        {
+            wp_send_json_error('Unauthorized');
+            return;
+        }
+
+        try
+        {
+            error_log("Starting Operaton DMN REST API Debug Session");
+
+            $results = array();
+            $results['server_config'] = $this->test_server_config();
+            $results['plugin_init'] = $this->test_plugin_initialization();
+            $results['rest_api'] = $this->test_rest_api_availability();
+            $results['api_call'] = $this->test_rest_api_call();
+
+            error_log("=== END OPERATON DMN DEBUG ===");
+
+            wp_send_json_success(array(
+                'message' => 'Debug completed successfully',
+                'results' => $results,
+                'check_logs' => 'See error log for detailed output'
+            ));
+        }
+        catch (Exception $e)
+        {
+            error_log("Debug error: " . $e->getMessage());
+            wp_send_json_error('Debug failed: ' . $e->getMessage());
+        }
+    }
+
+    private function test_server_config()
+    {
+        error_log("=== SERVER CONFIGURATION DEBUG ===");
+
+        $config = array(
+            'allow_url_fopen' => ini_get('allow_url_fopen') ? 'Enabled' : 'Disabled',
+            'curl_available' => function_exists('curl_init') ? 'Available' : 'Not available',
+            'openssl_loaded' => extension_loaded('openssl') ? 'Available' : 'Not available'
+        );
+
+        foreach ($config as $key => $value)
+        {
+            error_log("$key: $value");
+        }
+
+        return $config;
+    }
+
+    private function test_plugin_initialization()
+    {
+        error_log("=== PLUGIN INITIALIZATION DEBUG ===");
+
+        $status = array(
+            'api_manager_class' => class_exists('OperatonDMNApiManager'),
+            'health_check_method' => method_exists($this, 'health_check'),
+            'handle_evaluation_method' => method_exists($this, 'handle_evaluation')
+        );
+
+        foreach ($status as $check => $result)
+        {
+            error_log("$check: " . ($result ? 'YES' : 'NO'));
+        }
+
+        return $status;
+    }
+
+    private function test_rest_api_availability()
+    {
+        error_log("=== REST API AVAILABILITY DEBUG ===");
+
+        if (!function_exists('rest_get_url_prefix'))
+        {
+            error_log("ERROR: WordPress REST API not available");
+            return false;
+        }
+
+        $rest_server = rest_get_server();
+        $namespaces = $rest_server->get_namespaces();
+        $has_operaton = in_array('operaton-dmn/v1', $namespaces);
+
+        error_log("Available namespaces: " . implode(', ', $namespaces));
+        error_log("Operaton namespace registered: " . ($has_operaton ? 'YES' : 'NO'));
+
+        return $has_operaton;
+    }
+
+    private function test_rest_api_call()
+    {
+        error_log("=== REST API CALL TEST ===");
+
+        $test_url = home_url('/wp-json/operaton-dmn/v1/test');
+        $response = wp_remote_get($test_url);
+
+        if (is_wp_error($response))
+        {
+            error_log("REST API Error: " . $response->get_error_message());
+            return false;
+        }
+
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+
+        error_log("REST API Response Status: " . $status_code);
+        error_log("REST API Response Body: " . $body);
+
+        return $status_code === 200;
     }
 }
