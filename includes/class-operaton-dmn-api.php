@@ -92,7 +92,7 @@ class Operaton_DMN_API
         add_action('wp_ajax_operaton_clear_update_cache', array($this, 'ajax_clear_update_cache'));
 
         // API Debug tests
-        add_action('wp_ajax_operaton_dmn_debug', array($this, 'run_operaton_dmn_debug'));
+        add_action('wp_ajax_operaton_dmn_debug', array($this, 'handle_dmn_debug_ajax'));
         add_action('wp_ajax_nopriv_operaton_dmn_debug', array($this, 'run_operaton_dmn_debug'));
 
         // Decision flow REST endpoint
@@ -2388,6 +2388,60 @@ class Operaton_DMN_API
         {
             error_log("Debug error: " . $e->getMessage());
             wp_send_json_error('Debug failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Handle AJAX request for DMN debug tests
+     */
+    public function handle_dmn_debug_ajax()
+    {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
+        {
+            wp_send_json_error('Invalid nonce');
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options'))
+        {
+            wp_send_json_error('Insufficient permissions');
+        }
+
+        try
+        {
+            // Call your existing debug method and capture any output
+            ob_start();
+            $this->run_operaton_dmn_debug();
+            $debug_output = ob_get_clean();
+
+            // Also get the debug results if your method returns them
+            // You might want to modify run_operaton_dmn_debug to return structured data
+
+            wp_send_json_success([
+                'message' => 'Debug completed successfully',
+                'check_logs' => 'See error log for detailed output',
+                'timestamp' => current_time('mysql'),
+                'results' => [
+                    'server_config' => [
+                        'allow_url_fopen' => ini_get('allow_url_fopen') ? 'Enabled' : 'Disabled',
+                        'curl_available' => function_exists('curl_init') ? 'Available' : 'Not Available',
+                        'openssl_loaded' => extension_loaded('openssl') ? 'Available' : 'Not Available'
+                    ],
+                    'plugin_init' => [
+                        'api_manager_class' => class_exists('OperatonDMNAPI'),
+                        'handle_evaluation_method' => method_exists($this, 'handle_evaluation'),
+                        'health_check_method' => method_exists($this, 'health_check')
+                    ],
+                    'rest_api' => rest_url('operaton-dmn/v1/') ? true : false,
+                    'api_call' => $this->test_rest_api_call()
+                ]
+            ]);
+        }
+        catch (Exception $e)
+        {
+            error_log('Operaton DMN Debug AJAX Error: ' . $e->getMessage());
+            wp_send_json_error('Debug test execution failed: ' . $e->getMessage());
         }
     }
 
