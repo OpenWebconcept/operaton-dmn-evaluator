@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 ## Issues
 - [Issue #36](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/36) - Code snippet for radio buttons conflict with simplified `frontend.js` approach
 - [Issue #37](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/37) - Result fields clearing too agressive
+- [Issue #39](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/39) - Radio sync loop with duplicate form
 - [Issue #40](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/37) - Double AJAX Calls Creating Redundant Network Overhead
 
 ### Plugin now correctly distinguishes between
@@ -25,6 +26,14 @@ All notable changes to this project will be documented in this file.
 - ✅ **Event binding deduplication** - Prevented multiple event handlers
 - ✅ **Request-level locking** - Blocked duplicate function calls
 - ✅ **Proper cleanup** - Released locks after processing
+
+### Radio buttons
+- ✅ **Code Snippet** removed
+- ✅ **Infinite loop** stopped
+- ✅ **Radio sync** working for both duplicate forms
+- ✅ **Field logic** working for both duplicate forms
+
+> For now hardcoded Field Mapping are accepted.
 
 ## [1.0.0-beta.15] - 2025-08-31
 
