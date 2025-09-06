@@ -12,6 +12,8 @@ console.log('🚀 Operaton DMN FIXED frontend script loading...');
 // FIXED GLOBAL STATE MANAGEMENT
 // =============================================================================
 
+window.operatonProcessingLock = window.operatonProcessingLock || {};
+
 /**
  * Enhanced global state - better tracking without loops
  */
@@ -1083,8 +1085,17 @@ function simpleFormInitialization(formId) {
       // Use enhanced input monitoring
       setupInputChangeMonitoring(formId);
 
-      // Set up evaluation button events
-      bindEvaluationEventsOptimized(formId);
+      // Set up evaluation button events (with duplicate prevention)
+      if (!window.operatonInitialized.eventsBound) {
+        window.operatonInitialized.eventsBound = new Set();
+      }
+
+      if (!window.operatonInitialized.eventsBound.has(formId)) {
+        bindEvaluationEventsOptimized(formId);
+        window.operatonInitialized.eventsBound.add(formId);
+      } else {
+        console.log('Event handler already bound for form:', formId);
+      }
 
       // Set up enhanced navigation events
       bindNavigationEventsOptimized(formId);
@@ -1580,6 +1591,16 @@ function handleEvaluateClick($button) {
   const formId = $button.data('form-id');
   const configId = $button.data('config-id');
 
+  // CRITICAL: Prevent duplicate processing
+  const lockKey = `eval_${formId}_${configId}`;
+  if (window.operatonProcessingLock[lockKey]) {
+    console.log('🔒 Duplicate evaluation blocked for form:', formId);
+    return;
+  }
+
+  // Set processing lock
+  window.operatonProcessingLock[lockKey] = true;
+
   console.log('Button clicked for form:', formId, 'config:', configId);
 
   const config = getFormConfigCached(formId);
@@ -1813,6 +1834,11 @@ function handleEvaluateClick($button) {
       complete: function () {
         // Always use centralized button manager for restoration
         window.operatonButtonManager.restoreOriginalState($button, formId);
+
+        // CRITICAL: Release the processing lock
+        setTimeout(() => {
+          delete window.operatonProcessingLock[lockKey];
+        }, 1000); // 1 second cooldown to prevent rapid-fire clicks
       },
     });
   }
@@ -2310,6 +2336,18 @@ function createEmergencyOperatonAjax() {
   }
 }
 
+/**
+ * Make handleEvaluateClick globally accessible for delegation
+ */
+window.handleEvaluateClick = handleEvaluateClick;
+
+// Also add verification logging:
+if (typeof window.handleEvaluateClick === 'function') {
+    console.log('✅ handleEvaluateClick is globally accessible');
+} else {
+    console.error('❌ handleEvaluateClick is NOT globally accessible');
+}
+
 // =============================================================================
 // MAIN INITIALIZATION (SINGLE VERSION)
 // =============================================================================
@@ -2468,6 +2506,17 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============================================================================
 // GLOBAL DEBUGGING FUNCTIONS
 // =============================================================================
+
+// Debug function for testing delegation
+window.testDelegation = function() {
+    console.log('Testing delegation availability:');
+    console.log('operatonButtonManager:', typeof window.operatonButtonManager !== 'undefined');
+    console.log('handleEvaluateClick:', typeof window.handleEvaluateClick !== 'undefined');
+    console.log('Should delegate:',
+        typeof window.operatonButtonManager !== 'undefined' &&
+        typeof window.handleEvaluateClick !== 'undefined'
+    );
+};
 
 if (typeof window !== 'undefined') {
   window.operatonDebugFixed = function () {

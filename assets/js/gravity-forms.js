@@ -273,10 +273,8 @@
     },
 
     /**
-     * Handle evaluate button click
-     * Processes form evaluation when the evaluate button is clicked
-     *
-     * @param {Event} e Click event
+     * Handle evaluate button click - Clean production version
+     * Delegates to centralized manager when available, falls back to local handler
      */
     handleEvaluateClick: function (e) {
       e.preventDefault();
@@ -285,9 +283,17 @@
       var formId = $button.data('form-id');
       var configId = $button.data('config-id');
 
-      console.log('Evaluate button clicked for form:', formId);
+      // Delegate to centralized manager if available
+      if (typeof window.operatonButtonManager !== 'undefined' && typeof window.handleEvaluateClick === 'function') {
+        try {
+          window.handleEvaluateClick($button);
+          return; // Successfully delegated
+        } catch (error) {
+          console.error('Delegation failed, using fallback:', error);
+        }
+      }
 
-      // Get form configuration
+      // Fallback handler
       var config = window['operaton_config_' + formId];
       if (!config) {
         console.error('No configuration found for form:', formId);
@@ -309,22 +315,10 @@
         return;
       }
 
-      // FIXED: Use the centralized button manager instead of local button handling
-      if (typeof window.operatonButtonManager !== 'undefined') {
-        // Let the frontend.js button manager handle the button state
-        console.log('Delegating button management to centralized manager');
-
-        // Trigger the main evaluation handler instead of duplicating logic
-        if (typeof handleEvaluateClick === 'function') {
-          handleEvaluateClick($button);
-          return;
-        }
-      }
-
-      // FALLBACK: Simplified evaluation if button manager not available
+      // Execute fallback evaluation
       OperatonGravityForms.performEvaluationSimplified(formId, configId, formData, $button);
     },
-
+    
     /**
      * Validate form data before evaluation
      * Checks if required fields are filled for DMN evaluation
