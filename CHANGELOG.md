@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 ## Issues
 - [Issue #36](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/36) - Code snippet for radio buttons conflict with simplified `frontend.js` approach
 - [Issue #37](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/37) - Result fields clearing too agressive
+- [Issue #40](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/37) - Double AJAX Calls Creating Redundant Network Overhead
 
 ### Plugin now correctly distinguishes between
 - ✅ **Navigation** - preserves results
@@ -19,6 +20,11 @@ All notable changes to this project will be documented in this file.
 - ✅ **Cleaner** more maintainable code
 - ✅ **Follows** established patterns
 - ✅ **Can be extended** for other forms easily
+
+### Single AJAX flow
+- ✅ **Event binding deduplication** - Prevented multiple event handlers
+- ✅ **Request-level locking** - Blocked duplicate function calls
+- ✅ **Proper cleanup** - Released locks after processing
 
 ## [1.0.0-beta.15] - 2025-08-31
 
