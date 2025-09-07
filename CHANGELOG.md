@@ -7,7 +7,8 @@ All notable changes to this project will be documented in this file.
 - [Issue #36](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/36) - Code snippet for radio buttons conflict with simplified `frontend.js` approach
 - [Issue #37](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/37) - Result fields clearing too agressive
 - [Issue #39](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/39) - Radio sync loop with duplicate form
-- [Issue #40](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/37) - Double AJAX Calls Creating Redundant Network Overhead
+- [Issue #40](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/40) - Double AJAX Calls Creating Redundant Network Overhead
+- [Issue #41](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/41) - Implement Connection Reuse in API Class
 
 ### Plugin now correctly distinguishes between
 - ✅ **Navigation** - preserves results
@@ -32,6 +33,14 @@ All notable changes to this project will be documented in this file.
 - ✅ **Infinite loop** stopped
 - ✅ **Radio sync** working for both duplicate forms
 - ✅ **Field logic** working for both duplicate forms
+
+### Connection Reuse in API Class
+- ✅ **SSL handshake saved** - Second call skipped SSL negotiation
+- ✅ **TCP connection reused** - No new socket establishment needed
+- ✅ **DNS lookup saved** - Hostname resolution cached
+- ✅ **Batch operation success** - Multiple API calls using same connection
+
+
 
 > For now hardcoded Field Mapping are accepted.
 
