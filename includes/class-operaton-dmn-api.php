@@ -332,21 +332,17 @@ class Operaton_DMN_API
     }
 
     /**
-     * Batch multiple API operations for the same host
-     * Use this for process execution that requires multiple API calls
-     *
-     * @param object $config Configuration object
-     * @param array $form_data Form data
-     * @return array|WP_Error Batched execution results
+     * Enhanced batching optimization for process execution
+     * Replace your existing handle_process_execution_optimized method with this version
      */
     private function handle_process_execution_optimized($config, $form_data)
     {
         if (defined('WP_DEBUG') && WP_DEBUG)
         {
-            error_log('Operaton DMN API: Starting optimized process execution for key: ' . $config->process_key);
+            error_log('Operaton DMN API: Starting enhanced batched process execution for key: ' . $config->process_key);
         }
 
-        // Parse field mappings
+        // Parse and validate field mappings
         $field_mappings = json_decode($config->field_mappings, true);
         if (json_last_error() !== JSON_ERROR_NONE)
         {
@@ -366,19 +362,41 @@ class Operaton_DMN_API
 
         $base_url = $this->get_engine_rest_base_url($config->dmn_endpoint);
 
-        // Prepare batch API calls
-        $api_calls = array(
+        // ENHANCED: Prepare ALL possible API calls upfront for optimal batching
+        $api_batch = array(
             'start_process' => array(
                 'endpoint' => $this->build_process_endpoint($config->dmn_endpoint, $config->process_key),
                 'data' => array('variables' => $variables),
-                'method' => 'POST'
+                'method' => 'POST',
+                'required' => true
+            ),
+            'get_variables_active' => array(
+                'endpoint' => null, // Will be set after process start
+                'data' => array(),
+                'method' => 'GET',
+                'required' => false,
+                'fallback_for' => 'get_variables_history'
+            ),
+            'get_variables_history' => array(
+                'endpoint' => null, // Will be set after process start
+                'data' => array(),
+                'method' => 'GET',
+                'required' => true,
+                'primary_data_source' => true
             )
         );
 
-        // Execute process start with optimized connection
+        // Execute Step 1: Start Process (required)
+        $start_time = microtime(true);
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Batch Step 1 - Starting process at: ' . $api_batch['start_process']['endpoint']);
+        }
+
         $process_response = $this->make_optimized_api_call(
-            $api_calls['start_process']['endpoint'],
-            $api_calls['start_process']['data'],
+            $api_batch['start_process']['endpoint'],
+            $api_batch['start_process']['data'],
             'POST'
         );
 
@@ -416,40 +434,51 @@ class Operaton_DMN_API
         $process_instance_id = $process_result['id'];
         $process_ended = isset($process_result['ended']) ? $process_result['ended'] : false;
 
-        // Immediately get variables using the same optimized connection
-        $variables_endpoint = $base_url . '/history/variable-instance?processInstanceId=' . $process_instance_id;
-        $variables_response = $this->make_optimized_api_call($variables_endpoint, array(), 'GET');
-
-        if (is_wp_error($variables_response))
+        // ENHANCED: Prepare variable retrieval endpoints based on process state
+        if ($process_ended)
         {
-            // Fallback to original method if optimized call fails
-            return $this->get_process_variables($config, $process_instance_id, $process_ended);
-        }
+            // Process completed immediately - use history endpoint
+            $api_batch['get_variables_history']['endpoint'] = $base_url . '/history/variable-instance?processInstanceId=' . $process_instance_id;
+            $primary_endpoint = 'get_variables_history';
 
-        // Process the variables response
-        $variables_body = wp_remote_retrieve_body($variables_response);
-        $historical_variables = json_decode($variables_body, true);
-
-        $final_variables = array();
-        if (is_array($historical_variables))
-        {
-            foreach ($historical_variables as $var)
+            if (defined('WP_DEBUG') && WP_DEBUG)
             {
-                if (isset($var['name']) && array_key_exists('value', $var))
-                {
-                    $final_variables[$var['name']] = array(
-                        'value' => $var['value'],
-                        'type' => isset($var['type']) ? $var['type'] : 'String'
-                    );
-                }
+                error_log('Operaton DMN API: Process ended immediately, using history endpoint');
+            }
+        }
+        else
+        {
+            // Process might still be running - prepare both endpoints for intelligent fallback
+            $api_batch['get_variables_active']['endpoint'] = $base_url . '/process-instance/' . $process_instance_id . '/variables';
+            $api_batch['get_variables_history']['endpoint'] = $base_url . '/history/variable-instance?processInstanceId=' . $process_instance_id;
+            $primary_endpoint = 'get_variables_active';
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN API: Process may be running, preparing intelligent fallback strategy');
             }
         }
 
-        // Extract results
+        // Execute Step 2: Intelligent Variable Retrieval with Batched Fallback
+        $final_variables = $this->execute_variable_retrieval_batch($api_batch, $primary_endpoint, $process_instance_id);
+
+        if (is_wp_error($final_variables))
+        {
+            return $final_variables;
+        }
+
+        // Extract results using the retrieved variables
         $results = $this->extract_process_results($config, $final_variables);
 
-        // Store process instance ID
+        // Store process instance ID for decision flow
         $this->database->store_process_instance_id($config->form_id, $process_instance_id);
+
+        $total_time = round((microtime(true) - $start_time) * 1000, 2);
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Batched execution completed in ' . $total_time . 'ms');
+        }
 
         return array(
             'success' => true,
@@ -459,14 +488,189 @@ class Operaton_DMN_API
                 'variables_sent' => $variables,
                 'process_result' => $process_result,
                 'final_variables' => $final_variables,
-                'endpoint_used' => $api_calls['start_process']['endpoint'],
+                'endpoint_used' => $api_batch['start_process']['endpoint'],
                 'process_ended_immediately' => $process_ended,
-                'connection_stats' => self::$pool_stats,
-                'optimized_calls_used' => 2
+                'total_execution_time_ms' => $total_time,
+                'batching_strategy' => $primary_endpoint,
+                'extraction_summary' => array(
+                    'total_variables_found' => count($final_variables),
+                    'results_extracted' => count($results),
+                    'result_fields_searched' => array_keys($this->parse_result_mappings($config))
+                )
             ) : null
         );
     }
 
+    /**
+     * Execute intelligent variable retrieval with batched fallback strategy
+     *
+     * @param array $api_batch Prepared API call configurations
+     * @param string $primary_endpoint Primary endpoint to try first
+     * @param string $process_instance_id Process instance identifier
+     * @return array|WP_Error Retrieved variables or error
+     */
+    private function execute_variable_retrieval_batch($api_batch, $primary_endpoint, $process_instance_id)
+    {
+        $retrieval_start = microtime(true);
+
+        // Try primary strategy first
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Batch Step 2a - Trying primary strategy: ' . $primary_endpoint);
+        }
+
+        $primary_response = $this->make_optimized_api_call(
+            $api_batch[$primary_endpoint]['endpoint'],
+            $api_batch[$primary_endpoint]['data'],
+            $api_batch[$primary_endpoint]['method']
+        );
+
+        $primary_variables = $this->process_variable_response($primary_response, $primary_endpoint);
+
+        // If primary strategy succeeded and returned data, use it
+        if (!is_wp_error($primary_variables) && !empty($primary_variables))
+        {
+            $retrieval_time = round((microtime(true) - $retrieval_start) * 1000, 2);
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN API: Primary strategy succeeded in ' . $retrieval_time . 'ms, found ' . count($primary_variables) . ' variables');
+            }
+
+            return $primary_variables;
+        }
+
+        // Primary strategy failed or returned no data - try fallback
+        $fallback_endpoint = ($primary_endpoint === 'get_variables_active') ? 'get_variables_history' : 'get_variables_active';
+
+        if (!isset($api_batch[$fallback_endpoint]['endpoint']) || empty($api_batch[$fallback_endpoint]['endpoint']))
+        {
+            return new WP_Error(
+                'no_fallback',
+                __('Primary variable retrieval failed and no fallback available', 'operaton-dmn'),
+                array('status' => 500)
+            );
+        }
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Batch Step 2b - Primary failed, trying fallback: ' . $fallback_endpoint);
+        }
+
+        // Small delay before fallback to allow process completion if needed
+        if ($primary_endpoint === 'get_variables_active')
+        {
+            usleep(500000); // 0.5 second wait for process completion
+        }
+
+        $fallback_response = $this->make_optimized_api_call(
+            $api_batch[$fallback_endpoint]['endpoint'],
+            $api_batch[$fallback_endpoint]['data'],
+            $api_batch[$fallback_endpoint]['method']
+        );
+
+        $fallback_variables = $this->process_variable_response($fallback_response, $fallback_endpoint);
+
+        if (is_wp_error($fallback_variables))
+        {
+            return new WP_Error(
+                'variable_retrieval_failed',
+                sprintf(__('Both primary and fallback variable retrieval failed: %s', 'operaton-dmn'), $fallback_variables->get_error_message()),
+                array('status' => 500)
+            );
+        }
+
+        $total_retrieval_time = round((microtime(true) - $retrieval_start) * 1000, 2);
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Fallback strategy succeeded in ' . $total_retrieval_time . 'ms, found ' . count($fallback_variables) . ' variables');
+        }
+
+        return $fallback_variables;
+    }
+
+    /**
+     * Process variable response from API calls
+     *
+     * @param array|WP_Error $response HTTP response
+     * @param string $endpoint_type Type of endpoint called
+     * @return array|WP_Error Processed variables or error
+     */
+    private function process_variable_response($response, $endpoint_type)
+    {
+        if (is_wp_error($response))
+        {
+            return $response;
+        }
+
+        $http_code = wp_remote_retrieve_response_code($response);
+        if ($http_code !== 200)
+        {
+            return new WP_Error(
+                'api_error',
+                sprintf(__('Variable retrieval failed with status %d', 'operaton-dmn'), $http_code),
+                array('status' => 500)
+            );
+        }
+
+        $variables_body = wp_remote_retrieve_body($response);
+        $variables_data = json_decode($variables_body, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
+            return new WP_Error(
+                'json_error',
+                __('Invalid JSON response from variable retrieval', 'operaton-dmn'),
+                array('status' => 500)
+            );
+        }
+
+        if (!is_array($variables_data))
+        {
+            return array(); // Empty but valid response
+        }
+
+        // Convert to consistent format based on endpoint type
+        if ($endpoint_type === 'get_variables_history')
+        {
+            // History endpoint returns array of variable objects
+            $final_variables = array();
+            foreach ($variables_data as $var)
+            {
+                if (isset($var['name']) && array_key_exists('value', $var))
+                {
+                    $final_variables[$var['name']] = array(
+                        'value' => $var['value'],
+                        'type' => isset($var['type']) ? $var['type'] : 'String'
+                    );
+                }
+            }
+            return $final_variables;
+        }
+        else
+        {
+            // Active variables endpoint returns object with variable names as keys
+            return $variables_data;
+        }
+    }
+
+    /**
+     * Clear connection pool cache for testing/debugging
+     * Add this method for manual cache management
+     */
+    public function clear_connection_pool_for_batching()
+    {
+        $cleared = $this->clear_connection_pool();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Cleared connection pool for batching optimization: ' . $cleared . ' connections');
+        }
+
+        return $cleared;
+    }
+    
     /**
      * Get connection pool statistics with WordPress persistence
      */
