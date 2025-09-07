@@ -76,6 +76,11 @@ if (!defined('ABSPATH'))
             title="Force reload all configurations from database without using cache">
             Force Reload Configurations
         </button>
+        <!-- NEW: Connection Efficiency Button -->
+        <button type="button" id="check-connection-stats" class="button button-secondary"
+            title="Check HTTP connection reuse efficiency for API calls">
+            Check Connection Efficiency
+        </button>
     </div>
 
     <div id="cache-operation-result" style="margin-top: 10px;"></div>
@@ -87,6 +92,7 @@ if (!defined('ABSPATH'))
                 <li><strong>Decision Flow Cache:</strong> Clears cached decision flow summaries and temporary evaluation data</li>
                 <li><strong>All Configuration Cache:</strong> Clears ALL cached data including form configurations, transients, and forces fresh database reads</li>
                 <li><strong>Force Reload:</strong> Bypasses cache and reloads all configurations directly from database</li>
+                <li><strong>Connection Efficiency:</strong> Shows HTTP connection reuse statistics and optimization performance</li>
             </ul>
             <p style="margin-top: 10px;"><strong>When to use:</strong></p>
             <ul style="margin-left: 20px;">
@@ -94,6 +100,7 @@ if (!defined('ABSPATH'))
                 <li>When forms show old evaluation results</li>
                 <li>If configuration changes aren't being reflected</li>
                 <li>After plugin updates or database schema changes</li>
+                <li>To monitor API call efficiency and connection reuse performance</li>
             </ul>
         </div>
     </details>
@@ -571,6 +578,78 @@ if (!defined('ABSPATH'))
                     '⚠ <strong><?php _e('Status retrieval failed:', 'operaton-dmn'); ?></strong> <?php _e('Connection error', 'operaton-dmn'); ?> (' + status + ')</div>', false);
             }).always(function() {
                 button.prop('disabled', false).text('<?php _e('Get Plugin Status', 'operaton-dmn'); ?>');
+            });
+        });
+
+        // Connection Stats functionality
+        $('#check-connection-stats').on('click', function() {
+            console.log('Check Connection Efficiency button clicked');
+            var button = $(this);
+
+            button.prop('disabled', true).text('Checking...');
+            showCacheOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Analyzing connection pool efficiency...</div>', false);
+
+            $.post(ajaxurl, {
+                action: 'operaton_check_connection_stats',
+                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+            }, function(response) {
+                if (response.success && response.data.stats) {
+                    console.log('Connection stats response:', response.data);
+
+                    var stats = response.data.stats;
+                    var statusHtml = '<div style="color: #155724; padding: 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
+                        '<h4 style="margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">' +
+                        '<span style="color: ' + stats.efficiency_color + ';">📊</span> Connection Efficiency Report</h4>';
+
+                    // Efficiency summary with colored indicator
+                    statusHtml += '<div style="margin-bottom: 12px; padding: 8px; background: rgba(255,255,255,0.7); border-radius: 4px;">' +
+                        '<div style="font-size: 16px; font-weight: 600; color: ' + stats.efficiency_color + ';">' +
+                        stats.summary + '</div></div>';
+
+                    // Connection details in a grid
+                    if (stats.details && Object.keys(stats.details).length > 0) {
+                        statusHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-bottom: 10px;">';
+
+                        Object.entries(stats.details).forEach(function([key, value]) {
+                            var isEfficiency = key.includes('Reused');
+                            var textColor = isEfficiency ? stats.efficiency_color : '#495057';
+                            statusHtml += '<div style="padding: 6px 8px; background: rgba(255,255,255,0.8); border-radius: 3px; border-left: 3px solid ' +
+                                (isEfficiency ? stats.efficiency_color : '#dee2e6') + ';">' +
+                                '<div style="font-size: 11px; color: #6c757d; text-transform: uppercase; font-weight: 600;">' + key + '</div>' +
+                                '<div style="font-size: 14px; font-weight: 600; color: ' + textColor + ';">' + value + '</div>' +
+                                '</div>';
+                        });
+
+                        statusHtml += '</div>';
+                    }
+
+                    // Performance recommendations
+                    if (stats.efficiency_percent < 50) {
+                        statusHtml += '<div style="margin-top: 10px; padding: 8px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 13px;">' +
+                            '<strong>💡 Optimization Tip:</strong> Low connection reuse suggests high cache miss rate. ' +
+                            'Consider increasing connection pool timeout or checking for endpoint configuration issues.' +
+                            '</div>';
+                    } else if (stats.efficiency_percent >= 70) {
+                        statusHtml += '<div style="margin-top: 10px; padding: 8px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; font-size: 13px;">' +
+                            '<strong>🎉 Excellent!</strong> Your connection reuse optimization is working very well. ' +
+                            'This indicates efficient API communication with minimal SSL handshake overhead.' +
+                            '</div>';
+                    }
+
+                    statusHtml += '</div>';
+
+                    showCacheOperationFeedback(statusHtml);
+
+                } else {
+                    showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                        '⚠️ <strong>Connection stats check failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>', false);
+                }
+            }).fail(function(xhr, status, error) {
+                console.error('AJAX request failed:', xhr, status, error);
+                showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                    '⚠️ <strong>Connection stats check failed:</strong> Connection error (' + status + ')</div>', false);
+            }).always(function() {
+                button.prop('disabled', false).text('Check Connection Efficiency');
             });
         });
 

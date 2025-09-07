@@ -98,6 +98,7 @@ class Operaton_DMN_API
         if ($this->has_valid_connection($connection_key))
         {
             self::$pool_stats['hits']++;
+            $this->update_connection_stats('hits');  // Wordpress persistence for admin dashboard
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
                 error_log('Operaton DMN API: Reusing connection for host: ' . $host);
@@ -108,6 +109,8 @@ class Operaton_DMN_API
         // Create new optimized connection
         self::$pool_stats['misses']++;
         self::$pool_stats['created']++;
+        $this->update_connection_stats('misses'); // Wordpress persistence for admin dashboard
+        $this->update_connection_stats('created');
 
         if (defined('WP_DEBUG') && WP_DEBUG)
         {
@@ -250,6 +253,7 @@ class Operaton_DMN_API
     {
         // Clean old connections first
         $this->cleanup_old_connections();
+        $this->update_connection_stats('cleaned'); // Wordpress persistence for admin dashboard
 
         self::$connection_pool[$connection_key] = array(
             'options' => $options,
@@ -464,14 +468,20 @@ class Operaton_DMN_API
     }
 
     /**
-     * Get connection pool statistics
-     *
-     * @return array Pool statistics for monitoring
+     * Get connection pool statistics with WordPress persistence
      */
     public function get_connection_pool_stats()
     {
+        // Get stats from WordPress options (persistent storage)
+        $stored_stats = get_option('operaton_connection_stats', array(
+            'hits' => 0,
+            'misses' => 0,
+            'created' => 0,
+            'cleaned' => 0
+        ));
+
         return array(
-            'stats' => self::$pool_stats,
+            'stats' => $stored_stats,
             'active_connections' => count(self::$connection_pool),
             'pool_details' => array_map(function ($conn)
             {
@@ -482,6 +492,22 @@ class Operaton_DMN_API
                 );
             }, self::$connection_pool)
         );
+    }
+
+    /**
+     * Update persistent statistics
+     */
+    private function update_connection_stats($type)
+    {
+        $stats = get_option('operaton_connection_stats', array(
+            'hits' => 0,
+            'misses' => 0,
+            'created' => 0,
+            'cleaned' => 0
+        ));
+
+        $stats[$type]++;
+        update_option('operaton_connection_stats', $stats);
     }
 
     /**
@@ -1326,7 +1352,7 @@ class Operaton_DMN_API
 
         // NEW:
         $response = $this->make_optimized_api_call($full_endpoint, $test_data);
-        
+
         if (is_wp_error($response)) {
             return array(
                 'success' => false,
