@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - [Issue #39](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/39) - Radio sync loop with duplicate form
 - [Issue #40](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/40) - Double AJAX Calls Creating Redundant Network Overhead
 - [Issue #41](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/41) - Implement Connection Reuse in API Class
+- [Issue #44](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/44) - Check connection efficiency in admin dashboard
 
 ### Plugin now correctly distinguishes between
 - ✅ **Navigation** - preserves results
@@ -33,6 +34,7 @@ All notable changes to this project will be documented in this file.
 - ✅ **Infinite loop** stopped
 - ✅ **Radio sync** working for both duplicate forms
 - ✅ **Field logic** working for both duplicate forms
+> For now hardcoded Field Mapping are accepted.
 
 ### Connection Reuse in API Class
 - ✅ **SSL handshake saved** - Second call skipped SSL negotiation
@@ -40,9 +42,9 @@ All notable changes to this project will be documented in this file.
 - ✅ **DNS lookup saved** - Hostname resolution cached
 - ✅ **Batch operation success** - Multiple API calls using same connection
 
-
-
-> For now hardcoded Field Mapping are accepted.
+### Admin Dashboard
+- ✅ **Connection Efficiency** - Shows HTTP connection reuse statistics and optimization performance
+![Connection-efficiency-report](./assets/images/connection-efficiency.png)
 
 ## [1.0.0-beta.15] - 2025-08-31
 
