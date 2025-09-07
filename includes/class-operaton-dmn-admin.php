@@ -89,6 +89,9 @@ class Operaton_DMN_Admin
 
         // Note: Gravity Forms integration is handled by the dedicated Gravity Forms class
 
+        // AJAX handler for connection timeout settings saved in admin dashboard
+        add_action('wp_ajax_operaton_save_connection_timeout', array($this, 'ajax_save_connection_timeout'));
+
         // AJAX handler for connection reuse stats
         add_action('wp_ajax_operaton_check_connection_stats', array($this, 'ajax_check_connection_stats'));
 
@@ -1306,6 +1309,62 @@ class Operaton_DMN_Admin
     public function current_user_can_manage()
     {
         return current_user_can($this->capability);
+    }
+
+    /**
+     * AJAX handler for saving connection timeout setting
+     */
+    public function ajax_save_connection_timeout()
+    {
+        // Verify nonce and permissions
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce') || !current_user_can('manage_options'))
+        {
+            wp_send_json_error(array('message' => __('Security check failed', 'operaton-dmn')));
+            return;
+        }
+
+        $timeout = intval($_POST['timeout']);
+
+        // Validate timeout range (1 minute to 30 minutes)
+        if ($timeout < 60 || $timeout > 1800)
+        {
+            wp_send_json_error(array(
+                'message' => __('Invalid timeout value. Must be between 1 and 30 minutes.', 'operaton-dmn')
+            ));
+            return;
+        }
+
+        try
+        {
+            // Save the setting
+            update_option('operaton_connection_timeout', $timeout);
+
+            // Apply the setting to the API instance if available
+            $api_instance = $this->core->get_api_instance();
+            if ($api_instance && method_exists($api_instance, 'set_connection_pool_timeout'))
+            {
+                $api_instance->set_connection_pool_timeout($timeout);
+            }
+
+            // Format the response
+            $timeout_minutes = round($timeout / 60, 1);
+            $timeout_label = ($timeout_minutes == floor($timeout_minutes)) ?
+                intval($timeout_minutes) . ' minute' . (intval($timeout_minutes) != 1 ? 's' : '') :
+                $timeout_minutes . ' minutes';
+
+            wp_send_json_success(array(
+                'message' => sprintf(__('Connection timeout updated to %s', 'operaton-dmn'), $timeout_label),
+                'timeout_seconds' => $timeout,
+                'timeout_label' => $timeout_label
+            ));
+        }
+        catch (Exception $e)
+        {
+            error_log('Operaton DMN: Connection timeout save error: ' . $e->getMessage());
+            wp_send_json_error(array(
+                'message' => sprintf(__('Failed to save timeout setting: %s', 'operaton-dmn'), $e->getMessage())
+            ));
+        }
     }
 
     /**

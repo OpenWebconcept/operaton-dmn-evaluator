@@ -61,6 +61,15 @@ class Operaton_DMN_API
     private static $connection_pool = array();
 
     /**
+     * Initialize connection timeout from saved setting
+     */
+    private function init_connection_timeout()
+    {
+        $saved_timeout = get_option('operaton_connection_timeout', 300);
+        $this->set_connection_pool_timeout($saved_timeout);
+    }
+
+    /**
      * Connection pool statistics for monitoring
      * @var array
      */
@@ -656,6 +665,29 @@ class Operaton_DMN_API
     }
 
     /**
+     * Set connection pool timeout from admin setting
+     *
+     * @param int $timeout Timeout in seconds
+     */
+    public function set_connection_pool_timeout($timeout)
+    {
+        $this->connection_max_age = max(60, min(1800, intval($timeout)));
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Connection pool timeout updated to ' . $this->connection_max_age . ' seconds');
+        }
+
+        // Clear existing connections to apply new timeout immediately
+        $cleared = $this->clear_connection_pool();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Cleared ' . $cleared . ' connections to apply new timeout');
+        }
+    }
+
+    /**
      * Clear connection pool cache for testing/debugging
      * Add this method for manual cache management
      */
@@ -670,7 +702,7 @@ class Operaton_DMN_API
 
         return $cleared;
     }
-    
+
     /**
      * Get connection pool statistics with WordPress persistence
      */
@@ -743,6 +775,9 @@ class Operaton_DMN_API
     {
         $this->core = $core;
         $this->database = $database;
+
+        // Initialize connection timeout from saved setting
+        $this->init_connection_timeout();
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN API: Handler initialized');

@@ -83,6 +83,55 @@ if (!defined('ABSPATH'))
         </button>
     </div>
 
+    <!-- Connection Pool Settings -->
+    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #0073aa;">
+        <h4 style="margin: 0 0 10px 0; color: #0073aa;">Connection Pool Settings</h4>
+        <p style="margin: 0 0 15px 0; font-size: 14px; color: #666;">Configure how long connections are kept alive for reuse optimization.</p>
+
+        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="connection-timeout" style="font-weight: 600; color: #333;">Connection Timeout:</label>
+                <select id="connection-timeout" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd;">
+                    <?php
+                    $current_timeout = get_option('operaton_connection_timeout', 300);
+                    $timeout_options = array(
+                        300 => '5 minutes (Default)',
+                        600 => '10 minutes (Recommended)',
+                        900 => '15 minutes (High efficiency)',
+                        1200 => '20 minutes (Maximum)',
+                        1800 => '30 minutes (Development only)'
+                    );
+
+                    foreach ($timeout_options as $seconds => $label)
+                    {
+                        $selected = ($current_timeout == $seconds) ? 'selected' : '';
+                        echo '<option value="' . $seconds . '" ' . $selected . '>' . esc_html($label) . '</option>';
+                    }
+                    ?>
+                </select>
+            </div>
+
+            <button type="button" id="save-connection-timeout" class="button button-primary" style="padding: 6px 12px;">
+                Save Settings
+            </button>
+
+            <div id="timeout-save-result" style="margin-left: 10px;"></div>
+        </div>
+
+        <details style="margin-top: 10px;">
+            <summary style="cursor: pointer; font-weight: 600; color: #0073aa; font-size: 13px;">Connection Timeout Help</summary>
+            <div style="padding: 8px 0; font-size: 13px; color: #666; line-height: 1.4;">
+                <ul style="margin: 5px 0 5px 20px;">
+                    <li><strong>5 minutes:</strong> Best for high-traffic sites with frequent evaluations</li>
+                    <li><strong>10 minutes:</strong> Recommended for most production sites</li>
+                    <li><strong>15-20 minutes:</strong> Maximum efficiency for lower-traffic sites</li>
+                    <li><strong>30 minutes:</strong> Development/testing only (may cause memory issues)</li>
+                </ul>
+                <p style="margin: 8px 0 0 0;"><strong>Note:</strong> Longer timeouts increase connection reuse but use more memory. Choose based on your evaluation frequency.</p>
+            </div>
+        </details>
+    </div>
+
     <div id="cache-operation-result" style="margin-top: 10px;"></div>
 
     <details style="margin-top: 15px;">
@@ -653,6 +702,45 @@ if (!defined('ABSPATH'))
             });
         });
 
+        // Connection Timeout Save functionality
+        $('#save-connection-timeout').on('click', function() {
+            var button = $(this);
+            var timeout = $('#connection-timeout').val();
+            var resultDiv = $('#timeout-save-result');
+
+            if (!timeout) {
+                resultDiv.html('<span style="color: #dc3545;">Please select a timeout value</span>');
+                return;
+            }
+
+            button.prop('disabled', true).text('Saving...');
+            resultDiv.html('<span style="color: #666;">Saving setting...</span>');
+
+            $.post(ajaxurl, {
+                action: 'operaton_save_connection_timeout',
+                timeout: timeout,
+                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+            }, function(response) {
+                if (response.success) {
+                    resultDiv.html('<span style="color: #28a745; font-weight: 600;">✓ ' + response.data.message + '</span>');
+
+                    // Clear the success message after 4 seconds
+                    setTimeout(function() {
+                        resultDiv.fadeOut(300, function() {
+                            $(this).html('').show();
+                        });
+                    }, 4000);
+
+                } else {
+                    resultDiv.html('<span style="color: #dc3545;">✗ ' + (response.data ? response.data.message : 'Save failed') + '</span>');
+                }
+            }).fail(function(xhr, status, error) {
+                resultDiv.html('<span style="color: #dc3545;">✗ Connection error: ' + status + '</span>');
+            }).always(function() {
+                button.prop('disabled', false).text('Save Settings');
+            });
+        });
+        
         // NEW: Run DMN Debug Tests functionality
         $('#run-dmn-debug').on('click', function() {
             console.log('Run DMN Debug Tests button clicked');
