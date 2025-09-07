@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - [Issue #41](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/41) - Implement Connection Reuse in API Class
 - [Issue #42](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/42) - Batch Multiple Operations
 - [Issue #44](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/44) - Check connection efficiency in admin dashboard
+- [Issue #46](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/46) - Make connection pool timeout configurable in admin dashboard
 
 ### Plugin now correctly distinguishes between
 - ✅ **Navigation** - preserves results
@@ -46,6 +47,9 @@ All notable changes to this project will be documented in this file.
 ### Admin Dashboard
 - ✅ **Connection Efficiency** - Shows HTTP connection reuse statistics and optimization performance
 ![Connection-efficiency-report](./assets/images/connection-efficiency.png)
+
+- ✅ **Connection Pool Setting** - Configure how long connections are kept alive for reuse optimization
+![Connection-timeout-settings-save](./assets/images/connection-timeout-setting-save-admin.png)
 
 ### Enhanced Batching Optimization
 - ✅ **Intelligent Fallback Strategy** - Automatically tries active variables first, then falls back to historical variables if needed
