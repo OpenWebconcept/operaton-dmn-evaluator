@@ -55,6 +55,453 @@ class Operaton_DMN_API
     private $ssl_verify = false;
 
     /**
+     * HTTP connection pool for reusing connections to the same host
+     * @var array
+     */
+    private static $connection_pool = array();
+
+    /**
+     * Connection pool statistics for monitoring
+     * @var array
+     */
+    private static $pool_stats = array(
+        'hits' => 0,
+        'misses' => 0,
+        'created' => 0,
+        'cleaned' => 0
+    );
+
+    /**
+     * Maximum age for pooled connections (in seconds)
+     * @var int
+     */
+    private $connection_max_age = 300; // 5 minutes
+
+    /**
+     * Maximum number of connections per host
+     * @var int
+     */
+    private $max_connections_per_host = 3;
+
+    /**
+     * Get optimized HTTP client options with connection reuse
+     *
+     * @param string $endpoint_url Full endpoint URL
+     * @return array HTTP client options optimized for connection reuse
+     */
+    private function get_optimized_http_options($endpoint_url)
+    {
+        $host = parse_url($endpoint_url, PHP_URL_HOST);
+        $connection_key = $this->get_connection_key($host);
+
+        // Check if we have a valid cached connection
+        if ($this->has_valid_connection($connection_key))
+        {
+            self::$pool_stats['hits']++;
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN API: Reusing connection for host: ' . $host);
+            }
+            return $this->get_cached_connection_options($connection_key);
+        }
+
+        // Create new optimized connection
+        self::$pool_stats['misses']++;
+        self::$pool_stats['created']++;
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Creating new connection for host: ' . $host);
+        }
+
+        $options = $this->create_optimized_connection_options($host);
+        $this->cache_connection($connection_key, $options);
+
+        return $options;
+    }
+
+    /**
+     * Create optimized HTTP connection options
+     *
+     * @param string $host Hostname
+     * @return array Optimized HTTP options
+     */
+    private function create_optimized_connection_options($host)
+    {
+        return array(
+            'timeout' => $this->api_timeout,
+            'sslverify' => $this->ssl_verify,
+            'headers' => $this->get_api_headers_with_keepalive(),
+            'httpversion' => '1.1',
+            'blocking' => true,
+            'stream' => false,
+            'decompress' => true,
+            'redirection' => 3,
+            // Connection reuse optimizations
+            'user-agent' => $this->get_optimized_user_agent(),
+            // Force HTTP/1.1 with keep-alive
+            'curl_options' => array(
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                CURLOPT_TCP_KEEPALIVE => 1,
+                CURLOPT_TCP_KEEPIDLE => 60,
+                CURLOPT_TCP_KEEPINTVL => 30,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_DNS_CACHE_TIMEOUT => 300,
+                CURLOPT_MAXCONNECTS => $this->max_connections_per_host,
+                // Reuse connections
+                CURLOPT_FORBID_REUSE => false,
+                CURLOPT_FRESH_CONNECT => false,
+            )
+        );
+    }
+
+    /**
+     * Get API headers optimized for connection reuse
+     *
+     * @return array Headers with keep-alive directives
+     */
+    private function get_api_headers_with_keepalive()
+    {
+        $headers = $this->get_api_headers();
+
+        // Add connection keep-alive headers
+        $headers['Connection'] = 'keep-alive';
+        $headers['Keep-Alive'] = 'timeout=60, max=10';
+
+        return $headers;
+    }
+
+    /**
+     * Get optimized user agent string
+     *
+     * @return string User agent with connection info
+     */
+    private function get_optimized_user_agent()
+    {
+        return sprintf(
+            'WordPress/%s; Operaton-DMN/%s; Connection-Pool/1.0',
+            get_bloginfo('version'),
+            OPERATON_DMN_VERSION ?? '1.0.0'
+        );
+    }
+
+    /**
+     * Generate connection pool key
+     *
+     * @param string $host Hostname
+     * @return string Connection key
+     */
+    private function get_connection_key($host)
+    {
+        return 'operaton_conn_' . md5($host . $this->ssl_verify);
+    }
+
+    /**
+     * Check if we have a valid cached connection
+     *
+     * @param string $connection_key Connection cache key
+     * @return bool True if valid connection exists
+     */
+    private function has_valid_connection($connection_key)
+    {
+        if (!isset(self::$connection_pool[$connection_key]))
+        {
+            return false;
+        }
+
+        $connection = self::$connection_pool[$connection_key];
+        $age = time() - $connection['created_at'];
+
+        if ($age > $this->connection_max_age)
+        {
+            unset(self::$connection_pool[$connection_key]);
+            self::$pool_stats['cleaned']++;
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Get cached connection options
+     *
+     * @param string $connection_key Connection cache key
+     * @return array Cached connection options
+     */
+    private function get_cached_connection_options($connection_key)
+    {
+        $connection = self::$connection_pool[$connection_key];
+        $connection['last_used'] = time();
+        $connection['use_count']++;
+
+        // Update the cached connection
+        self::$connection_pool[$connection_key] = $connection;
+
+        return $connection['options'];
+    }
+
+    /**
+     * Cache connection options
+     *
+     * @param string $connection_key Connection cache key
+     * @param array $options HTTP options to cache
+     */
+    private function cache_connection($connection_key, $options)
+    {
+        // Clean old connections first
+        $this->cleanup_old_connections();
+
+        self::$connection_pool[$connection_key] = array(
+            'options' => $options,
+            'created_at' => time(),
+            'last_used' => time(),
+            'use_count' => 1,
+            'host' => parse_url($options['user-agent'] ?? '', PHP_URL_HOST)
+        );
+    }
+
+    /**
+     * Clean up old connections from the pool
+     */
+    private function cleanup_old_connections()
+    {
+        $current_time = time();
+        $cleaned = 0;
+
+        foreach (self::$connection_pool as $key => $connection)
+        {
+            $age = $current_time - $connection['created_at'];
+            $idle_time = $current_time - $connection['last_used'];
+
+            // Remove if too old or idle too long
+            if ($age > $this->connection_max_age || $idle_time > 120)
+            {
+                unset(self::$connection_pool[$key]);
+                $cleaned++;
+            }
+        }
+
+        if ($cleaned > 0)
+        {
+            self::$pool_stats['cleaned'] += $cleaned;
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN API: Cleaned ' . $cleaned . ' old connections');
+            }
+        }
+    }
+
+    /**
+     * Enhanced API call method with connection reuse
+     * Replace your existing wp_remote_post calls with this method
+     *
+     * @param string $endpoint Full endpoint URL
+     * @param array $data Request data
+     * @param string $method HTTP method (POST, GET, etc.)
+     * @return array|WP_Error HTTP response
+     */
+    private function make_optimized_api_call($endpoint, $data = array(), $method = 'POST')
+    {
+        // Get optimized connection options
+        $options = $this->get_optimized_http_options($endpoint);
+
+        // Add request-specific data
+        if (!empty($data))
+        {
+            $options['body'] = is_array($data) ? wp_json_encode($data) : $data;
+        }
+
+        // Make the request using the appropriate method
+        if ($method === 'POST')
+        {
+            return wp_remote_post($endpoint, $options);
+        }
+        elseif ($method === 'GET')
+        {
+            return wp_remote_get($endpoint, $options);
+        }
+        else
+        {
+            $options['method'] = $method;
+            return wp_remote_request($endpoint, $options);
+        }
+    }
+
+    /**
+     * Batch multiple API operations for the same host
+     * Use this for process execution that requires multiple API calls
+     *
+     * @param object $config Configuration object
+     * @param array $form_data Form data
+     * @return array|WP_Error Batched execution results
+     */
+    private function handle_process_execution_optimized($config, $form_data)
+    {
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Starting optimized process execution for key: ' . $config->process_key);
+        }
+
+        // Parse field mappings
+        $field_mappings = json_decode($config->field_mappings, true);
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
+            return new WP_Error(
+                'invalid_mappings',
+                __('Invalid field mappings configuration', 'operaton-dmn'),
+                array('status' => 500)
+            );
+        }
+
+        // Process input variables
+        $variables = $this->process_input_variables($field_mappings, $form_data);
+        if (is_wp_error($variables))
+        {
+            return $variables;
+        }
+
+        $base_url = $this->get_engine_rest_base_url($config->dmn_endpoint);
+
+        // Prepare batch API calls
+        $api_calls = array(
+            'start_process' => array(
+                'endpoint' => $this->build_process_endpoint($config->dmn_endpoint, $config->process_key),
+                'data' => array('variables' => $variables),
+                'method' => 'POST'
+            )
+        );
+
+        // Execute process start with optimized connection
+        $process_response = $this->make_optimized_api_call(
+            $api_calls['start_process']['endpoint'],
+            $api_calls['start_process']['data'],
+            'POST'
+        );
+
+        if (is_wp_error($process_response))
+        {
+            return new WP_Error(
+                'api_error',
+                sprintf(__('Failed to start process: %s', 'operaton-dmn'), $process_response->get_error_message()),
+                array('status' => 500)
+            );
+        }
+
+        $http_code = wp_remote_retrieve_response_code($process_response);
+        $body = wp_remote_retrieve_body($process_response);
+
+        if ($http_code !== 200 && $http_code !== 201)
+        {
+            return new WP_Error(
+                'api_error',
+                sprintf(__('Process start failed with status %d: %s', 'operaton-dmn'), $http_code, $body),
+                array('status' => 500)
+            );
+        }
+
+        $process_result = json_decode($body, true);
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
+            return new WP_Error(
+                'invalid_response',
+                __('Invalid JSON response from process start', 'operaton-dmn'),
+                array('status' => 500)
+            );
+        }
+
+        $process_instance_id = $process_result['id'];
+        $process_ended = isset($process_result['ended']) ? $process_result['ended'] : false;
+
+        // Immediately get variables using the same optimized connection
+        $variables_endpoint = $base_url . '/history/variable-instance?processInstanceId=' . $process_instance_id;
+        $variables_response = $this->make_optimized_api_call($variables_endpoint, array(), 'GET');
+
+        if (is_wp_error($variables_response))
+        {
+            // Fallback to original method if optimized call fails
+            return $this->get_process_variables($config, $process_instance_id, $process_ended);
+        }
+
+        // Process the variables response
+        $variables_body = wp_remote_retrieve_body($variables_response);
+        $historical_variables = json_decode($variables_body, true);
+
+        $final_variables = array();
+        if (is_array($historical_variables))
+        {
+            foreach ($historical_variables as $var)
+            {
+                if (isset($var['name']) && array_key_exists('value', $var))
+                {
+                    $final_variables[$var['name']] = array(
+                        'value' => $var['value'],
+                        'type' => isset($var['type']) ? $var['type'] : 'String'
+                    );
+                }
+            }
+        }
+
+        // Extract results
+        $results = $this->extract_process_results($config, $final_variables);
+
+        // Store process instance ID
+        $this->database->store_process_instance_id($config->form_id, $process_instance_id);
+
+        return array(
+            'success' => true,
+            'results' => $results,
+            'process_instance_id' => $process_instance_id,
+            'debug_info' => $this->get_debug_info() ? array(
+                'variables_sent' => $variables,
+                'process_result' => $process_result,
+                'final_variables' => $final_variables,
+                'endpoint_used' => $api_calls['start_process']['endpoint'],
+                'process_ended_immediately' => $process_ended,
+                'connection_stats' => self::$pool_stats,
+                'optimized_calls_used' => 2
+            ) : null
+        );
+    }
+
+    /**
+     * Get connection pool statistics
+     *
+     * @return array Pool statistics for monitoring
+     */
+    public function get_connection_pool_stats()
+    {
+        return array(
+            'stats' => self::$pool_stats,
+            'active_connections' => count(self::$connection_pool),
+            'pool_details' => array_map(function ($conn)
+            {
+                return array(
+                    'age' => time() - $conn['created_at'],
+                    'idle_time' => time() - $conn['last_used'],
+                    'use_count' => $conn['use_count']
+                );
+            }, self::$connection_pool)
+        );
+    }
+
+    /**
+     * Clear connection pool (useful for testing or debugging)
+     */
+    public function clear_connection_pool()
+    {
+        $cleared = count(self::$connection_pool);
+        self::$connection_pool = array();
+        self::$pool_stats['cleaned'] += $cleared;
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Manually cleared ' . $cleared . ' connections');
+        }
+
+        return $cleared;
+    }
+
+    /**
      * Constructor for API handler
      * Initializes API functionality with required dependencies
      *
@@ -462,7 +909,10 @@ class Operaton_DMN_API
             $use_process = isset($config->use_process) ? $config->use_process : false;
 
             if ($use_process && !empty($config->process_key)) {
-                return $this->handle_process_execution($config, $params['form_data']);
+            // OLD:
+            //    return $this->handle_process_execution($config, $params['form_data']);
+            // NEW:
+                return $this->handle_process_execution_optimized($config, $params['form_data']);
             } else {
                 return $this->handle_decision_evaluation($config, $params['form_data']);
             }
@@ -653,12 +1103,16 @@ class Operaton_DMN_API
             error_log('Operaton DMN API: Request data: ' . wp_json_encode($operaton_data));
         }
 
-        $response = wp_remote_post($evaluation_endpoint, array(
-            'headers' => $this->get_api_headers(),
-            'body' => wp_json_encode($operaton_data),
-            'timeout' => $this->api_timeout,
-            'sslverify' => $this->ssl_verify,
-        ));
+        // OLD:
+        //$response = wp_remote_post($evaluation_endpoint, array(
+        //    'headers' => $this->get_api_headers(),
+        //    'body' => wp_json_encode($operaton_data),
+        //    'timeout' => $this->api_timeout,
+        //    'sslverify' => $this->ssl_verify,
+        //));
+
+        // NEW:
+        $response = $this->make_optimized_api_call($evaluation_endpoint, $operaton_data);
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
             if (is_wp_error($response)) {
@@ -862,13 +1316,17 @@ class Operaton_DMN_API
             )
         );
 
-        $response = wp_remote_post($full_endpoint, array(
-            'headers' => $this->get_api_headers(),
-            'body' => wp_json_encode($test_data),
-            'timeout' => 15,
-            'sslverify' => $this->ssl_verify,
-        ));
+        // OLD:
+        //$response = wp_remote_post($full_endpoint, array(
+        //    'headers' => $this->get_api_headers(),
+        //    'body' => wp_json_encode($test_data),
+        //    'timeout' => 15,
+        //    'sslverify' => $this->ssl_verify,
+        //));
 
+        // NEW:
+        $response = $this->make_optimized_api_call($full_endpoint, $test_data);
+        
         if (is_wp_error($response)) {
             return array(
                 'success' => false,
