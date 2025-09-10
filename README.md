@@ -48,7 +48,7 @@ All notable changes to this project are documented in the [CHANGELOG.md](./CHANG
 ### Enhanced Plugin features
 - ✅ **Plugin now correctly distinguishes between** navigation, actual user input changes, result field population, form re-initialization
 - ✅ **Populate Radio Buttons Code Snippet removed** - Proper integration with existing safeguard system
-- ✅ **Single AJAX flow** - - Prevented multiple event handlers and blocks duplicate function calls
+- ✅ **Single AJAX flow** - Prevented multiple event handlers and blocks duplicate function calls
 - ✅ **Connection Reuse in API Class** - Second call skipped SSL negotiation, no new socket establishment needed and hostname resolution cached
 - ✅ **Batch operation success** - Multiple API calls using same connection
 - ✅ **Enhanced Batching Optimization**
