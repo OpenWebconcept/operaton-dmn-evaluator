@@ -21,9 +21,37 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEST_RESULTS_DIR="$PROJECT_ROOT/test-results"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
-# Environment variables
-export DMN_TEST_URL="${DMN_TEST_URL:-https://owc-gemeente.open-regels.nl}"
-export DMN_API_KEY="${DMN_API_KEY:-}"
+# Load environment from .env.testing
+load_environment() {
+    local env_file="$PROJECT_ROOT/.env.testing"
+
+    if [[ -f "$env_file" ]]; then
+        echo "Loading environment from .env.testing..."
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            # Skip empty lines and comments
+            if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
+                continue
+            fi
+
+            # Export the variable
+            if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+                export "$line"
+                echo "  Loaded: ${line%%=*}"
+            fi
+        done < "$env_file"
+        echo "Environment loaded successfully"
+    else
+        echo "Warning: .env.testing not found, using defaults"
+        # FIXED: Use correct default URL (without "test")
+        export DMN_TEST_URL="${DMN_TEST_URL:-https://owc-gemeente.open-regels.nl}"
+        export DMN_ENGINE_URL="${DMN_ENGINE_URL:-https://operaton-dev.open-regels.nl}"
+        export DMN_API_KEY="${DMN_API_KEY:-}"
+        export TEST_ENV="${TEST_ENV:-development}"
+    fi
+}
+
+# Load environment first
+load_environment
 
 # Test execution flags
 RUN_UNIT_TESTS=true
@@ -131,6 +159,13 @@ initialize_test_environment() {
     log_step "Setting up test configuration"
     setup_test_configuration
 
+    # Display loaded environment
+    log_step "Environment configuration:"
+    echo "  DMN_TEST_URL: $DMN_TEST_URL"
+    echo "  DMN_ENGINE_URL: $DMN_ENGINE_URL"
+    echo "  DMN_API_KEY: $([ -n "$DMN_API_KEY" ] && echo "configured" || echo "not configured")"
+    echo "  TEST_ENV: $TEST_ENV"
+
     log_success "Test environment initialized"
 }
 
@@ -171,6 +206,7 @@ setup_test_configuration() {
 {
     "timestamp": "$(date -Iseconds)",
     "target_url": "$DMN_TEST_URL",
+    "engine_url": "$DMN_ENGINE_URL",
     "api_key_configured": $([ -n "$DMN_API_KEY" ] && echo "true" || echo "false"),
     "test_suite": {
         "unit_tests": $RUN_UNIT_TESTS,
@@ -256,8 +292,13 @@ run_load_tests() {
     cd "$PROJECT_ROOT"
 
     if [ -f "tests/load/dmn-load-test.js" ]; then
-        log_step "Running K6 load tests"
-        if k6 run tests/load/dmn-load-test.js --env TEST_TYPE=health_only 2>&1 | tee "$TEST_RESULTS_DIR/load-tests-$TIMESTAMP.log"; then
+        log_step "Running K6 load tests with environment variables"
+        if k6 run \
+            -e DMN_TEST_URL="$DMN_TEST_URL" \
+            -e DMN_ENGINE_URL="$DMN_ENGINE_URL" \
+            -e DMN_API_KEY="$DMN_API_KEY" \
+            tests/load/dmn-load-test.js \
+            2>&1 | tee "$TEST_RESULTS_DIR/load-tests-$TIMESTAMP.log"; then
             log_success "Load tests completed successfully"
             TEST_RESULTS[passed]=$((TEST_RESULTS[passed] + 1))
         else
@@ -289,7 +330,7 @@ run_chaos_tests() {
 
     if [ -f "tests/chaos/chaos-engineering.js" ]; then
         log_step "Running chaos engineering tests"
-        if node tests/chaos/chaos-engineering.js development 2>&1 | tee "$TEST_RESULTS_DIR/chaos-tests-$TIMESTAMP.log"; then
+        if DMN_TEST_URL="$DMN_TEST_URL" DMN_ENGINE_URL="$DMN_ENGINE_URL" node tests/chaos/chaos-engineering.js development 2>&1 | tee "$TEST_RESULTS_DIR/chaos-tests-$TIMESTAMP.log"; then
             log_success "Chaos tests completed"
             TEST_RESULTS[passed]=$((TEST_RESULTS[passed] + 1))
         else
@@ -322,7 +363,8 @@ generate_comprehensive_report() {
 {
     "test_session": {
         "timestamp": "$(date -Iseconds)",
-        "target_url": "$DMN_TEST_URL"
+        "target_url": "$DMN_TEST_URL",
+        "engine_url": "$DMN_ENGINE_URL"
     },
     "summary": {
         "total_test_suites": ${TEST_RESULTS[total]},
@@ -359,6 +401,7 @@ EOF
         <h1>🚀 Operaton DMN Test Report</h1>
         <p>Generated: $(date)</p>
         <p>Target: $DMN_TEST_URL</p>
+        <p>Engine: $DMN_ENGINE_URL</p>
     </div>
 
     <div class="metric">
@@ -395,6 +438,7 @@ main() {
 
     echo -e "${CYAN}Configuration:${NC}"
     echo -e "  Target URL: ${BOLD}$DMN_TEST_URL${NC}"
+    echo -e "  Engine URL: ${BOLD}$DMN_ENGINE_URL${NC}"
     echo -e "  API Key: ${BOLD}$([ -n "$DMN_API_KEY" ] && echo "Configured" || echo "Not configured")${NC}"
     echo ""
     echo -e "${CYAN}Test Suites:${NC}"
