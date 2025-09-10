@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.0.0-beta.16] - 2025-09-XX
+## [1.0.0-beta.16] - 2025-09-10
 
 ## Issues
 - [Issue #36](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/36) - Code snippet for radio buttons conflict with simplified `frontend.js` approach
