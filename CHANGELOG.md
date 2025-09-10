@@ -1,11 +1,19 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.0.0-beta.16] - 2025-09-XX
+## [1.0.0-beta.16] - 2025-09-10
 
 ## Issues
 - [Issue #36](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/36) - Code snippet for radio buttons conflict with simplified `frontend.js` approach
 - [Issue #37](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/37) - Result fields clearing too agressive
+- [Issue #39](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/39) - Radio sync loop with duplicate form
+- [Issue #40](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/40) - Double AJAX Calls Creating Redundant Network Overhead
+- [Issue #41](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/41) - Implement Connection Reuse in API Class
+- [Issue #42](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/42) - Batch Multiple Operations
+- [Issue #44](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/44) - Check connection efficiency in admin dashboard
+- [Issue #46](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/46) - Make connection pool timeout configurable in admin dashboard
+- [Issue #48](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/48) - Load test need improvement
+- [Issue #49](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/49) - Script `run-comprehensive-tests.sh` has a hardcoded environment variable that overrides `.env.testing`
 
 ### Plugin now correctly distinguishes between
 - ✅ **Navigation** - preserves results
@@ -19,6 +27,45 @@ All notable changes to this project will be documented in this file.
 - ✅ **Cleaner** more maintainable code
 - ✅ **Follows** established patterns
 - ✅ **Can be extended** for other forms easily
+
+### Single AJAX flow
+- ✅ **Event binding deduplication** - Prevented multiple event handlers
+- ✅ **Request-level locking** - Blocked duplicate function calls
+- ✅ **Proper cleanup** - Released locks after processing
+
+### Radio buttons
+- ✅ **Code Snippet** removed
+- ✅ **Infinite loop** stopped
+- ✅ **Radio sync** working for both duplicate forms
+- ✅ **Field logic** working for both duplicate forms
+> For now hardcoded Field Mapping are accepted.
+
+### Connection Reuse in API Class
+- ✅ **SSL handshake saved** - Second call skipped SSL negotiation
+- ✅ **TCP connection reused** - No new socket establishment needed
+- ✅ **DNS lookup saved** - Hostname resolution cached
+- ✅ **Batch operation success** - Multiple API calls using same connection
+
+### Admin Dashboard
+- ✅ **Connection Efficiency** - Shows HTTP connection reuse statistics and optimization performance
+![Connection-efficiency-report](./assets/images/connection-efficiency.png)
+
+- ✅ **Connection Pool Setting** - Configure how long connections are kept alive for reuse optimization
+![Connection-timeout-settings-save](./assets/images/connection-timeout-setting-save-admin.png)
+
+### Enhanced Batching Optimization
+- ✅ **Intelligent Fallback Strategy** - Automatically tries active variables first, then falls back to historical variables if needed
+- ✅ **Optimized Timing** - Uses smart delays only when necessary for process completion
+- ✅ **Enhanced Error Handling** - Comprehensive error handling for each step in the batch
+- ✅ **Performance Monitoring** - Detailed timing and logging for optimization analysis
+- ✅ **Connection Pool Efficiency** - Maximizes reuse of the same connection across all batched calls
+
+### Too aggressive K6 load test fixed
+- ✅ **Timeout Issues** - Increased from 3s to 15s timeouts
+- ✅ **Concurrency Problems** - Reduced max VUs and added proper ramping
+- ✅ **Unrealistic Thresholds** - Adjusted from 500ms to 2000ms response time expectations
+- ✅ **Response Structure Validation** - Fixed to match your actual DMN response format
+- ✅ **Enhanced Error Handling** - Better logging and debugging for any future issues
 
 ## [1.0.0-beta.15] - 2025-08-31
 

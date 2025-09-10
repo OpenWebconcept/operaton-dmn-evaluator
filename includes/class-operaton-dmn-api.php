@@ -55,6 +55,715 @@ class Operaton_DMN_API
     private $ssl_verify = false;
 
     /**
+     * HTTP connection pool for reusing connections to the same host
+     * @var array
+     */
+    private static $connection_pool = array();
+
+    /**
+     * Initialize connection timeout from saved setting
+     */
+    private function init_connection_timeout()
+    {
+        $saved_timeout = get_option('operaton_connection_timeout', 300);
+        $this->set_connection_pool_timeout($saved_timeout);
+    }
+
+    /**
+     * Connection pool statistics for monitoring
+     * @var array
+     */
+    private static $pool_stats = array(
+        'hits' => 0,
+        'misses' => 0,
+        'created' => 0,
+        'cleaned' => 0
+    );
+
+    /**
+     * Maximum age for pooled connections (in seconds)
+     * @var int
+     */
+    private $connection_max_age = 300; // 5 minutes
+
+    /**
+     * Maximum number of connections per host
+     * @var int
+     */
+    private $max_connections_per_host = 3;
+
+    /**
+     * Get optimized HTTP client options with connection reuse
+     *
+     * @param string $endpoint_url Full endpoint URL
+     * @return array HTTP client options optimized for connection reuse
+     */
+    private function get_optimized_http_options($endpoint_url)
+    {
+        $host = parse_url($endpoint_url, PHP_URL_HOST);
+        $connection_key = $this->get_connection_key($host);
+
+        // Check if we have a valid cached connection
+        if ($this->has_valid_connection($connection_key))
+        {
+            self::$pool_stats['hits']++;
+            $this->update_connection_stats('hits');  // Wordpress persistence for admin dashboard
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN API: Reusing connection for host: ' . $host);
+            }
+            return $this->get_cached_connection_options($connection_key);
+        }
+
+        // Create new optimized connection
+        self::$pool_stats['misses']++;
+        self::$pool_stats['created']++;
+        $this->update_connection_stats('misses'); // Wordpress persistence for admin dashboard
+        $this->update_connection_stats('created');
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Creating new connection for host: ' . $host);
+        }
+
+        $options = $this->create_optimized_connection_options($host);
+        $this->cache_connection($connection_key, $options);
+
+        return $options;
+    }
+
+    /**
+     * Create optimized HTTP connection options
+     *
+     * @param string $host Hostname
+     * @return array Optimized HTTP options
+     */
+    private function create_optimized_connection_options($host)
+    {
+        return array(
+            'timeout' => $this->api_timeout,
+            'sslverify' => $this->ssl_verify,
+            'headers' => $this->get_api_headers_with_keepalive(),
+            'httpversion' => '1.1',
+            'blocking' => true,
+            'stream' => false,
+            'decompress' => true,
+            'redirection' => 3,
+            // Connection reuse optimizations
+            'user-agent' => $this->get_optimized_user_agent(),
+            // Force HTTP/1.1 with keep-alive
+            'curl_options' => array(
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                CURLOPT_TCP_KEEPALIVE => 1,
+                CURLOPT_TCP_KEEPIDLE => 60,
+                CURLOPT_TCP_KEEPINTVL => 30,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_DNS_CACHE_TIMEOUT => 300,
+                CURLOPT_MAXCONNECTS => $this->max_connections_per_host,
+                // Reuse connections
+                CURLOPT_FORBID_REUSE => false,
+                CURLOPT_FRESH_CONNECT => false,
+            )
+        );
+    }
+
+    /**
+     * Get API headers optimized for connection reuse
+     *
+     * @return array Headers with keep-alive directives
+     */
+    private function get_api_headers_with_keepalive()
+    {
+        $headers = $this->get_api_headers();
+
+        // Add connection keep-alive headers
+        $headers['Connection'] = 'keep-alive';
+        $headers['Keep-Alive'] = 'timeout=60, max=10';
+
+        return $headers;
+    }
+
+    /**
+     * Get optimized user agent string
+     *
+     * @return string User agent with connection info
+     */
+    private function get_optimized_user_agent()
+    {
+        return sprintf(
+            'WordPress/%s; Operaton-DMN/%s; Connection-Pool/1.0',
+            get_bloginfo('version'),
+            OPERATON_DMN_VERSION ?? '1.0.0'
+        );
+    }
+
+    /**
+     * Generate connection pool key
+     *
+     * @param string $host Hostname
+     * @return string Connection key
+     */
+    private function get_connection_key($host)
+    {
+        return 'operaton_conn_' . md5($host . $this->ssl_verify);
+    }
+
+    /**
+     * Check if we have a valid cached connection
+     *
+     * @param string $connection_key Connection cache key
+     * @return bool True if valid connection exists
+     */
+    private function has_valid_connection($connection_key)
+    {
+        if (!isset(self::$connection_pool[$connection_key]))
+        {
+            return false;
+        }
+
+        $connection = self::$connection_pool[$connection_key];
+        $age = time() - $connection['created_at'];
+
+        if ($age > $this->connection_max_age)
+        {
+            unset(self::$connection_pool[$connection_key]);
+            self::$pool_stats['cleaned']++;
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Get cached connection options
+     *
+     * @param string $connection_key Connection cache key
+     * @return array Cached connection options
+     */
+    private function get_cached_connection_options($connection_key)
+    {
+        $connection = self::$connection_pool[$connection_key];
+        $connection['last_used'] = time();
+        $connection['use_count']++;
+
+        // Update the cached connection
+        self::$connection_pool[$connection_key] = $connection;
+
+        return $connection['options'];
+    }
+
+    /**
+     * Cache connection options
+     *
+     * @param string $connection_key Connection cache key
+     * @param array $options HTTP options to cache
+     */
+    private function cache_connection($connection_key, $options)
+    {
+        // Clean old connections first
+        $this->cleanup_old_connections();
+        $this->update_connection_stats('cleaned'); // Wordpress persistence for admin dashboard
+
+        self::$connection_pool[$connection_key] = array(
+            'options' => $options,
+            'created_at' => time(),
+            'last_used' => time(),
+            'use_count' => 1,
+            'host' => parse_url($options['user-agent'] ?? '', PHP_URL_HOST)
+        );
+    }
+
+    /**
+     * Clean up old connections from the pool
+     */
+    private function cleanup_old_connections()
+    {
+        $current_time = time();
+        $cleaned = 0;
+
+        foreach (self::$connection_pool as $key => $connection)
+        {
+            $age = $current_time - $connection['created_at'];
+            $idle_time = $current_time - $connection['last_used'];
+
+            // Remove if too old or idle too long
+            if ($age > $this->connection_max_age || $idle_time > 120)
+            {
+                unset(self::$connection_pool[$key]);
+                $cleaned++;
+            }
+        }
+
+        if ($cleaned > 0)
+        {
+            self::$pool_stats['cleaned'] += $cleaned;
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN API: Cleaned ' . $cleaned . ' old connections');
+            }
+        }
+    }
+
+    /**
+     * Enhanced API call method with connection reuse
+     * Replace your existing wp_remote_post calls with this method
+     *
+     * @param string $endpoint Full endpoint URL
+     * @param array $data Request data
+     * @param string $method HTTP method (POST, GET, etc.)
+     * @return array|WP_Error HTTP response
+     */
+    private function make_optimized_api_call($endpoint, $data = array(), $method = 'POST')
+    {
+        // Get optimized connection options
+        $options = $this->get_optimized_http_options($endpoint);
+
+        // Add request-specific data
+        if (!empty($data))
+        {
+            $options['body'] = is_array($data) ? wp_json_encode($data) : $data;
+        }
+
+        // Make the request using the appropriate method
+        if ($method === 'POST')
+        {
+            return wp_remote_post($endpoint, $options);
+        }
+        elseif ($method === 'GET')
+        {
+            return wp_remote_get($endpoint, $options);
+        }
+        else
+        {
+            $options['method'] = $method;
+            return wp_remote_request($endpoint, $options);
+        }
+    }
+
+    /**
+     * Enhanced batching optimization for process execution
+     * Replace your existing handle_process_execution_optimized method with this version
+     */
+    private function handle_process_execution_optimized($config, $form_data)
+    {
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Starting enhanced batched process execution for key: ' . $config->process_key);
+        }
+
+        // Parse and validate field mappings
+        $field_mappings = json_decode($config->field_mappings, true);
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
+            return new WP_Error(
+                'invalid_mappings',
+                __('Invalid field mappings configuration', 'operaton-dmn'),
+                array('status' => 500)
+            );
+        }
+
+        // Process input variables
+        $variables = $this->process_input_variables($field_mappings, $form_data);
+        if (is_wp_error($variables))
+        {
+            return $variables;
+        }
+
+        $base_url = $this->get_engine_rest_base_url($config->dmn_endpoint);
+
+        // ENHANCED: Prepare ALL possible API calls upfront for optimal batching
+        $api_batch = array(
+            'start_process' => array(
+                'endpoint' => $this->build_process_endpoint($config->dmn_endpoint, $config->process_key),
+                'data' => array('variables' => $variables),
+                'method' => 'POST',
+                'required' => true
+            ),
+            'get_variables_active' => array(
+                'endpoint' => null, // Will be set after process start
+                'data' => array(),
+                'method' => 'GET',
+                'required' => false,
+                'fallback_for' => 'get_variables_history'
+            ),
+            'get_variables_history' => array(
+                'endpoint' => null, // Will be set after process start
+                'data' => array(),
+                'method' => 'GET',
+                'required' => true,
+                'primary_data_source' => true
+            )
+        );
+
+        // Execute Step 1: Start Process (required)
+        $start_time = microtime(true);
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Batch Step 1 - Starting process at: ' . $api_batch['start_process']['endpoint']);
+        }
+
+        $process_response = $this->make_optimized_api_call(
+            $api_batch['start_process']['endpoint'],
+            $api_batch['start_process']['data'],
+            'POST'
+        );
+
+        if (is_wp_error($process_response))
+        {
+            return new WP_Error(
+                'api_error',
+                sprintf(__('Failed to start process: %s', 'operaton-dmn'), $process_response->get_error_message()),
+                array('status' => 500)
+            );
+        }
+
+        $http_code = wp_remote_retrieve_response_code($process_response);
+        $body = wp_remote_retrieve_body($process_response);
+
+        if ($http_code !== 200 && $http_code !== 201)
+        {
+            return new WP_Error(
+                'api_error',
+                sprintf(__('Process start failed with status %d: %s', 'operaton-dmn'), $http_code, $body),
+                array('status' => 500)
+            );
+        }
+
+        $process_result = json_decode($body, true);
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
+            return new WP_Error(
+                'invalid_response',
+                __('Invalid JSON response from process start', 'operaton-dmn'),
+                array('status' => 500)
+            );
+        }
+
+        $process_instance_id = $process_result['id'];
+        $process_ended = isset($process_result['ended']) ? $process_result['ended'] : false;
+
+        // ENHANCED: Prepare variable retrieval endpoints based on process state
+        if ($process_ended)
+        {
+            // Process completed immediately - use history endpoint
+            $api_batch['get_variables_history']['endpoint'] = $base_url . '/history/variable-instance?processInstanceId=' . $process_instance_id;
+            $primary_endpoint = 'get_variables_history';
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN API: Process ended immediately, using history endpoint');
+            }
+        }
+        else
+        {
+            // Process might still be running - prepare both endpoints for intelligent fallback
+            $api_batch['get_variables_active']['endpoint'] = $base_url . '/process-instance/' . $process_instance_id . '/variables';
+            $api_batch['get_variables_history']['endpoint'] = $base_url . '/history/variable-instance?processInstanceId=' . $process_instance_id;
+            $primary_endpoint = 'get_variables_active';
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN API: Process may be running, preparing intelligent fallback strategy');
+            }
+        }
+
+        // Execute Step 2: Intelligent Variable Retrieval with Batched Fallback
+        $final_variables = $this->execute_variable_retrieval_batch($api_batch, $primary_endpoint, $process_instance_id);
+
+        if (is_wp_error($final_variables))
+        {
+            return $final_variables;
+        }
+
+        // Extract results using the retrieved variables
+        $results = $this->extract_process_results($config, $final_variables);
+
+        // Store process instance ID for decision flow
+        $this->database->store_process_instance_id($config->form_id, $process_instance_id);
+
+        $total_time = round((microtime(true) - $start_time) * 1000, 2);
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Batched execution completed in ' . $total_time . 'ms');
+        }
+
+        return array(
+            'success' => true,
+            'results' => $results,
+            'process_instance_id' => $process_instance_id,
+            'debug_info' => $this->get_debug_info() ? array(
+                'variables_sent' => $variables,
+                'process_result' => $process_result,
+                'final_variables' => $final_variables,
+                'endpoint_used' => $api_batch['start_process']['endpoint'],
+                'process_ended_immediately' => $process_ended,
+                'total_execution_time_ms' => $total_time,
+                'batching_strategy' => $primary_endpoint,
+                'extraction_summary' => array(
+                    'total_variables_found' => count($final_variables),
+                    'results_extracted' => count($results),
+                    'result_fields_searched' => array_keys($this->parse_result_mappings($config))
+                )
+            ) : null
+        );
+    }
+
+    /**
+     * Execute intelligent variable retrieval with batched fallback strategy
+     *
+     * @param array $api_batch Prepared API call configurations
+     * @param string $primary_endpoint Primary endpoint to try first
+     * @param string $process_instance_id Process instance identifier
+     * @return array|WP_Error Retrieved variables or error
+     */
+    private function execute_variable_retrieval_batch($api_batch, $primary_endpoint, $process_instance_id)
+    {
+        $retrieval_start = microtime(true);
+
+        // Try primary strategy first
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Batch Step 2a - Trying primary strategy: ' . $primary_endpoint);
+        }
+
+        $primary_response = $this->make_optimized_api_call(
+            $api_batch[$primary_endpoint]['endpoint'],
+            $api_batch[$primary_endpoint]['data'],
+            $api_batch[$primary_endpoint]['method']
+        );
+
+        $primary_variables = $this->process_variable_response($primary_response, $primary_endpoint);
+
+        // If primary strategy succeeded and returned data, use it
+        if (!is_wp_error($primary_variables) && !empty($primary_variables))
+        {
+            $retrieval_time = round((microtime(true) - $retrieval_start) * 1000, 2);
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN API: Primary strategy succeeded in ' . $retrieval_time . 'ms, found ' . count($primary_variables) . ' variables');
+            }
+
+            return $primary_variables;
+        }
+
+        // Primary strategy failed or returned no data - try fallback
+        $fallback_endpoint = ($primary_endpoint === 'get_variables_active') ? 'get_variables_history' : 'get_variables_active';
+
+        if (!isset($api_batch[$fallback_endpoint]['endpoint']) || empty($api_batch[$fallback_endpoint]['endpoint']))
+        {
+            return new WP_Error(
+                'no_fallback',
+                __('Primary variable retrieval failed and no fallback available', 'operaton-dmn'),
+                array('status' => 500)
+            );
+        }
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Batch Step 2b - Primary failed, trying fallback: ' . $fallback_endpoint);
+        }
+
+        // Small delay before fallback to allow process completion if needed
+        if ($primary_endpoint === 'get_variables_active')
+        {
+            usleep(500000); // 0.5 second wait for process completion
+        }
+
+        $fallback_response = $this->make_optimized_api_call(
+            $api_batch[$fallback_endpoint]['endpoint'],
+            $api_batch[$fallback_endpoint]['data'],
+            $api_batch[$fallback_endpoint]['method']
+        );
+
+        $fallback_variables = $this->process_variable_response($fallback_response, $fallback_endpoint);
+
+        if (is_wp_error($fallback_variables))
+        {
+            return new WP_Error(
+                'variable_retrieval_failed',
+                sprintf(__('Both primary and fallback variable retrieval failed: %s', 'operaton-dmn'), $fallback_variables->get_error_message()),
+                array('status' => 500)
+            );
+        }
+
+        $total_retrieval_time = round((microtime(true) - $retrieval_start) * 1000, 2);
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Fallback strategy succeeded in ' . $total_retrieval_time . 'ms, found ' . count($fallback_variables) . ' variables');
+        }
+
+        return $fallback_variables;
+    }
+
+    /**
+     * Process variable response from API calls
+     *
+     * @param array|WP_Error $response HTTP response
+     * @param string $endpoint_type Type of endpoint called
+     * @return array|WP_Error Processed variables or error
+     */
+    private function process_variable_response($response, $endpoint_type)
+    {
+        if (is_wp_error($response))
+        {
+            return $response;
+        }
+
+        $http_code = wp_remote_retrieve_response_code($response);
+        if ($http_code !== 200)
+        {
+            return new WP_Error(
+                'api_error',
+                sprintf(__('Variable retrieval failed with status %d', 'operaton-dmn'), $http_code),
+                array('status' => 500)
+            );
+        }
+
+        $variables_body = wp_remote_retrieve_body($response);
+        $variables_data = json_decode($variables_body, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
+            return new WP_Error(
+                'json_error',
+                __('Invalid JSON response from variable retrieval', 'operaton-dmn'),
+                array('status' => 500)
+            );
+        }
+
+        if (!is_array($variables_data))
+        {
+            return array(); // Empty but valid response
+        }
+
+        // Convert to consistent format based on endpoint type
+        if ($endpoint_type === 'get_variables_history')
+        {
+            // History endpoint returns array of variable objects
+            $final_variables = array();
+            foreach ($variables_data as $var)
+            {
+                if (isset($var['name']) && array_key_exists('value', $var))
+                {
+                    $final_variables[$var['name']] = array(
+                        'value' => $var['value'],
+                        'type' => isset($var['type']) ? $var['type'] : 'String'
+                    );
+                }
+            }
+            return $final_variables;
+        }
+        else
+        {
+            // Active variables endpoint returns object with variable names as keys
+            return $variables_data;
+        }
+    }
+
+    /**
+     * Set connection pool timeout from admin setting
+     *
+     * @param int $timeout Timeout in seconds
+     */
+    public function set_connection_pool_timeout($timeout)
+    {
+        $this->connection_max_age = max(60, min(1800, intval($timeout)));
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Connection pool timeout updated to ' . $this->connection_max_age . ' seconds');
+        }
+
+        // Clear existing connections to apply new timeout immediately
+        $cleared = $this->clear_connection_pool();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Cleared ' . $cleared . ' connections to apply new timeout');
+        }
+    }
+
+    /**
+     * Clear connection pool cache for testing/debugging
+     * Add this method for manual cache management
+     */
+    public function clear_connection_pool_for_batching()
+    {
+        $cleared = $this->clear_connection_pool();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Cleared connection pool for batching optimization: ' . $cleared . ' connections');
+        }
+
+        return $cleared;
+    }
+
+    /**
+     * Get connection pool statistics with WordPress persistence
+     */
+    public function get_connection_pool_stats()
+    {
+        // Get stats from WordPress options (persistent storage)
+        $stored_stats = get_option('operaton_connection_stats', array(
+            'hits' => 0,
+            'misses' => 0,
+            'created' => 0,
+            'cleaned' => 0
+        ));
+
+        return array(
+            'stats' => $stored_stats,
+            'active_connections' => count(self::$connection_pool),
+            'pool_details' => array_map(function ($conn)
+            {
+                return array(
+                    'age' => time() - $conn['created_at'],
+                    'idle_time' => time() - $conn['last_used'],
+                    'use_count' => $conn['use_count']
+                );
+            }, self::$connection_pool)
+        );
+    }
+
+    /**
+     * Update persistent statistics
+     */
+    private function update_connection_stats($type)
+    {
+        $stats = get_option('operaton_connection_stats', array(
+            'hits' => 0,
+            'misses' => 0,
+            'created' => 0,
+            'cleaned' => 0
+        ));
+
+        $stats[$type]++;
+        update_option('operaton_connection_stats', $stats);
+    }
+
+    /**
+     * Clear connection pool (useful for testing or debugging)
+     */
+    public function clear_connection_pool()
+    {
+        $cleared = count(self::$connection_pool);
+        self::$connection_pool = array();
+        self::$pool_stats['cleaned'] += $cleared;
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Manually cleared ' . $cleared . ' connections');
+        }
+
+        return $cleared;
+    }
+
+    /**
      * Constructor for API handler
      * Initializes API functionality with required dependencies
      *
@@ -66,6 +775,9 @@ class Operaton_DMN_API
     {
         $this->core = $core;
         $this->database = $database;
+
+        // Initialize connection timeout from saved setting
+        $this->init_connection_timeout();
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN API: Handler initialized');
@@ -90,6 +802,10 @@ class Operaton_DMN_API
         add_action('wp_ajax_nopriv_operaton_test_endpoint', array($this, 'ajax_test_endpoint'));
         add_action('wp_ajax_operaton_test_full_config', array($this, 'ajax_test_full_config'));
         add_action('wp_ajax_operaton_clear_update_cache', array($this, 'ajax_clear_update_cache'));
+
+        // API Debug tests
+        add_action('wp_ajax_operaton_dmn_debug', array($this, 'handle_dmn_debug_ajax'));
+        add_action('wp_ajax_nopriv_operaton_dmn_debug', array($this, 'run_operaton_dmn_debug'));
 
         // Decision flow REST endpoint
         add_action('rest_api_init', array($this, 'register_decision_flow_endpoint'));
@@ -458,7 +1174,10 @@ class Operaton_DMN_API
             $use_process = isset($config->use_process) ? $config->use_process : false;
 
             if ($use_process && !empty($config->process_key)) {
-                return $this->handle_process_execution($config, $params['form_data']);
+            // OLD:
+            //    return $this->handle_process_execution($config, $params['form_data']);
+            // NEW:
+                return $this->handle_process_execution_optimized($config, $params['form_data']);
             } else {
                 return $this->handle_decision_evaluation($config, $params['form_data']);
             }
@@ -649,12 +1368,16 @@ class Operaton_DMN_API
             error_log('Operaton DMN API: Request data: ' . wp_json_encode($operaton_data));
         }
 
-        $response = wp_remote_post($evaluation_endpoint, array(
-            'headers' => $this->get_api_headers(),
-            'body' => wp_json_encode($operaton_data),
-            'timeout' => $this->api_timeout,
-            'sslverify' => $this->ssl_verify,
-        ));
+        // OLD:
+        //$response = wp_remote_post($evaluation_endpoint, array(
+        //    'headers' => $this->get_api_headers(),
+        //    'body' => wp_json_encode($operaton_data),
+        //    'timeout' => $this->api_timeout,
+        //    'sslverify' => $this->ssl_verify,
+        //));
+
+        // NEW:
+        $response = $this->make_optimized_api_call($evaluation_endpoint, $operaton_data);
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
             if (is_wp_error($response)) {
@@ -858,12 +1581,16 @@ class Operaton_DMN_API
             )
         );
 
-        $response = wp_remote_post($full_endpoint, array(
-            'headers' => $this->get_api_headers(),
-            'body' => wp_json_encode($test_data),
-            'timeout' => 15,
-            'sslverify' => $this->ssl_verify,
-        ));
+        // OLD:
+        //$response = wp_remote_post($full_endpoint, array(
+        //    'headers' => $this->get_api_headers(),
+        //    'body' => wp_json_encode($test_data),
+        //    'timeout' => 15,
+        //    'sslverify' => $this->ssl_verify,
+        //));
+
+        // NEW:
+        $response = $this->make_optimized_api_call($full_endpoint, $test_data);
 
         if (is_wp_error($response)) {
             return array(
@@ -2349,5 +3076,173 @@ class Operaton_DMN_API
     public function get_database_instance()
     {
         return $this->database;
+    }
+
+    /**
+     * AJAX handler for debug tests
+     */
+    public function run_operaton_dmn_debug()
+    {
+        if (!current_user_can('manage_options'))
+        {
+            wp_send_json_error('Unauthorized');
+            return;
+        }
+
+        try
+        {
+            error_log("Starting Operaton DMN REST API Debug Session");
+
+            $results = array();
+            $results['server_config'] = $this->test_server_config();
+            $results['plugin_init'] = $this->test_plugin_initialization();
+            $results['rest_api'] = $this->test_rest_api_availability();
+            $results['api_call'] = $this->test_rest_api_call();
+
+            error_log("=== END OPERATON DMN DEBUG ===");
+
+            wp_send_json_success(array(
+                'message' => 'Debug completed successfully',
+                'results' => $results,
+                'check_logs' => 'See error log for detailed output'
+            ));
+        }
+        catch (Exception $e)
+        {
+            error_log("Debug error: " . $e->getMessage());
+            wp_send_json_error('Debug failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Handle AJAX request for DMN debug tests
+     */
+    public function handle_dmn_debug_ajax()
+    {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
+        {
+            wp_send_json_error('Invalid nonce');
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options'))
+        {
+            wp_send_json_error('Insufficient permissions');
+        }
+
+        try
+        {
+            // Call your existing debug method and capture any output
+            ob_start();
+            $this->run_operaton_dmn_debug();
+            $debug_output = ob_get_clean();
+
+            // Also get the debug results if your method returns them
+            // You might want to modify run_operaton_dmn_debug to return structured data
+
+            wp_send_json_success([
+                'message' => 'Debug completed successfully',
+                'check_logs' => 'See error log for detailed output',
+                'timestamp' => current_time('mysql'),
+                'results' => [
+                    'server_config' => [
+                        'allow_url_fopen' => ini_get('allow_url_fopen') ? 'Enabled' : 'Disabled',
+                        'curl_available' => function_exists('curl_init') ? 'Available' : 'Not Available',
+                        'openssl_loaded' => extension_loaded('openssl') ? 'Available' : 'Not Available'
+                    ],
+                    'plugin_init' => [
+                        'api_manager_class' => class_exists('OperatonDMNAPI'),
+                        'handle_evaluation_method' => method_exists($this, 'handle_evaluation'),
+                        'health_check_method' => method_exists($this, 'health_check')
+                    ],
+                    'rest_api' => rest_url('operaton-dmn/v1/') ? true : false,
+                    'api_call' => $this->test_rest_api_call()
+                ]
+            ]);
+        }
+        catch (Exception $e)
+        {
+            error_log('Operaton DMN Debug AJAX Error: ' . $e->getMessage());
+            wp_send_json_error('Debug test execution failed: ' . $e->getMessage());
+        }
+    }
+
+    private function test_server_config()
+    {
+        error_log("=== SERVER CONFIGURATION DEBUG ===");
+
+        $config = array(
+            'allow_url_fopen' => ini_get('allow_url_fopen') ? 'Enabled' : 'Disabled',
+            'curl_available' => function_exists('curl_init') ? 'Available' : 'Not available',
+            'openssl_loaded' => extension_loaded('openssl') ? 'Available' : 'Not available'
+        );
+
+        foreach ($config as $key => $value)
+        {
+            error_log("$key: $value");
+        }
+
+        return $config;
+    }
+
+    private function test_plugin_initialization()
+    {
+        error_log("=== PLUGIN INITIALIZATION DEBUG ===");
+
+        $status = array(
+            'api_manager_class' => class_exists('OperatonDMNApiManager'),
+            'health_check_method' => method_exists($this, 'health_check'),
+            'handle_evaluation_method' => method_exists($this, 'handle_evaluation')
+        );
+
+        foreach ($status as $check => $result)
+        {
+            error_log("$check: " . ($result ? 'YES' : 'NO'));
+        }
+
+        return $status;
+    }
+
+    private function test_rest_api_availability()
+    {
+        error_log("=== REST API AVAILABILITY DEBUG ===");
+
+        if (!function_exists('rest_get_url_prefix'))
+        {
+            error_log("ERROR: WordPress REST API not available");
+            return false;
+        }
+
+        $rest_server = rest_get_server();
+        $namespaces = $rest_server->get_namespaces();
+        $has_operaton = in_array('operaton-dmn/v1', $namespaces);
+
+        error_log("Available namespaces: " . implode(', ', $namespaces));
+        error_log("Operaton namespace registered: " . ($has_operaton ? 'YES' : 'NO'));
+
+        return $has_operaton;
+    }
+
+    private function test_rest_api_call()
+    {
+        error_log("=== REST API CALL TEST ===");
+
+        $test_url = home_url('/wp-json/operaton-dmn/v1/test');
+        $response = wp_remote_get($test_url);
+
+        if (is_wp_error($response))
+        {
+            error_log("REST API Error: " . $response->get_error_message());
+            return false;
+        }
+
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+
+        error_log("REST API Response Status: " . $status_code);
+        error_log("REST API Response Body: " . $body);
+
+        return $status_code === 200;
     }
 }

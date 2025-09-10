@@ -12,6 +12,8 @@ console.log('🚀 Operaton DMN FIXED frontend script loading...');
 // FIXED GLOBAL STATE MANAGEMENT
 // =============================================================================
 
+window.operatonProcessingLock = window.operatonProcessingLock || {};
+
 /**
  * Enhanced global state - better tracking without loops
  */
@@ -547,6 +549,10 @@ function setupPageChangeDetection(formId) {
   }, 2000);
 }
 
+/**
+ * Non-blocking input monitoring that preserves all input functionality
+ */
+
 function setupInputChangeMonitoring(formId) {
   const $ = window.jQuery || window.$;
   const $form = $(`#gform_${formId}`);
@@ -559,155 +565,251 @@ function setupInputChangeMonitoring(formId) {
   // Remove ALL existing handlers first
   $form.off('.operaton-clear');
 
-  // Cache result field IDs once to avoid repeated calls
+  // Cache result field IDs once
   const resultFieldIds = getResultFieldIds(formId);
-  console.log(`Cached result field IDs for form ${formId}:`, resultFieldIds);
+  console.log(`Result field IDs for monitoring form ${formId}:`, resultFieldIds);
 
-  // ENHANCED: More conservative debounced clearing with safeguard checks
+  // State tracking for intelligent clearing
   let debounceTimer = null;
   let lastClearTime = 0;
+  let inputActivity = new Map(); // Track input activity per field
 
-  function debouncedClear(reason) {
-    // 🚩 CRITICAL: Check if we're currently populating results
-    if (window.operatonPopulatingResults) {
-      console.log('🛡️ SAFEGUARD: Skipping clear during result population');
-      return;
+  function shouldClearResults(fieldName, fieldValue, eventType) {
+    // Never clear during safeguard periods
+    if (window.operatonPopulatingResults || window.operatonFieldLogicUpdating) {
+      return false;
     }
 
-    // NEW: Skip clearing during field logic updates
-    if (window.operatonFieldLogicUpdating) {
-      console.log('Skipping clear - field logic updating');
-      return;
+    // Don't clear too frequently
+    if (Date.now() - lastClearTime < 1000) {
+      return false;
     }
 
-    // Prevent rapid successive clears
-    const now = Date.now();
-    if (now - lastClearTime < 1000) {
-      console.log('Skipping clear - too soon after last clear');
+    return true;
+  }
+
+  function scheduleResultsClear(reason, delay = 500) {
+    if (!shouldClearResults()) {
       return;
     }
 
     if (debounceTimer) {
-      window.clearTimeout(debounceTimer);
+      clearTimeout(debounceTimer);
     }
-    debounceTimer = window.setTimeout(() => {
-      // Double-check the safeguard flag right before clearing
-      if (window.operatonPopulatingResults) {
-        console.log('🛡️ SAFEGUARD: Last-second skip of clear during result population');
+
+    debounceTimer = setTimeout(() => {
+      // Final check before clearing
+      if (window.operatonPopulatingResults || window.operatonFieldLogicUpdating) {
+        console.log('SAFEGUARD: Canceling clear due to active operations');
         return;
       }
 
-      console.log(`INPUT CHANGE CLEARING: ${reason}`);
+      console.log(`CLEARING RESULTS: ${reason}`);
       clearAllResultFields(formId, reason);
       clearStoredResults(formId);
       lastClearTime = Date.now();
-    }, 500);
+    }, delay);
   }
 
-  // Monitor regular form fields with safeguard checks
-  $form.on(
-    'change.operaton-clear',
-    'input[type="text"], input[type="number"], input[type="email"], input[type="date"], select, textarea',
-    function () {
-      const $field = $(this);
-      const fieldId = $field.attr('id');
-      const fieldName = $field.attr('name') || fieldId;
-
-      // Skip result fields using cached IDs
-      const isResultField = resultFieldIds.some(
-        id => fieldId && (fieldId.includes(`input_${formId}_${id}`) || fieldId === `input_${formId}_${id}`)
-      );
-
-      if (isResultField) {
-        console.log(`Skipping result field change: ${fieldName}`);
-        return;
-      }
-
-      // 🚩 Skip if we're populating results
-      if (window.operatonPopulatingResults) {
-        console.log('🛡️ SAFEGUARD: Skipping change handler during result population');
-        return;
-      }
-
-      const fieldValue = $field.val();
-      console.log(`INPUT CHANGE DETECTED (change): ${fieldName} = "${fieldValue}"`);
-      debouncedClear(`Input changed: ${fieldName}`);
-    }
-  );
-
-  // For text/number inputs, also monitor 'input' event with safeguards
-  $form.on('input.operaton-clear', 'input[type="text"], input[type="number"], input[type="email"]', function () {
-    const $field = $(this);
+  function isMonitorableField($field) {
     const fieldId = $field.attr('id');
     const fieldName = $field.attr('name') || fieldId;
 
-    // Skip result fields using cached IDs
-    const isResultField = resultFieldIds.some(
+    if (!fieldName) return false;
+
+    // Skip result fields
+    const isResult = resultFieldIds.some(
       id => fieldId && (fieldId.includes(`input_${formId}_${id}`) || fieldId === `input_${formId}_${id}`)
     );
 
-    if (isResultField || window.operatonPopulatingResults) {
-      return; // Don't log for result fields or during population
+    if (isResult) {
+      return false;
     }
 
-    // Much longer debounce for typing
-    if (debounceTimer) {
-      window.clearTimeout(debounceTimer);
+    // Skip system fields
+    if (fieldName.includes('gform_') || fieldName.includes('honeypot')) {
+      return false;
     }
-    debounceTimer = window.setTimeout(() => {
-      if (window.operatonPopulatingResults) {
-        return; // Final safeguard check
-      }
 
-      const finalValue = $field.val();
-      console.log(`INPUT TYPING COMPLETE: ${fieldName} = "${finalValue}"`);
-      clearAllResultFields(formId, `Input typing complete: ${fieldName}`);
-      clearStoredResults(formId);
-      lastClearTime = Date.now();
-    }, 1500);
+    // Skip hidden sync fields (but not all hidden fields)
+    if (fieldName.startsWith('input_') && $field.attr('type') === 'hidden') {
+      return false;
+    }
+
+    return true;
+  }
+
+  // CRITICAL FIX: Use completely passive event monitoring
+  // These handlers do NOT call preventDefault() or stopPropagation()
+
+  // Method 1: Monitor via 'change' events (when user finishes with field)
+  $form.on('change.operaton-clear', 'input, select, textarea', function(event) {
+    const $field = $(this);
+
+    if (!isMonitorableField($field)) {
+      return;
+    }
+
+    const fieldName = $field.attr('name') || $field.attr('id');
+    const fieldValue = $field.val();
+
+    console.log(`CHANGE DETECTED: ${fieldName} = "${fieldValue}"`);
+    scheduleResultsClear(`Field changed: ${fieldName}`, 300);
   });
 
-  // Monitor radio buttons with safeguards
-  $form.on('change.operaton-clear', 'input[type="radio"]', function () {
+  // Method 2: Monitor typing completion with very long delay
+  $form.on('input.operaton-clear', 'input[type="text"], input[type="number"], input[type="email"]', function(event) {
+    const $field = $(this);
+
+    if (!isMonitorableField($field)) {
+      return;
+    }
+
+    const fieldName = $field.attr('name') || $field.attr('id');
+
+    // Track input activity
+    inputActivity.set(fieldName, Date.now());
+
+    // Very long delay - only clear after user completely stops typing
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+
+    debounceTimer = setTimeout(() => {
+      // Check if user is still typing in ANY field
+      const now = Date.now();
+      let stillTyping = false;
+
+      for (let [field, lastActivity] of inputActivity) {
+        if (now - lastActivity < 2000) { // If any field was active in last 2 seconds
+          stillTyping = true;
+          break;
+        }
+      }
+
+      if (!stillTyping && shouldClearResults()) {
+        const finalValue = $field.val();
+        console.log(`TYPING SESSION COMPLETED: ${fieldName} = "${finalValue}"`);
+        clearAllResultFields(formId, `Typing completed: ${fieldName}`);
+        clearStoredResults(formId);
+        lastClearTime = Date.now();
+      }
+    }, 4000); // 4 second delay - very conservative
+  });
+
+  // Method 3: Monitor radio buttons (these can have immediate clearing)
+  $form.on('change.operaton-clear', 'input[type="radio"]', function(event) {
     const $radio = $(this);
     const radioName = $radio.attr('name');
     const radioValue = $radio.val();
 
-    // Skip hidden sync fields
+    // Skip system radio fields
     if (radioName && radioName.startsWith('input_')) {
-      console.log(`Skipping hidden radio sync field: ${radioName}`);
       return;
     }
 
-    // Ignore changes during radio sync or result population
+    // Skip during sync operations
     if (window.operatonRadioSyncInProgress || window.operatonPopulatingResults) {
-      console.log(`🛡️ SAFEGUARD: Skipping radio change during sync/population: ${radioName}`);
       return;
     }
 
-    if (radioName) {
-      console.log(`RADIO CHANGE DETECTED: ${radioName} = "${radioValue}"`);
-      debouncedClear(`Radio changed: ${radioName}`);
-    }
+    console.log(`RADIO SELECTED: ${radioName} = "${radioValue}"`);
+    scheduleResultsClear(`Radio selected: ${radioName}`, 200);
   });
 
-  // Monitor checkboxes with safeguards
-  $form.on('change.operaton-clear', 'input[type="checkbox"]', function () {
-    if (window.operatonPopulatingResults) {
-      console.log('🛡️ SAFEGUARD: Skipping checkbox change during result population');
-      return;
-    }
-
+  // Method 4: Monitor checkboxes
+  $form.on('change.operaton-clear', 'input[type="checkbox"]', function(event) {
     const $checkbox = $(this);
     const checkboxName = $checkbox.attr('name') || $checkbox.attr('id');
     const isChecked = $checkbox.is(':checked');
 
-    console.log(`CHECKBOX CHANGE DETECTED: ${checkboxName} = ${isChecked}`);
-    debouncedClear(`Checkbox changed: ${checkboxName}`);
+    if (!isMonitorableField($checkbox)) {
+      return;
+    }
+
+    console.log(`CHECKBOX TOGGLED: ${checkboxName} = ${isChecked}`);
+    scheduleResultsClear(`Checkbox changed: ${checkboxName}`, 200);
   });
 
-  console.log(`Enhanced input monitoring with safeguards active for form ${formId}`);
+  console.log(`NON-BLOCKING input monitoring active for form ${formId} - all fields monitorable, input unrestricted`);
 }
+
+/**
+ * Make field logic completely non-blocking
+ */
+if (window.OperatonFieldLogic) {
+  // Override the setupEventListeners to be completely passive
+  window.OperatonFieldLogic.setupEventListeners = function(formId, mapping, $form) {
+    const self = this;
+
+    // Partner field - use only blur and change, never input
+    const $partnerField = $form.find(`#input_${formId}_${mapping.partnerField}`);
+    if ($partnerField.length > 0) {
+      $partnerField.off('.fieldlogic');
+
+      // Only respond to blur (when user leaves field) and change (when value actually changes)
+      $partnerField.on('blur.fieldlogic change.fieldlogic', function() {
+        // Don't interfere during active typing or focus
+        if ($(this).is(':focus')) {
+          return;
+        }
+
+        setTimeout(() => {
+          if (!window.operatonPopulatingResults && !window.operatonFieldLogicUpdating) {
+            self.updateAlleenstaandLogic(formId, mapping, $form);
+          }
+        }, 100);
+      });
+    }
+
+    // Child field - same approach
+    const $childField = $form.find(`#input_${formId}_${mapping.childField}`);
+    if ($childField.length > 0) {
+      $childField.off('.fieldlogic');
+
+      $childField.on('blur.fieldlogic change.fieldlogic', function() {
+        if ($(this).is(':focus')) {
+          return;
+        }
+
+        setTimeout(() => {
+          if (!window.operatonPopulatingResults && !window.operatonFieldLogicUpdating) {
+            self.updateChildrenLogic(formId, mapping, $form);
+          }
+        }, 100);
+      });
+    }
+
+    console.log(`NON-BLOCKING field logic events set up for form ${formId}`);
+  };
+
+  console.log("Field logic updated to be completely non-blocking");
+}
+
+/**
+ * TEST FUNCTION: Verify input functionality
+ */
+window.testInputFunctionality = function(formId = 8) {
+  const $ = jQuery;
+  const fields = [
+    {id: 14, name: 'partner_geslachtsnaam'},
+    {id: 16, name: 'kind_geboorteplaats'}
+  ];
+
+  console.log("=== TESTING INPUT FUNCTIONALITY ===");
+
+  fields.forEach(field => {
+    const $field = $(`#input_${formId}_${field.id}`);
+    console.log(`Field ${field.name} (${field.id}):`);
+    console.log(`  Found: ${$field.length > 0}`);
+    console.log(`  Disabled: ${$field.prop('disabled')}`);
+    console.log(`  Readonly: ${$field.prop('readonly')}`);
+    console.log(`  Current value: "${$field.val()}"`);
+    console.log(`  Event handlers: ${Object.keys($._data($field[0], 'events') || {}).join(', ') || 'none'}`);
+  });
+
+  return "Test complete - check console output";
+};
 
 // =============================================================================
 // FIXED ENHANCED NAVIGATION HANDLING - Preserves results during navigation
@@ -983,8 +1085,17 @@ function simpleFormInitialization(formId) {
       // Use enhanced input monitoring
       setupInputChangeMonitoring(formId);
 
-      // Set up evaluation button events
-      bindEvaluationEventsOptimized(formId);
+      // Set up evaluation button events (with duplicate prevention)
+      if (!window.operatonInitialized.eventsBound) {
+        window.operatonInitialized.eventsBound = new Set();
+      }
+
+      if (!window.operatonInitialized.eventsBound.has(formId)) {
+        bindEvaluationEventsOptimized(formId);
+        window.operatonInitialized.eventsBound.add(formId);
+      } else {
+        console.log('Event handler already bound for form:', formId);
+      }
 
       // Set up enhanced navigation events
       bindNavigationEventsOptimized(formId);
@@ -1194,8 +1305,15 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
       childrenField: 34,
       // No radio mappings needed - we update the fields directly
     },
+    11: {
+      // Added for the duplicated form
+      partnerField: 14,
+      alleenstaandField: 33,
+      childField: 16,
+      childrenField: 34,
+    },
   },
-  
+
   /**
    * Initialize field logic for a specific form
    */
@@ -1473,6 +1591,16 @@ function handleEvaluateClick($button) {
   const formId = $button.data('form-id');
   const configId = $button.data('config-id');
 
+  // CRITICAL: Prevent duplicate processing
+  const lockKey = `eval_${formId}_${configId}`;
+  if (window.operatonProcessingLock[lockKey]) {
+    console.log('🔒 Duplicate evaluation blocked for form:', formId);
+    return;
+  }
+
+  // Set processing lock
+  window.operatonProcessingLock[lockKey] = true;
+
   console.log('Button clicked for form:', formId, 'config:', configId);
 
   const config = getFormConfigCached(formId);
@@ -1706,6 +1834,11 @@ function handleEvaluateClick($button) {
       complete: function () {
         // Always use centralized button manager for restoration
         window.operatonButtonManager.restoreOriginalState($button, formId);
+
+        // CRITICAL: Release the processing lock
+        setTimeout(() => {
+          delete window.operatonProcessingLock[lockKey];
+        }, 1000); // 1 second cooldown to prevent rapid-fire clicks
       },
     });
   }
@@ -2203,6 +2336,18 @@ function createEmergencyOperatonAjax() {
   }
 }
 
+/**
+ * Make handleEvaluateClick globally accessible for delegation
+ */
+window.handleEvaluateClick = handleEvaluateClick;
+
+// Also add verification logging:
+if (typeof window.handleEvaluateClick === 'function') {
+    console.log('✅ handleEvaluateClick is globally accessible');
+} else {
+    console.error('❌ handleEvaluateClick is NOT globally accessible');
+}
+
 // =============================================================================
 // MAIN INITIALIZATION (SINGLE VERSION)
 // =============================================================================
@@ -2361,6 +2506,17 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============================================================================
 // GLOBAL DEBUGGING FUNCTIONS
 // =============================================================================
+
+// Debug function for testing delegation
+window.testDelegation = function() {
+    console.log('Testing delegation availability:');
+    console.log('operatonButtonManager:', typeof window.operatonButtonManager !== 'undefined');
+    console.log('handleEvaluateClick:', typeof window.handleEvaluateClick !== 'undefined');
+    console.log('Should delegate:',
+        typeof window.operatonButtonManager !== 'undefined' &&
+        typeof window.handleEvaluateClick !== 'undefined'
+    );
+};
 
 if (typeof window !== 'undefined') {
   window.operatonDebugFixed = function () {

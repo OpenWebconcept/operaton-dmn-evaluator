@@ -89,6 +89,12 @@ class Operaton_DMN_Admin
 
         // Note: Gravity Forms integration is handled by the dedicated Gravity Forms class
 
+        // AJAX handler for connection timeout settings saved in admin dashboard
+        add_action('wp_ajax_operaton_save_connection_timeout', array($this, 'ajax_save_connection_timeout'));
+
+        // AJAX handler for connection reuse stats
+        add_action('wp_ajax_operaton_check_connection_stats', array($this, 'ajax_check_connection_stats'));
+
         // AJAX handler for clearing all configuration cache
         add_action('wp_ajax_operaton_clear_all_cache', array($this, 'ajax_clear_all_cache'));
 
@@ -1303,5 +1309,172 @@ class Operaton_DMN_Admin
     public function current_user_can_manage()
     {
         return current_user_can($this->capability);
+    }
+
+    /**
+     * AJAX handler for saving connection timeout setting
+     */
+    public function ajax_save_connection_timeout()
+    {
+        // Verify nonce and permissions
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce') || !current_user_can('manage_options'))
+        {
+            wp_send_json_error(array('message' => __('Security check failed', 'operaton-dmn')));
+            return;
+        }
+
+        $timeout = intval($_POST['timeout']);
+
+        // Validate timeout range (1 minute to 30 minutes)
+        if ($timeout < 60 || $timeout > 1800)
+        {
+            wp_send_json_error(array(
+                'message' => __('Invalid timeout value. Must be between 1 and 30 minutes.', 'operaton-dmn')
+            ));
+            return;
+        }
+
+        try
+        {
+            // Save the setting
+            update_option('operaton_connection_timeout', $timeout);
+
+            // Apply the setting to the API instance if available
+            $api_instance = $this->core->get_api_instance();
+            if ($api_instance && method_exists($api_instance, 'set_connection_pool_timeout'))
+            {
+                $api_instance->set_connection_pool_timeout($timeout);
+            }
+
+            // Format the response
+            $timeout_minutes = round($timeout / 60, 1);
+            $timeout_label = ($timeout_minutes == floor($timeout_minutes)) ?
+                intval($timeout_minutes) . ' minute' . (intval($timeout_minutes) != 1 ? 's' : '') :
+                $timeout_minutes . ' minutes';
+
+            wp_send_json_success(array(
+                'message' => sprintf(__('Connection timeout updated to %s', 'operaton-dmn'), $timeout_label),
+                'timeout_seconds' => $timeout,
+                'timeout_label' => $timeout_label
+            ));
+        }
+        catch (Exception $e)
+        {
+            error_log('Operaton DMN: Connection timeout save error: ' . $e->getMessage());
+            wp_send_json_error(array(
+                'message' => sprintf(__('Failed to save timeout setting: %s', 'operaton-dmn'), $e->getMessage())
+            ));
+        }
+    }
+
+    /**
+     * AJAX handler for checking connection pool statistics
+     */
+    public function ajax_check_connection_stats()
+    {
+        // Verify nonce and permissions
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce') || !current_user_can('manage_options'))
+        {
+            wp_send_json_error(array('message' => __('Security check failed', 'operaton-dmn')));
+            return;
+        }
+
+        try
+        {
+            // Get the API instance to access connection stats
+            $api_instance = $this->core->get_api_instance();
+
+            if (!$api_instance || !method_exists($api_instance, 'get_connection_pool_stats'))
+            {
+                wp_send_json_error(array(
+                    'message' => __('Connection pool monitoring not available', 'operaton-dmn')
+                ));
+                return;
+            }
+
+            // Get the connection pool statistics
+            $stats = $api_instance->get_connection_pool_stats();
+
+            // Format the statistics for display
+            $formatted_stats = $this->format_connection_stats($stats);
+
+            wp_send_json_success(array(
+                'message' => __('Connection efficiency check completed', 'operaton-dmn'),
+                'stats' => $formatted_stats,
+                'raw_stats' => $stats // For debugging if needed
+            ));
+        }
+        catch (Exception $e)
+        {
+            error_log('Operaton DMN: Connection stats error: ' . $e->getMessage());
+            wp_send_json_error(array(
+                'message' => sprintf(__('Failed to retrieve connection stats: %s', 'operaton-dmn'), $e->getMessage())
+            ));
+        }
+    }
+
+    /**
+     * Format connection statistics for display
+     */
+    private function format_connection_stats($stats)
+    {
+        if (empty($stats) || !isset($stats['stats']))
+        {
+            return array(
+                'summary' => 'No connection activity recorded yet',
+                'details' => array(),
+                'efficiency' => 'N/A'
+            );
+        }
+
+        $pool_stats = $stats['stats'];
+        $active_connections = $stats['active_connections'] ?? 0;
+        $pool_details = $stats['pool_details'] ?? array();
+
+        // Calculate efficiency
+        $total_requests = $pool_stats['hits'] + $pool_stats['misses'];
+        $efficiency_percent = $total_requests > 0 ? round(($pool_stats['hits'] / $total_requests) * 100, 1) : 0;
+
+        // Determine efficiency status
+        if ($efficiency_percent >= 70)
+        {
+            $efficiency_status = 'Excellent';
+            $efficiency_color = '#28a745';
+        }
+        elseif ($efficiency_percent >= 50)
+        {
+            $efficiency_status = 'Good';
+            $efficiency_color = '#ffc107';
+        }
+        elseif ($efficiency_percent >= 30)
+        {
+            $efficiency_status = 'Fair';
+            $efficiency_color = '#fd7e14';
+        }
+        else
+        {
+            $efficiency_status = 'Poor';
+            $efficiency_color = '#dc3545';
+        }
+
+        return array(
+            'summary' => sprintf(
+                'Connection reuse efficiency: %s%% (%s)',
+                $efficiency_percent,
+                $efficiency_status
+            ),
+            'efficiency_percent' => $efficiency_percent,
+            'efficiency_status' => $efficiency_status,
+            'efficiency_color' => $efficiency_color,
+            'details' => array(
+                'Total API Calls' => number_format($total_requests),
+                'Reused Connections' => number_format($pool_stats['hits']),
+                'New Connections' => number_format($pool_stats['misses']),
+                'Active Connections' => number_format($active_connections),
+                'Connections Created' => number_format($pool_stats['created']),
+                'Connections Cleaned' => number_format($pool_stats['cleaned'])
+            ),
+            'pool_details' => $pool_details
+        );
     }
 }
