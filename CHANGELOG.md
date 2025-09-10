@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - [Issue #42](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/42) - Batch Multiple Operations
 - [Issue #44](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/44) - Check connection efficiency in admin dashboard
 - [Issue #46](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/46) - Make connection pool timeout configurable in admin dashboard
+- [Issue #48](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/48) - Load test need improvement
 
 ### Plugin now correctly distinguishes between
 - ✅ **Navigation** - preserves results
@@ -57,6 +58,13 @@ All notable changes to this project will be documented in this file.
 - ✅ **Enhanced Error Handling** - Comprehensive error handling for each step in the batch
 - ✅ **Performance Monitoring** - Detailed timing and logging for optimization analysis
 - ✅ **Connection Pool Efficiency** - Maximizes reuse of the same connection across all batched calls
+
+### Too aggressive K6 load test fixed
+- ✅ **Timeout Issues** - Increased from 3s to 15s timeouts
+- ✅ **Concurrency Problems** - Reduced max VUs and added proper ramping
+- ✅ **Unrealistic Thresholds** - Adjusted from 500ms to 2000ms response time expectations
+- ✅ **Response Structure Validation** - Fixed to match your actual DMN response format
+- ✅ **Enhanced Error Handling** - Better logging and debugging for any future issues
 
 ## [1.0.0-beta.15] - 2025-08-31
 
