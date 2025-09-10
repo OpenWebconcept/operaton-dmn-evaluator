@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - [Issue #44](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/44) - Check connection efficiency in admin dashboard
 - [Issue #46](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/46) - Make connection pool timeout configurable in admin dashboard
 - [Issue #48](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/48) - Load test need improvement
+- [Issue #49](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/49) - Script `run-comprehensive-tests.sh` has a hardcoded environment variable that overrides `.env.testing`
 
 ### Plugin now correctly distinguishes between
 - ✅ **Navigation** - preserves results
