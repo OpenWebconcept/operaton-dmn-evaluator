@@ -22,7 +22,7 @@ TEST_RESULTS_DIR="$PROJECT_ROOT/test-results"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Environment variables
-export DMN_TEST_URL="${DMN_TEST_URL:-https://owc-gemeente.test.open-regels.nl}"
+export DMN_TEST_URL="${DMN_TEST_URL:-https://owc-gemeente.open-regels.nl}"
 export DMN_API_KEY="${DMN_API_KEY:-}"
 
 # Test execution flags
