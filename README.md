@@ -41,7 +41,29 @@ This plugin is part of the [OpenWebconcept](https://github.com/OpenWebconcept) e
 
 All notable changes to this project are documented in the [CHANGELOG.md](./CHANGELOG.md).
 
-## What's New in v1.0.0-beta.15 ✨
+---
+
+## What's New in v1.0.0-beta.16 ✨
+
+### Enhanced Plugin features
+- ✅ **Plugin now correctly distinguishes between** navigation, actual user input changes, result field population, form re-initialization
+- ✅ **Populate Radio Buttons Code Snippet removed** - Proper integration with existing safeguard system
+- ✅ **Single AJAX flow** - - Prevented multiple event handlers and blocks duplicate function calls
+- ✅ **Connection Reuse in API Class** - Second call skipped SSL negotiation, no new socket establishment needed and hostname resolution cached
+- ✅ **Batch operation success** - Multiple API calls using same connection
+- ✅ **Enhanced Batching Optimization**
+- ✅ **Too aggressive K6 load test fixed**
+
+### NEW Admin Dashboard functionalities
+- ✅ **Connection Efficiency** - Shows HTTP connection reuse statistics and optimization performance
+![Connection-efficiency-report](./assets/images/connection-efficiency.png)
+
+- ✅ **Connection Pool Setting** - Configure how long connections are kept alive for reuse optimization
+![Connection-timeout-settings-save](./assets/images/connection-timeout-setting-save-admin.png)
+
+---
+
+## What's New in v1.0.0-beta.15
 
 ### 🏆 **Testing Infrastructure Complete**
 
@@ -57,8 +79,9 @@ All notable changes to this project are documented in the [CHANGELOG.md](./CHANG
 - ✅ **Developer workflow integration** with environment-specific commands
 - ✅ **Performance benchmarks** and quality metrics tracking
 
+---
 
-## Plugin Architecture (v1.0.0-beta.11)
+## Plugin Architecture
 
 ### Enterprise-Grade Architecture
 - **Manager-Based Design**: Modular architecture with specialized managers for different functionality
@@ -207,11 +230,12 @@ operaton-dmn-evaluator/
 
 # Demo Heusden Pass and Child Package
 
-A live demo of the plugin is available at https://owc-gemeente.test.open-regels.nl/
+A live demo of the plugin is available at https://owc-gemeente.open-regels.nl/
 
 - **Page 1**: The start form opens with pre-filled data via the Haal Centraal BRP API using a test citizen service number (BSN). A fictitious income has been prefilled as well. Click “Next”.
-- **Page 2**: Adjust the radio buttons as needed and click “Evaluate.” If left unchanged, the value “true” will appear for “eligibilityHeusdenPass” and “eligibilityChildPackage” will be "false". A green confirmation notification will briefly appear in the top right corner. Click “Next.”
+- **Page 2**: Adjust the radio buttons as needed and click “Evaluate.” If left unchanged, the value “true” will appear for both “eligibilityHeusdenPass” and “eligibilityChildPackage”. A green confirmation notification will briefly appear in the top right corner. Click “Next.”
 - **Page 3**: The final step shows an overview of all input and output values per decision table. In this example, there are 11 tables, making it 100% transparent how decisions regarding Heusden Pass and Child Package eligibility are made.
+
 
 ![Form step 2](./assets/images/DemoEvaluator.png)
 
