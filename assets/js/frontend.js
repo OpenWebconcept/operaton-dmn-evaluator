@@ -1305,7 +1305,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
       childrenField: 34,
       // No radio mappings needed - we update the fields directly
     },
-    11: {
+    1: {
       // Added for the duplicated form
       partnerField: 14,
       alleenstaandField: 33,
