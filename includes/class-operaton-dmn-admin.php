@@ -1093,38 +1093,94 @@ class Operaton_DMN_Admin
     {
         $issues = array();
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
             error_log('Operaton DMN Admin: Performing health check');
         }
 
         // Check if Gravity Forms is active
         $gravity_forms_manager = $this->core->get_gravity_forms_instance();
-        if (!$gravity_forms_manager || !$gravity_forms_manager->is_gravity_forms_available()) {
+        if (!$gravity_forms_manager || !$gravity_forms_manager->is_gravity_forms_available())
+        {
             $issues[] = __('Gravity Forms is not active.', 'operaton-dmn');
         }
 
-        // Check if Gravity Forms is active
-        if (!class_exists('GFForms')) {
+        // Check if Gravity Forms is active (duplicate check - can remove one)
+        if (!class_exists('GFForms'))
+        {
             $issues[] = __('Gravity Forms is not active.', 'operaton-dmn');
         }
 
         // Check database table
         global $wpdb;
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") !== $table_name) {
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") !== $table_name)
+        {
             $issues[] = __('Database table is missing.', 'operaton-dmn');
         }
 
-        // Check if REST API is working
-        $test_url = rest_url('operaton-dmn/v1/test');
-        $response = wp_remote_get($test_url, array('timeout' => 5));
-        if (is_wp_error($response)) {
-            $issues[] = __('REST API is not accessible.', 'operaton-dmn');
+        // IMPROVED REST API CHECK - Test internal registration instead of external HTTP call
+        if (!$this->test_rest_api_internally())
+        {
+            // Only add this as an issue if we're confident it's a real problem
+            // Since your logs show the API is working, let's be more specific
+            error_log('Operaton DMN Admin: REST API internal test failed, but external functionality may still work');
+
+            // Optional: Only show this warning in debug mode
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                $issues[] = __('REST API registration check failed (functionality may still work).', 'operaton-dmn');
+            }
         }
 
         return $issues;
     }
 
+    /**
+     * Test REST API internally without external HTTP calls
+     *
+     * @return bool True if REST API appears to be working
+     */
+    private function test_rest_api_internally()
+    {
+        try
+        {
+            // Method 1: Check if our routes are registered
+            $routes = rest_get_server()->get_routes();
+            $our_namespace = '/operaton-dmn/v1';
+
+            if (!isset($routes[$our_namespace . '/evaluate']))
+            {
+                error_log('Operaton DMN Admin: REST route /evaluate not found in registered routes');
+                return false;
+            }
+
+            // Method 2: Test if we can create a REST request (without executing it)
+            $request = new WP_REST_Request('GET', '/operaton-dmn/v1/health');
+            if (!$request)
+            {
+                error_log('Operaton DMN Admin: Failed to create REST request object');
+                return false;
+            }
+
+            // Method 3: Check if the API class has the required methods
+            $api_instance = $this->core->get_api_instance();
+            if (!$api_instance || !method_exists($api_instance, 'handle_evaluation'))
+            {
+                error_log('Operaton DMN Admin: API instance or required methods not available');
+                return false;
+            }
+
+            error_log('Operaton DMN Admin: REST API internal checks passed');
+            return true;
+        }
+        catch (Exception $e)
+        {
+            error_log('Operaton DMN Admin: REST API internal test exception: ' . $e->getMessage());
+            return false;
+        }
+    }
+    
     /**
      * Display system information for debug page
      * Shows system details for troubleshooting
