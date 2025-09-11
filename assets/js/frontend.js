@@ -1955,35 +1955,66 @@ function convertDateFormat(dateStr, fieldName) {
 
   console.log('Converting date for field:', fieldName, 'Input:', dateStr);
 
+  // If already in ISO format (YYYY-MM-DD), return as-is
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     return dateStr;
   }
 
+  // Handle DD-MM-YYYY format (with dashes)
   if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
     const parts = dateStr.split('-');
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    const day = parts[0];
+    const month = parts[1];
+    const year = parts[2];
+    return `${year}-${month}-${day}`;
   }
 
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+  // Handle DD/MM/YYYY format (with slashes) - THIS WAS THE BUG
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
     const parts = dateStr.split('/');
-    return `${parts[2]}-${parts[0]}-${parts[1]}`;
+    const day = parts[0].padStart(2, '0');
+    const month = parts[1].padStart(2, '0');
+    const year = parts[2];
+
+    // FIXED: Correct order is YYYY-MM-DD, not YYYY-DD-MM
+    const convertedDate = `${year}-${month}-${day}`;
+    console.log('DD/MM/YYYY conversion:', dateStr, '->', convertedDate);
+    return convertedDate;
   }
 
+  // Handle MM/DD/YYYY format (US format)
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+    // Note: This creates ambiguity with DD/MM/YYYY
+    // You may need to specify which format your forms use
+    console.warn('Ambiguous date format detected:', dateStr, 'Assuming DD/MM/YYYY');
+  }
+
+  // Handle YYYY/MM/DD format
+  if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(dateStr)) {
+    const parts = dateStr.split('/');
+    const year = parts[0];
+    const month = parts[1].padStart(2, '0');
+    const day = parts[2].padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // Try JavaScript Date parsing as fallback
   try {
     const date = new Date(dateStr);
     if (!isNaN(date.getTime())) {
-      return (
-        date.getFullYear() +
-        '-' +
-        String(date.getMonth() + 1).padStart(2, '0') +
-        '-' +
-        String(date.getDate()).padStart(2, '0')
-      );
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const result = `${year}-${month}-${day}`;
+      console.log('Date object conversion:', dateStr, '->', result);
+      return result;
     }
   } catch (e) {
     console.error('Error parsing date:', dateStr, e);
   }
 
+  // If all else fails, return original string
+  console.warn('Could not convert date format:', dateStr);
   return dateStr;
 }
 
