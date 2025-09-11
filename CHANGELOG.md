@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 ## Issues
 - [Issue #53](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/53) - Test connection dashboard not in sync with live
 - [Issue #54](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/54) - Plugin failing to extract the result value because it's looking for different data structure
+- [Issue #55](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/55) - Health check false positive
 
 ### Admin Dashboard
 - ✅ **Proper URL construction** - Matching exactly what aadmin test connection is validating, ensuring consistency between the test and actual evaluation.
@@ -13,6 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### Bug fixes
 - ✅ **Date conversion** function has a bug where it converts `DD/MM/YYYY` format incorrectly, which was the root cause of [Issue #54](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/54)
+- ✅ **Eliminated false positives** - No more misleading health warnings when the API actually works
 
 ## [1.0.0-beta.16] - 2025-09-10
 
