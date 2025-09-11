@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.0.0-beta.17] - 2025-09-XX
+
+## Issues
+- [Issue #53](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/53) - Test connection dashboard not in sync with live
+
+### Admin Dashboard
+- ✅ **Proper URL construction** - Matching exactly what aadmin test connection is validating, ensuring consistency between the test and actual evaluation.
+![Test Connection Fixed](./assets/images/Test-Connection-Fixed.png)
+
 ## [1.0.0-beta.16] - 2025-09-10
 
 ## Issues
