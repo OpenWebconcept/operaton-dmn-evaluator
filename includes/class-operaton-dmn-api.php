@@ -1824,18 +1824,43 @@ class Operaton_DMN_API
      */
     private function build_evaluation_endpoint($base_endpoint, $decision_key)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
             error_log('Operaton DMN API: Building evaluation endpoint for decision: ' . $decision_key);
+            error_log('Operaton DMN API: Input base endpoint: ' . $base_endpoint);
         }
 
-        // Ensure base endpoint ends with /
-        if (!empty($base_endpoint) && substr($base_endpoint, -1) !== '/') {
-            $base_endpoint .= '/';
+        // Normalize base URL - remove any trailing path components that shouldn't be there
+        $clean_base_url = rtrim($base_endpoint, '/');
+
+        // Remove common endpoint paths that might be incorrectly included
+        $clean_base_url = preg_replace('/\/decision-definition.*$/', '', $clean_base_url);
+        $clean_base_url = preg_replace('/\/process-definition.*$/', '', $clean_base_url);
+
+        // Ensure it ends with /engine-rest
+        if (!str_ends_with($clean_base_url, '/engine-rest'))
+        {
+            if (str_ends_with($clean_base_url, '/'))
+            {
+                $clean_base_url .= 'engine-rest';
+            }
+            else
+            {
+                $clean_base_url .= '/engine-rest';
+            }
         }
 
-        return $base_endpoint . $decision_key . '/evaluate';
+        // Build the complete evaluation URL
+        $evaluation_url = $clean_base_url . '/decision-definition/key/' . $decision_key . '/evaluate';
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Final evaluation endpoint: ' . $evaluation_url);
+        }
+
+        return $evaluation_url;
     }
-
+    
     /**
      * Build process execution endpoint URL from base endpoint and process key
      * Constructs complete process start URL following Operaton REST API conventions
