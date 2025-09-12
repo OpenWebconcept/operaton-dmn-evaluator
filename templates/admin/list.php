@@ -17,49 +17,228 @@ if (!defined('ABSPATH'))
 }
 ?>
 
-<!-- Debug Tools Section - Now positioned after header with consistent styling -->
-<div class="operaton-update-section">
-    <h3><?php _e('Debug Tools', 'operaton-dmn'); ?></h3>
-    <p><?php _e('Development and troubleshooting tools for plugin diagnostics and testing.', 'operaton-dmn'); ?></p>
+<!-- Add New Configuration Button - Now at the top -->
+<div style="margin: 20px 0;">
+    <a href="<?php echo admin_url('admin.php?page=operaton-dmn-add'); ?>" class="button button-primary button-hero">
+        <?php _e('Add New Configuration', 'operaton-dmn'); ?>
+    </a>
+</div>
 
-    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
-        <button type="button" id="get-plugin-status" class="button"
-            title="<?php _e('Get current plugin status and configuration information', 'operaton-dmn'); ?>">
-            <?php _e('Get Plugin Status', 'operaton-dmn'); ?>
-        </button>
+<!-- Configurations Table -->
+<?php if (empty($configs)): ?>
+    <div class="operaton-config-form-wrap">
+        <div style="padding: 40px; text-align: center; color: #666;">
+            <h3><?php _e('No Configurations Found', 'operaton-dmn'); ?></h3>
+            <p><?php _e('You haven\'t created any DMN configurations yet.', 'operaton-dmn'); ?></p>
+            <p>
+                <a href="<?php echo admin_url('admin.php?page=operaton-dmn-add'); ?>" class="button button-primary">
+                    <?php _e('Create Your First Configuration', 'operaton-dmn'); ?>
+                </a>
+            </p>
+        </div>
+    </div>
+<?php else: ?>
+    <!-- Configuration Stats Bar -->
+    <div class="operaton-stats-bar" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #0073aa;">
+        <div>
+            <?php
+            $total_configs = count($configs);
+            $active_configs = count(array_filter($configs, function ($config)
+            {
+                $is_complete = !empty($config->dmn_endpoint) &&
+                    !empty($config->field_mappings) &&
+                    !empty($config->result_mappings);
+                if (isset($config->use_process) && $config->use_process)
+                {
+                    return $is_complete && !empty($config->process_key);
+                }
+                else
+                {
+                    return $is_complete && !empty($config->decision_key);
+                }
+            }));
+            $incomplete_configs = $total_configs - $active_configs;
+            ?>
+            <strong><?php _e('Configuration Summary:', 'operaton-dmn'); ?></strong>
+            <?php printf(__('Total: %d | Active: %d | Incomplete: %d', 'operaton-dmn'), $total_configs, $active_configs, $incomplete_configs); ?>
+        </div>
 
-        <button type="button" id="run-dmn-debug" class="button"
-            title="<?php _e('Run comprehensive DMN debug tests (check error logs)', 'operaton-dmn'); ?>">
-            <?php _e('Run DMN Debug Tests', 'operaton-dmn'); ?>
-        </button>
+        <?php if ($total_configs > 10): ?>
+            <div class="operaton-search-filters">
+                <input type="text" id="config-search" placeholder="<?php _e('Search configurations...', 'operaton-dmn'); ?>" style="margin-right: 10px; padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                <select id="status-filter" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value=""><?php _e('All Statuses', 'operaton-dmn'); ?></option>
+                    <option value="active"><?php _e('Active Only', 'operaton-dmn'); ?></option>
+                    <option value="incomplete"><?php _e('Incomplete Only', 'operaton-dmn'); ?></option>
+                </select>
+                <select id="mode-filter" style="margin-left: 10px; padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value=""><?php _e('All Modes', 'operaton-dmn'); ?></option>
+                    <option value="process"><?php _e('Process Mode', 'operaton-dmn'); ?></option>
+                    <option value="direct"><?php _e('Direct Mode', 'operaton-dmn'); ?></option>
+                </select>
+            </div>
+        <?php endif; ?>
     </div>
 
-    <div id="debug-operation-result" style="margin-top: 10px;"></div>
+    <div class="operaton-config-form-wrap">
+        <table class="operaton-config-table" id="configurations-table">
+            <thead>
+                <tr>
+                    <th class="sortable" data-sort="name"><?php _e('Name', 'operaton-dmn'); ?> <span class="sort-indicator"></span></th>
+                    <th class="sortable" data-sort="form"><?php _e('Form', 'operaton-dmn'); ?> <span class="sort-indicator"></span></th>
+                    <th class="sortable" data-sort="mode"><?php _e('Mode', 'operaton-dmn'); ?> <span class="sort-indicator"></span></th>
+                    <th><?php _e('Endpoint', 'operaton-dmn'); ?></th>
+                    <th><?php _e('Key', 'operaton-dmn'); ?></th>
+                    <th class="sortable" data-sort="status"><?php _e('Status', 'operaton-dmn'); ?> <span class="sort-indicator"></span></th>
+                    <th><?php _e('Actions', 'operaton-dmn'); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($configs as $config): ?>
+                    <tr data-config-id="<?php echo $config->id; ?>"
+                        data-name="<?php echo esc_attr(strtolower($config->name)); ?>"
+                        data-mode="<?php echo (isset($config->use_process) && $config->use_process) ? 'process' : 'direct'; ?>"
+                        data-status="<?php
+                                        $is_complete = !empty($config->dmn_endpoint) &&
+                                            !empty($config->field_mappings) &&
+                                            !empty($config->result_mappings);
+                                        if (isset($config->use_process) && $config->use_process)
+                                        {
+                                            echo ($is_complete && !empty($config->process_key)) ? 'active' : 'incomplete';
+                                        }
+                                        else
+                                        {
+                                            echo ($is_complete && !empty($config->decision_key)) ? 'active' : 'incomplete';
+                                        }
+                                        ?>">
+                        <td class="operaton-config-name">
+                            <?php echo esc_html($config->name); ?>
+                            <?php if (!empty($config->button_text) && $config->button_text !== 'Evaluate'): ?>
+                                <br><small style="color: #666;"><?php _e('Button:', 'operaton-dmn'); ?> "<?php echo esc_html($config->button_text); ?>"</small>
+                            <?php endif; ?>
+                        </td>
+                        <td class="operaton-config-form">
+                            <?php
+                            // Get form title if possible
+                            $form_title = 'Form #' . $config->form_id;
+                            if (class_exists('GFAPI'))
+                            {
+                                $form = GFAPI::get_form($config->form_id);
+                                if ($form)
+                                {
+                                    $form_title = esc_html($form['title']) . ' (#' . $config->form_id . ')';
+                                }
+                            }
+                            echo $form_title;
+                            ?>
+                        </td>
+                        <td>
+                            <?php if (isset($config->use_process) && $config->use_process): ?>
+                                <span style="color: #0073aa; font-weight: 600;">
+                                    <?php _e('Process', 'operaton-dmn'); ?>
+                                </span>
+                                <?php if (isset($config->show_decision_flow) && $config->show_decision_flow): ?>
+                                    <br><small style="color: #46b450;">+ <?php _e('Decision Flow', 'operaton-dmn'); ?></small>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <span style="color: #666;">
+                                    <?php _e('Direct', 'operaton-dmn'); ?>
+                                </span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="operaton-config-endpoint">
+                            <?php
+                            $endpoint = esc_html($config->dmn_endpoint);
+                            // Truncate long URLs for display
+                            if (strlen($endpoint) > 50)
+                            {
+                                echo '<span title="' . $endpoint . '">' . substr($endpoint, 0, 47) . '...</span>';
+                            }
+                            else
+                            {
+                                echo $endpoint;
+                            }
+                            ?>
+                        </td>
+                        <td style="font-family: 'Courier New', monospace; font-size: 12px;">
+                            <?php if (isset($config->use_process) && $config->use_process): ?>
+                                <strong><?php _e('Process:', 'operaton-dmn'); ?></strong><br>
+                                <?php echo esc_html($config->process_key ?: __('Not set', 'operaton-dmn')); ?>
+                            <?php else: ?>
+                                <strong><?php _e('Decision:', 'operaton-dmn'); ?></strong><br>
+                                <?php echo esc_html($config->decision_key ?: __('Not set', 'operaton-dmn')); ?>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php
+                            // Determine status based on configuration completeness
+                            $is_complete = !empty($config->dmn_endpoint) &&
+                                !empty($config->field_mappings) &&
+                                !empty($config->result_mappings);
 
-    <details style="margin-top: 15px;">
-        <summary style="cursor: pointer; font-weight: 600; color: #0073aa;"><?php _e('Debug Tools Help', 'operaton-dmn'); ?></summary>
-        <div style="padding: 10px 0; font-size: 14px; color: #666; line-height: 1.5;">
-            <ul style="margin-left: 20px;">
-                <li><strong><?php _e('Plugin Status:', 'operaton-dmn'); ?></strong> <?php _e('Shows current plugin version, configuration status, and system information', 'operaton-dmn'); ?></li>
-                <li><strong><?php _e('DMN Debug Tests:', 'operaton-dmn'); ?></strong> <?php _e('Runs comprehensive server configuration, plugin initialization, and REST API tests (results logged to error log)', 'operaton-dmn'); ?></li>
-            </ul>
-            <p style="margin-top: 10px;"><strong><?php _e('When to use:', 'operaton-dmn'); ?></strong></p>
-            <ul style="margin-left: 20px;">
-                <li><?php _e('When troubleshooting plugin issues', 'operaton-dmn'); ?></li>
-                <li><?php _e('Before contacting support', 'operaton-dmn'); ?></li>
-                <li><?php _e('After plugin updates to verify functionality', 'operaton-dmn'); ?></li>
-                <li><?php _e('When DMN evaluations are failing', 'operaton-dmn'); ?></li>
-            </ul>
-        </div>
-    </details>
-</div>
+                            if (isset($config->use_process) && $config->use_process)
+                            {
+                                $is_complete = $is_complete && !empty($config->process_key);
+                            }
+                            else
+                            {
+                                $is_complete = $is_complete && !empty($config->decision_key);
+                            }
+                            ?>
+
+                            <?php if ($is_complete): ?>
+                                <span class="operaton-config-status active">
+                                    <?php _e('Active', 'operaton-dmn'); ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="operaton-config-status inactive">
+                                    <?php _e('Incomplete', 'operaton-dmn'); ?>
+                                </span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="operaton-config-actions">
+                            <a href="<?php echo admin_url('admin.php?page=operaton-dmn-add&edit=' . $config->id); ?>"
+                                class="button button-small" title="<?php _e('Edit Configuration', 'operaton-dmn'); ?>">
+                                <?php _e('Edit', 'operaton-dmn'); ?>
+                            </a>
+
+                            <button type="button" class="button button-small button-link-delete"
+                                onclick="deleteConfig(<?php echo $config->id; ?>, '<?php echo esc_js($config->name); ?>')"
+                                title="<?php _e('Delete Configuration', 'operaton-dmn'); ?>">
+                                <?php _e('Delete', 'operaton-dmn'); ?>
+                            </button>
+
+                            <?php if ($is_complete): ?>
+                                <br style="margin-bottom: 5px;">
+                                <button type="button" class="button button-small"
+                                    onclick="testConfig(<?php echo $config->id; ?>)"
+                                    title="<?php _e('Test Configuration', 'operaton-dmn'); ?>">
+                                    <?php _e('Test', 'operaton-dmn'); ?>
+                                </button>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+
+        <?php if ($total_configs > 20): ?>
+            <div class="operaton-pagination" style="margin-top: 20px; text-align: center;">
+                <div id="pagination-info" style="margin-bottom: 10px; color: #666; font-size: 14px;">
+                    <?php printf(__('Showing %d configurations', 'operaton-dmn'), $total_configs); ?>
+                </div>
+                <div id="pagination-controls">
+                    <!-- Pagination will be added via JavaScript if needed -->
+                </div>
+            </div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
 
 <!-- Enhanced Decision Flow Cache Management Section -->
 <div class="operaton-update-section">
     <h3>Configuration & Cache Management</h3>
     <p>Manage cached decision flow data and configuration settings. Clear cache when you update DMN endpoints or experience configuration issues.</p>
-
-    <!-- Remove the PHP success messages since we're using AJAX now -->
 
     <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
         <button type="button" id="clear-decision-cache" class="button"
@@ -76,7 +255,7 @@ if (!defined('ABSPATH'))
             title="Force reload all configurations from database without using cache">
             Force Reload Configurations
         </button>
-        <!-- NEW: Connection Efficiency Button -->
+
         <button type="button" id="check-connection-stats" class="button button-secondary"
             title="Check HTTP connection reuse efficiency for API calls">
             Check Connection Efficiency
@@ -155,6 +334,43 @@ if (!defined('ABSPATH'))
     </details>
 </div>
 
+<!-- Debug Tools Section -->
+<div class="operaton-update-section">
+    <h3><?php _e('Debug Tools', 'operaton-dmn'); ?></h3>
+    <p><?php _e('Development and troubleshooting tools for plugin diagnostics and testing.', 'operaton-dmn'); ?></p>
+
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+        <button type="button" id="get-plugin-status" class="button"
+            title="<?php _e('Get current plugin status and configuration information', 'operaton-dmn'); ?>">
+            <?php _e('Get Plugin Status', 'operaton-dmn'); ?>
+        </button>
+
+        <button type="button" id="run-dmn-debug" class="button"
+            title="<?php _e('Run comprehensive DMN debug tests (check error logs)', 'operaton-dmn'); ?>">
+            <?php _e('Run DMN Debug Tests', 'operaton-dmn'); ?>
+        </button>
+    </div>
+
+    <div id="debug-operation-result" style="margin-top: 10px;"></div>
+
+    <details style="margin-top: 15px;">
+        <summary style="cursor: pointer; font-weight: 600; color: #0073aa;"><?php _e('Debug Tools Help', 'operaton-dmn'); ?></summary>
+        <div style="padding: 10px 0; font-size: 14px; color: #666; line-height: 1.5;">
+            <ul style="margin-left: 20px;">
+                <li><strong><?php _e('Plugin Status:', 'operaton-dmn'); ?></strong> <?php _e('Shows current plugin version, configuration status, and system information', 'operaton-dmn'); ?></li>
+                <li><strong><?php _e('DMN Debug Tests:', 'operaton-dmn'); ?></strong> <?php _e('Runs comprehensive server configuration, plugin initialization, and REST API tests (results logged to error log)', 'operaton-dmn'); ?></li>
+            </ul>
+            <p style="margin-top: 10px;"><strong><?php _e('When to use:', 'operaton-dmn'); ?></strong></p>
+            <ul style="margin-left: 20px;">
+                <li><?php _e('When troubleshooting plugin issues', 'operaton-dmn'); ?></li>
+                <li><?php _e('Before contacting support', 'operaton-dmn'); ?></li>
+                <li><?php _e('After plugin updates to verify functionality', 'operaton-dmn'); ?></li>
+                <li><?php _e('When DMN evaluations are failing', 'operaton-dmn'); ?></li>
+            </ul>
+        </div>
+    </details>
+</div>
+
 <!-- Update Management Section -->
 <?php if (current_user_can('manage_options')): ?>
     <div class="operaton-update-section">
@@ -203,197 +419,6 @@ if (!defined('ABSPATH'))
     </div>
 <?php endif; ?>
 
-<!-- Add New Configuration Button -->
-<div style="margin: 20px 0;">
-    <a href="<?php echo admin_url('admin.php?page=operaton-dmn-add'); ?>" class="button button-primary">
-        <?php _e('Add New Configuration', 'operaton-dmn'); ?>
-    </a>
-</div>
-
-<!-- Configurations Table -->
-<?php if (empty($configs)): ?>
-    <div class="operaton-config-form-wrap">
-        <div style="padding: 40px; text-align: center; color: #666;">
-            <h3><?php _e('No Configurations Found', 'operaton-dmn'); ?></h3>
-            <p><?php _e('You haven\'t created any DMN configurations yet.', 'operaton-dmn'); ?></p>
-            <p>
-                <a href="<?php echo admin_url('admin.php?page=operaton-dmn-add'); ?>" class="button button-primary">
-                    <?php _e('Create Your First Configuration', 'operaton-dmn'); ?>
-                </a>
-            </p>
-        </div>
-    </div>
-<?php else: ?>
-    <div class="operaton-config-form-wrap">
-        <table class="operaton-config-table">
-            <thead>
-                <tr>
-                    <th><?php _e('Name', 'operaton-dmn'); ?></th>
-                    <th><?php _e('Form', 'operaton-dmn'); ?></th>
-                    <th><?php _e('Mode', 'operaton-dmn'); ?></th>
-                    <th><?php _e('Endpoint', 'operaton-dmn'); ?></th>
-                    <th><?php _e('Key', 'operaton-dmn'); ?></th>
-                    <th><?php _e('Status', 'operaton-dmn'); ?></th>
-                    <th><?php _e('Actions', 'operaton-dmn'); ?></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($configs as $config): ?>
-                    <tr>
-                        <td class="operaton-config-name">
-                            <?php echo esc_html($config->name); ?>
-                            <?php if (!empty($config->button_text) && $config->button_text !== 'Evaluate'): ?>
-                                <br><small style="color: #666;"><?php _e('Button:', 'operaton-dmn'); ?> "<?php echo esc_html($config->button_text); ?>"</small>
-                            <?php endif; ?>
-                        </td>
-                        <td class="operaton-config-form">
-                            <?php
-                            // Get form title if possible
-                            $form_title = 'Form #' . $config->form_id;
-                            if (class_exists('GFAPI'))
-                            {
-                                $form = GFAPI::get_form($config->form_id);
-                                if ($form)
-                                {
-                                    $form_title = esc_html($form['title']) . ' (#' . $config->form_id . ')';
-                                }
-                            }
-                            echo $form_title;
-                            ?>
-                        </td>
-                        <td>
-                            <?php if (isset($config->use_process) && $config->use_process): ?>
-                                <span style="color: #0073aa; font-weight: 600;">
-                                    <?php _e('Process', 'operaton-dmn'); ?>
-                                </span>
-                                <?php if (isset($config->show_decision_flow) && $config->show_decision_flow): ?>
-                                    <br><small style="color: #46b450;">+ <?php _e('Decision Flow', 'operaton-dmn'); ?></small>
-                                <?php endif; ?>
-                            <?php else: ?>
-                                <span style="color: #666;">
-                                    <?php _e('Direct', 'operaton-dmn'); ?>
-                                </span>
-                            <?php endif; ?>
-                        </td>
-                        <td class="operaton-config-endpoint">
-                            <?php
-                            $endpoint = esc_html($config->dmn_endpoint);
-                            // Truncate long URLs for display
-                            if (strlen($endpoint) > 50)
-                            {
-                                echo substr($endpoint, 0, 47) . '...';
-                            }
-                            else
-                            {
-                                echo $endpoint;
-                            }
-                            ?>
-                        </td>
-                        <td style="font-family: 'Courier New', monospace; font-size: 12px;">
-                            <?php if (isset($config->use_process) && $config->use_process): ?>
-                                <strong><?php _e('Process:', 'operaton-dmn'); ?></strong><br>
-                                <?php echo esc_html($config->process_key ?: __('Not set', 'operaton-dmn')); ?>
-                            <?php else: ?>
-                                <strong><?php _e('Decision:', 'operaton-dmn'); ?></strong><br>
-                                <?php echo esc_html($config->decision_key ?: __('Not set', 'operaton-dmn')); ?>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php
-                            // Determine status based on configuration completeness
-                            $is_complete = !empty($config->dmn_endpoint) &&
-                                !empty($config->field_mappings) &&
-                                !empty($config->result_mappings);
-
-                            if (isset($config->use_process) && $config->use_process)
-                            {
-                                $is_complete = $is_complete && !empty($config->process_key);
-                            }
-                            else
-                            {
-                                $is_complete = $is_complete && !empty($config->decision_key);
-                            }
-                            ?>
-
-                            <?php if ($is_complete): ?>
-                                <span class="operaton-config-status active">
-                                    <?php _e('Active', 'operaton-dmn'); ?>
-                                </span>
-                            <?php else: ?>
-                                <span class="operaton-config-status inactive">
-                                    <?php _e('Incomplete', 'operaton-dmn'); ?>
-                                </span>
-                            <?php endif; ?>
-                        </td>
-                        <td class="operaton-config-actions">
-                            <a href="<?php echo admin_url('admin.php?page=operaton-dmn-add&edit=' . $config->id); ?>"
-                                class="button button-small" title="<?php _e('Edit Configuration', 'operaton-dmn'); ?>">
-                                <?php _e('Edit', 'operaton-dmn'); ?>
-                            </a>
-
-                            <button type="button" class="button button-small button-link-delete"
-                                onclick="deleteConfig(<?php echo $config->id; ?>, '<?php echo esc_js($config->name); ?>')"
-                                title="<?php _e('Delete Configuration', 'operaton-dmn'); ?>">
-                                <?php _e('Delete', 'operaton-dmn'); ?>
-                            </button>
-
-                            <?php if ($is_complete): ?>
-                                <br style="margin-bottom: 5px;">
-                                <button type="button" class="button button-small"
-                                    onclick="testConfig(<?php echo $config->id; ?>)"
-                                    title="<?php _e('Test Configuration', 'operaton-dmn'); ?>">
-                                    <?php _e('Test', 'operaton-dmn'); ?>
-                                </button>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Configuration Summary -->
-    <div class="operaton-notice info" style="margin-top: 20px;">
-        <h4><?php _e('Configuration Summary', 'operaton-dmn'); ?></h4>
-        <p>
-            <?php
-            printf(
-                __('Total configurations: %d | Active: %d | Incomplete: %d', 'operaton-dmn'),
-                count($configs),
-                count(array_filter($configs, function ($config)
-                {
-                    $is_complete = !empty($config->dmn_endpoint) &&
-                        !empty($config->field_mappings) &&
-                        !empty($config->result_mappings);
-                    if (isset($config->use_process) && $config->use_process)
-                    {
-                        return $is_complete && !empty($config->process_key);
-                    }
-                    else
-                    {
-                        return $is_complete && !empty($config->decision_key);
-                    }
-                })),
-                count(array_filter($configs, function ($config)
-                {
-                    $is_complete = !empty($config->dmn_endpoint) &&
-                        !empty($config->field_mappings) &&
-                        !empty($config->result_mappings);
-                    if (isset($config->use_process) && $config->use_process)
-                    {
-                        return !($is_complete && !empty($config->process_key));
-                    }
-                    else
-                    {
-                        return !($is_complete && !empty($config->decision_key));
-                    }
-                }))
-            );
-            ?>
-        </p>
-    </div>
-<?php endif; ?>
-
 <!-- Help Section -->
 <div class="operaton-notice info" style="margin-top: 30px;">
     <h4><?php _e('Need Help?', 'operaton-dmn'); ?></h4>
@@ -408,7 +433,6 @@ if (!defined('ABSPATH'))
         </a>
     </p>
 </div>
-</div>
 
 <!-- Confirmation Dialog and JavaScript -->
 <div id="delete-confirmation" style="display: none;">
@@ -419,10 +443,8 @@ if (!defined('ABSPATH'))
 
 <script>
     // Global functions that need to be called from HTML
-    // Delete configuration function
     function deleteConfig(configId, configName) {
         if (confirm('<?php _e('Are you sure you want to delete the configuration', 'operaton-dmn'); ?> "' + configName + '"?\n\n<?php _e('This action cannot be undone.', 'operaton-dmn'); ?>')) {
-            // Create a form and submit it
             var form = document.createElement('form');
             form.method = 'POST';
             form.action = '';
@@ -451,17 +473,14 @@ if (!defined('ABSPATH'))
         }
     }
 
-    // Test configuration function
     function testConfig(configId) {
         alert('<?php _e('Testing functionality will be implemented in the next update.', 'operaton-dmn'); ?>');
-        // TODO: Implement AJAX testing functionality
     }
 
     // Global variables to manage feedback timers
     var cacheOperationTimer = null;
     var debugOperationTimer = null;
 
-    // Global function to show full debug data
     function showFullDebugData() {
         if (window.operatonDebugData) {
             var existingFullData = document.getElementById('full-debug-data');
@@ -470,7 +489,6 @@ if (!defined('ABSPATH'))
                 return;
             }
 
-            // Append to the parent container instead of the auto-fading result div
             var parentContainer = jQuery('#debug-operation-result').parent();
             var fullDataHtml = '<div id="full-debug-data" style="margin-top: 10px; max-height: 400px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: pre-wrap; border: 1px solid #ddd;">' +
                 '<div style="margin-bottom: 10px; font-family: sans-serif; font-weight: bold; color: #0073aa;">Complete Debug Information:</div>' +
@@ -479,7 +497,6 @@ if (!defined('ABSPATH'))
 
             parentContainer.append(fullDataHtml);
 
-            // Change button text
             var button = jQuery('#debug-operation-result').find('button');
             if (button.length) {
                 button.text('Hide Full Details');
@@ -487,7 +504,6 @@ if (!defined('ABSPATH'))
         }
     }
 
-    // NEW: Global function to show full DMN debug data
     function showFullDmnDebugData() {
         if (window.operatonDmnDebugData) {
             var existingFullData = document.getElementById('full-dmn-debug-data');
@@ -496,7 +512,6 @@ if (!defined('ABSPATH'))
                 return;
             }
 
-            // Append to the parent container instead of the auto-fading result div
             var parentContainer = jQuery('#debug-operation-result').parent();
             var fullDataHtml = '<div id="full-dmn-debug-data" style="margin-top: 10px; max-height: 400px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: pre-wrap; border: 1px solid #ddd;">' +
                 '<div style="margin-bottom: 10px; font-family: sans-serif; font-weight: bold; color: #0073aa;">Complete DMN Debug Test Results:</div>' +
@@ -505,7 +520,6 @@ if (!defined('ABSPATH'))
 
             parentContainer.append(fullDataHtml);
 
-            // Change button text - find the specific button for DMN debug
             var buttons = jQuery('#debug-operation-result').find('button');
             buttons.each(function() {
                 if (jQuery(this).text().indexOf('Show Full Test Results') !== -1) {
@@ -518,20 +532,13 @@ if (!defined('ABSPATH'))
     }
 
     jQuery(document).ready(function($) {
-        // Helper function to show feedback with proper timer management
         function showCacheOperationFeedback(html, fadeOut = true) {
             var result = $('#cache-operation-result');
-
-            // Clear any existing timer
             if (cacheOperationTimer) {
                 clearTimeout(cacheOperationTimer);
                 cacheOperationTimer = null;
             }
-
-            // Make sure the div is visible and show content
             result.stop(true, true).show().html(html);
-
-            // Set new timer if fadeOut is requested
             if (fadeOut) {
                 cacheOperationTimer = setTimeout(function() {
                     result.fadeOut(500);
@@ -540,33 +547,109 @@ if (!defined('ABSPATH'))
             }
         }
 
-        // Helper function for debug operation feedback
         function showDebugOperationFeedback(html, fadeOut = true) {
             var result = $('#debug-operation-result');
-
-            // Clear any existing timer
             if (debugOperationTimer) {
                 clearTimeout(debugOperationTimer);
                 debugOperationTimer = null;
             }
-
-            // Make sure the div is visible and show content
             result.stop(true, true).show().html(html);
-
-            // Set new timer if fadeOut is requested
             if (fadeOut) {
                 debugOperationTimer = setTimeout(function() {
                     result.fadeOut(500);
                     debugOperationTimer = null;
-                }, 5000); // Longer timeout for debug info
+                }, 5000);
             }
         }
 
-        // Fixed Get Plugin Status functionality
-        $('#get-plugin-status').on('click', function() {
-            console.log('Get Plugin Status button clicked');
-            var button = $(this);
+        function filterConfigurations() {
+            var searchTerm = $('#config-search').val().toLowerCase();
+            var statusFilter = $('#status-filter').val();
+            var modeFilter = $('#mode-filter').val();
+            var visibleCount = 0;
 
+            $('#configurations-table tbody tr').each(function() {
+                var $row = $(this);
+                var name = $row.data('name');
+                var status = $row.data('status');
+                var mode = $row.data('mode');
+
+                var showRow = true;
+
+                if (searchTerm && name.indexOf(searchTerm) === -1) {
+                    showRow = false;
+                }
+
+                if (statusFilter && status !== statusFilter) {
+                    showRow = false;
+                }
+
+                if (modeFilter && mode !== modeFilter) {
+                    showRow = false;
+                }
+
+                if (showRow) {
+                    $row.show();
+                    visibleCount++;
+                } else {
+                    $row.hide();
+                }
+            });
+
+            $('#pagination-info').text('Showing ' + visibleCount + ' configurations');
+        }
+
+        $('.sortable').on('click', function() {
+            var $this = $(this);
+            var sortBy = $this.data('sort');
+            var $tbody = $('#configurations-table tbody');
+            var $rows = $tbody.find('tr').toArray();
+
+            var isAsc = $this.hasClass('sort-asc');
+
+            $('.sortable').removeClass('sort-asc sort-desc');
+            $this.addClass(isAsc ? 'sort-desc' : 'sort-asc');
+
+            $rows.sort(function(a, b) {
+                var aVal, bVal;
+
+                switch (sortBy) {
+                    case 'name':
+                        aVal = $(a).find('.operaton-config-name').text().toLowerCase();
+                        bVal = $(b).find('.operaton-config-name').text().toLowerCase();
+                        break;
+                    case 'form':
+                        aVal = $(a).find('.operaton-config-form').text().toLowerCase();
+                        bVal = $(b).find('.operaton-config-form').text().toLowerCase();
+                        break;
+                    case 'mode':
+                        aVal = $(a).data('mode');
+                        bVal = $(b).data('mode');
+                        break;
+                    case 'status':
+                        aVal = $(a).data('status');
+                        bVal = $(b).data('status');
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (aVal < bVal) return isAsc ? 1 : -1;
+                if (aVal > bVal) return isAsc ? -1 : 1;
+                return 0;
+            });
+
+            $.each($rows, function(index, row) {
+                $tbody.append(row);
+            });
+        });
+
+        $('#config-search, #status-filter, #mode-filter').on('input change', function() {
+            filterConfigurations();
+        });
+
+        $('#get-plugin-status').on('click', function() {
+            var button = $(this);
             button.prop('disabled', true).text('<?php _e('Getting Status...', 'operaton-dmn'); ?>');
             showDebugOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ <?php _e('Retrieving plugin status information...', 'operaton-dmn'); ?></div>', false);
 
@@ -575,13 +658,9 @@ if (!defined('ABSPATH'))
                 _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
             }, function(response) {
                 if (response.success && response.data) {
-                    console.log('Plugin status response:', response.data);
-
-                    // Create a formatted display instead of raw JSON
                     var statusHtml = '<div style="color: #155724; padding: 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
                         '<h4 style="margin: 0 0 10px 0;">✅ <?php _e('Plugin Status Information', 'operaton-dmn'); ?></h4>';
 
-                    // Display key information in a readable format
                     if (response.data.plugin_version) {
                         statusHtml += '<div><strong><?php _e('Plugin Version:', 'operaton-dmn'); ?></strong> ' + response.data.plugin_version + '</div>';
                     }
@@ -613,8 +692,6 @@ if (!defined('ABSPATH'))
                     statusHtml += '</div>';
 
                     showDebugOperationFeedback(statusHtml);
-
-                    // Store the full data globally for the "Show Full Details" button
                     window.operatonDebugData = response.data;
 
                 } else {
@@ -622,7 +699,6 @@ if (!defined('ABSPATH'))
                         '⚠ <strong><?php _e('Status retrieval failed:', 'operaton-dmn'); ?></strong> ' + (response.data ? response.data.message : '<?php _e('Unknown error', 'operaton-dmn'); ?>') + '</div>', false);
                 }
             }).fail(function(xhr, status, error) {
-                console.error('AJAX request failed:', xhr, status, error);
                 showDebugOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
                     '⚠ <strong><?php _e('Status retrieval failed:', 'operaton-dmn'); ?></strong> <?php _e('Connection error', 'operaton-dmn'); ?> (' + status + ')</div>', false);
             }).always(function() {
@@ -630,122 +706,8 @@ if (!defined('ABSPATH'))
             });
         });
 
-        // Connection Stats functionality
-        $('#check-connection-stats').on('click', function() {
-            console.log('Check Connection Efficiency button clicked');
-            var button = $(this);
-
-            button.prop('disabled', true).text('Checking...');
-            showCacheOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Analyzing connection pool efficiency...</div>', false);
-
-            $.post(ajaxurl, {
-                action: 'operaton_check_connection_stats',
-                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
-            }, function(response) {
-                if (response.success && response.data.stats) {
-                    console.log('Connection stats response:', response.data);
-
-                    var stats = response.data.stats;
-                    var statusHtml = '<div style="color: #155724; padding: 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
-                        '<h4 style="margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">' +
-                        '<span style="color: ' + stats.efficiency_color + ';">📊</span> Connection Efficiency Report</h4>';
-
-                    // Efficiency summary with colored indicator
-                    statusHtml += '<div style="margin-bottom: 12px; padding: 8px; background: rgba(255,255,255,0.7); border-radius: 4px;">' +
-                        '<div style="font-size: 16px; font-weight: 600; color: ' + stats.efficiency_color + ';">' +
-                        stats.summary + '</div></div>';
-
-                    // Connection details in a grid
-                    if (stats.details && Object.keys(stats.details).length > 0) {
-                        statusHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-bottom: 10px;">';
-
-                        Object.entries(stats.details).forEach(function([key, value]) {
-                            var isEfficiency = key.includes('Reused');
-                            var textColor = isEfficiency ? stats.efficiency_color : '#495057';
-                            statusHtml += '<div style="padding: 6px 8px; background: rgba(255,255,255,0.8); border-radius: 3px; border-left: 3px solid ' +
-                                (isEfficiency ? stats.efficiency_color : '#dee2e6') + ';">' +
-                                '<div style="font-size: 11px; color: #6c757d; text-transform: uppercase; font-weight: 600;">' + key + '</div>' +
-                                '<div style="font-size: 14px; font-weight: 600; color: ' + textColor + ';">' + value + '</div>' +
-                                '</div>';
-                        });
-
-                        statusHtml += '</div>';
-                    }
-
-                    // Performance recommendations
-                    if (stats.efficiency_percent < 50) {
-                        statusHtml += '<div style="margin-top: 10px; padding: 8px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 13px;">' +
-                            '<strong>💡 Optimization Tip:</strong> Low connection reuse suggests high cache miss rate. ' +
-                            'Consider increasing connection pool timeout or checking for endpoint configuration issues.' +
-                            '</div>';
-                    } else if (stats.efficiency_percent >= 70) {
-                        statusHtml += '<div style="margin-top: 10px; padding: 8px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; font-size: 13px;">' +
-                            '<strong>🎉 Excellent!</strong> Your connection reuse optimization is working very well. ' +
-                            'This indicates efficient API communication with minimal SSL handshake overhead.' +
-                            '</div>';
-                    }
-
-                    statusHtml += '</div>';
-
-                    showCacheOperationFeedback(statusHtml);
-
-                } else {
-                    showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
-                        '⚠️ <strong>Connection stats check failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>', false);
-                }
-            }).fail(function(xhr, status, error) {
-                console.error('AJAX request failed:', xhr, status, error);
-                showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
-                    '⚠️ <strong>Connection stats check failed:</strong> Connection error (' + status + ')</div>', false);
-            }).always(function() {
-                button.prop('disabled', false).text('Check Connection Efficiency');
-            });
-        });
-
-        // Connection Timeout Save functionality
-        $('#save-connection-timeout').on('click', function() {
-            var button = $(this);
-            var timeout = $('#connection-timeout').val();
-            var resultDiv = $('#timeout-save-result');
-
-            if (!timeout) {
-                resultDiv.html('<span style="color: #dc3545;">Please select a timeout value</span>');
-                return;
-            }
-
-            button.prop('disabled', true).text('Saving...');
-            resultDiv.html('<span style="color: #666;">Saving setting...</span>');
-
-            $.post(ajaxurl, {
-                action: 'operaton_save_connection_timeout',
-                timeout: timeout,
-                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
-            }, function(response) {
-                if (response.success) {
-                    resultDiv.html('<span style="color: #28a745; font-weight: 600;">✓ ' + response.data.message + '</span>');
-
-                    // Clear the success message after 4 seconds
-                    setTimeout(function() {
-                        resultDiv.fadeOut(300, function() {
-                            $(this).html('').show();
-                        });
-                    }, 4000);
-
-                } else {
-                    resultDiv.html('<span style="color: #dc3545;">✗ ' + (response.data ? response.data.message : 'Save failed') + '</span>');
-                }
-            }).fail(function(xhr, status, error) {
-                resultDiv.html('<span style="color: #dc3545;">✗ Connection error: ' + status + '</span>');
-            }).always(function() {
-                button.prop('disabled', false).text('Save Settings');
-            });
-        });
-        
-        // NEW: Run DMN Debug Tests functionality
         $('#run-dmn-debug').on('click', function() {
-            console.log('Run DMN Debug Tests button clicked');
             var button = $(this);
-
             button.prop('disabled', true).text('<?php _e('Running Tests...', 'operaton-dmn'); ?>');
             showDebugOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ <?php _e('Running comprehensive DMN debug tests...', 'operaton-dmn'); ?></div>', false);
 
@@ -754,13 +716,9 @@ if (!defined('ABSPATH'))
                 _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
             }, function(response) {
                 if (response.success) {
-                    console.log('DMN Debug response:', response.data);
-
-                    // Create formatted display with summary and detailed results
                     var debugHtml = '<div style="color: #155724; padding: 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
                         '<h4 style="margin: 0 0 10px 0;">✅ <?php _e('DMN Debug Tests Completed', 'operaton-dmn'); ?></h4>';
 
-                    // Add summary if results are available
                     if (response.data.results) {
                         var results = response.data.results;
                         debugHtml += '<div style="margin-bottom: 10px;"><strong><?php _e('Quick Summary:', 'operaton-dmn'); ?></strong></div>';
@@ -785,13 +743,10 @@ if (!defined('ABSPATH'))
                         '<strong><?php _e('Error Log:', 'operaton-dmn'); ?></strong> Detailed test results written to WordPress error log.' +
                         '</div>';
 
-                    // Add "Show Full Details" button similar to plugin status
                     debugHtml += '<div style="margin-top: 10px;"><button onclick="showFullDmnDebugData()" class="button button-small"><?php _e('Show Full Test Results', 'operaton-dmn'); ?></button></div>';
                     debugHtml += '</div>';
 
                     showDebugOperationFeedback(debugHtml);
-
-                    // Store the full debug data globally for the "Show Full Details" button
                     window.operatonDmnDebugData = response.data;
 
                 } else {
@@ -799,7 +754,6 @@ if (!defined('ABSPATH'))
                         '⚠ <strong><?php _e('Debug tests failed:', 'operaton-dmn'); ?></strong> ' + (response.data ? response.data.message : '<?php _e('Unknown error', 'operaton-dmn'); ?>') + '</div>', false);
                 }
             }).fail(function(xhr, status, error) {
-                console.error('AJAX request failed:', xhr, status, error);
                 showDebugOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
                     '⚠ <strong><?php _e('Debug tests failed:', 'operaton-dmn'); ?></strong> <?php _e('Connection error', 'operaton-dmn'); ?> (' + status + ')</div>', false);
             }).always(function() {
@@ -807,46 +761,105 @@ if (!defined('ABSPATH'))
             });
         });
 
-        // NEW: Global function to show full DMN debug data
-        window.showFullDmnDebugData = function() {
-            if (window.operatonDmnDebugData) {
-                var existingFullData = document.getElementById('full-dmn-debug-data');
-                if (existingFullData) {
-                    existingFullData.remove();
-                    // Change button text back
-                    var buttons = jQuery('#debug-operation-result').find('button');
-                    buttons.each(function() {
-                        if (jQuery(this).text().indexOf('Hide Full Test Results') !== -1) {
-                            jQuery(this).text('Show Full Test Results');
-                        }
-                    });
-                    return;
-                }
-
-                // Append to the parent container instead of the auto-fading result div
-                var parentContainer = jQuery('#debug-operation-result').parent();
-                var fullDataHtml = '<div id="full-dmn-debug-data" style="margin-top: 10px; max-height: 400px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: pre-wrap; border: 1px solid #ddd;">' +
-                    '<div style="margin-bottom: 10px; font-family: sans-serif; font-weight: bold; color: #0073aa;">Complete DMN Debug Test Results:</div>' +
-                    JSON.stringify(window.operatonDmnDebugData, null, 2) +
-                    '</div>';
-
-                parentContainer.append(fullDataHtml);
-
-                // Change button text to "Hide"
-                var buttons = jQuery('#debug-operation-result').find('button');
-                buttons.each(function() {
-                    if (jQuery(this).text().indexOf('Show Full Test Results') !== -1) {
-                        jQuery(this).text('Hide Full Test Results');
-                    }
-                });
-            }
-        };
-
-        // NEW: Clear Decision Flow Cache functionality (matching other buttons)
-        $('#clear-decision-cache').on('click', function() {
-            console.log('Clear Decision Flow Cache button clicked');
+        $('#check-connection-stats').on('click', function() {
             var button = $(this);
+            button.prop('disabled', true).text('Checking...');
+            showCacheOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Analyzing connection pool efficiency...</div>', false);
 
+            $.post(ajaxurl, {
+                action: 'operaton_check_connection_stats',
+                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+            }, function(response) {
+                if (response.success && response.data.stats) {
+                    var stats = response.data.stats;
+                    var statusHtml = '<div style="color: #155724; padding: 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
+                        '<h4 style="margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">' +
+                        '<span style="color: ' + stats.efficiency_color + ';">📊</span> Connection Efficiency Report</h4>';
+
+                    statusHtml += '<div style="margin-bottom: 12px; padding: 8px; background: rgba(255,255,255,0.7); border-radius: 4px;">' +
+                        '<div style="font-size: 16px; font-weight: 600; color: ' + stats.efficiency_color + ';">' +
+                        stats.summary + '</div></div>';
+
+                    if (stats.details && Object.keys(stats.details).length > 0) {
+                        statusHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-bottom: 10px;">';
+
+                        Object.entries(stats.details).forEach(function([key, value]) {
+                            var isEfficiency = key.includes('Reused');
+                            var textColor = isEfficiency ? stats.efficiency_color : '#495057';
+                            statusHtml += '<div style="padding: 6px 8px; background: rgba(255,255,255,0.8); border-radius: 3px; border-left: 3px solid ' +
+                                (isEfficiency ? stats.efficiency_color : '#dee2e6') + ';">' +
+                                '<div style="font-size: 11px; color: #6c757d; text-transform: uppercase; font-weight: 600;">' + key + '</div>' +
+                                '<div style="font-size: 14px; font-weight: 600; color: ' + textColor + ';">' + value + '</div>' +
+                                '</div>';
+                        });
+
+                        statusHtml += '</div>';
+                    }
+
+                    if (stats.efficiency_percent < 50) {
+                        statusHtml += '<div style="margin-top: 10px; padding: 8px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 13px;">' +
+                            '<strong>💡 Optimization Tip:</strong> Low connection reuse suggests high cache miss rate. ' +
+                            'Consider increasing connection pool timeout or checking for endpoint configuration issues.' +
+                            '</div>';
+                    } else if (stats.efficiency_percent >= 70) {
+                        statusHtml += '<div style="margin-top: 10px; padding: 8px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; font-size: 13px;">' +
+                            '<strong>🎉 Excellent!</strong> Your connection reuse optimization is working very well. ' +
+                            'This indicates efficient API communication with minimal SSL handshake overhead.' +
+                            '</div>';
+                    }
+
+                    statusHtml += '</div>';
+                    showCacheOperationFeedback(statusHtml);
+
+                } else {
+                    showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                        '⚠️ <strong>Connection stats check failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>', false);
+                }
+            }).fail(function(xhr, status, error) {
+                showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                    '⚠️ <strong>Connection stats check failed:</strong> Connection error (' + status + ')</div>', false);
+            }).always(function() {
+                button.prop('disabled', false).text('Check Connection Efficiency');
+            });
+        });
+
+        $('#save-connection-timeout').on('click', function() {
+            var button = $(this);
+            var timeout = $('#connection-timeout').val();
+            var resultDiv = $('#timeout-save-result');
+
+            if (!timeout) {
+                resultDiv.html('<span style="color: #dc3545;">Please select a timeout value</span>');
+                return;
+            }
+
+            button.prop('disabled', true).text('Saving...');
+            resultDiv.html('<span style="color: #666;">Saving setting...</span>');
+
+            $.post(ajaxurl, {
+                action: 'operaton_save_connection_timeout',
+                timeout: timeout,
+                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+            }, function(response) {
+                if (response.success) {
+                    resultDiv.html('<span style="color: #28a745; font-weight: 600;">✓ ' + response.data.message + '</span>');
+                    setTimeout(function() {
+                        resultDiv.fadeOut(300, function() {
+                            $(this).html('').show();
+                        });
+                    }, 4000);
+                } else {
+                    resultDiv.html('<span style="color: #dc3545;">✗ ' + (response.data ? response.data.message : 'Save failed') + '</span>');
+                }
+            }).fail(function(xhr, status, error) {
+                resultDiv.html('<span style="color: #dc3545;">✗ Connection error: ' + status + '</span>');
+            }).always(function() {
+                button.prop('disabled', false).text('Save Settings');
+            });
+        });
+
+        $('#clear-decision-cache').on('click', function() {
+            var button = $(this);
             button.prop('disabled', true).text('Clearing Cache...');
             showCacheOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Clearing decision flow cache...</div>', false);
 
@@ -855,7 +868,6 @@ if (!defined('ABSPATH'))
                 _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
             }, function(response) {
                 if (response.success) {
-                    console.log('AJAX response:', response);
                     showCacheOperationFeedback('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
                         '✅ <strong>Decision flow cache cleared successfully!</strong><br>' +
                         '<small>Configurations will reload from database.</small></div>');
@@ -871,7 +883,61 @@ if (!defined('ABSPATH'))
             });
         });
 
-        // Update check functionality
+        $('#clear-all-cache').on('click', function() {
+            var button = $(this);
+            if (!confirm('Clear all cached configurations and decision flows?\n\nThis will:\n• Clear all WordPress transients\n• Clear object cache\n• Force reload all configurations\n\nThis action is safe and recommended when configurations aren\'t updating.')) {
+                return;
+            }
+
+            button.prop('disabled', true).text('Clearing Cache...');
+            showCacheOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Clearing all configuration cache...</div>', false);
+
+            $.post(ajaxurl, {
+                action: 'operaton_clear_all_cache',
+                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+            }, function(response) {
+                if (response.success) {
+                    showCacheOperationFeedback('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
+                        '✅ <strong>All cache cleared successfully!</strong><br>' +
+                        '<small>Cleared ' + (response.data.transients_cleared || 0) + ' transients and ' +
+                        (response.data.configs_reloaded || 0) + ' configurations reloaded.</small></div>');
+                } else {
+                    showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                        '❌ <strong>Cache clear failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>', false);
+                }
+            }).fail(function(xhr, status, error) {
+                showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                    '❌ <strong>Cache clear failed:</strong> Connection error (' + status + ')</div>', false);
+            }).always(function() {
+                button.prop('disabled', false).text('Clear All Configuration Cache');
+            });
+        });
+
+        $('#force-reload-configs').on('click', function() {
+            var button = $(this);
+            button.prop('disabled', true).text('Reloading...');
+            showCacheOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Force reloading configurations from database...</div>', false);
+
+            $.post(ajaxurl, {
+                action: 'operaton_force_reload_configs',
+                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
+            }, function(response) {
+                if (response.success) {
+                    showCacheOperationFeedback('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
+                        '✅ <strong>Configurations reloaded successfully!</strong><br>' +
+                        '<small>Reloaded ' + (response.data.configs_reloaded || 0) + ' configurations from database.</small></div>');
+                } else {
+                    showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                        '❌ <strong>Reload failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>', false);
+                }
+            }).fail(function(xhr, status, error) {
+                showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
+                    '❌ <strong>Reload failed:</strong> Connection error (' + status + ')</div>', false);
+            }).always(function() {
+                button.prop('disabled', false).text('Force Reload Configurations');
+            });
+        });
+
         $('#operaton-check-updates').on('click', function() {
             var button = $(this);
             var status = $('#operaton-update-status');
@@ -897,83 +963,81 @@ if (!defined('ABSPATH'))
                 button.prop('disabled', false).text('<?php _e('Check for Updates Now', 'operaton-dmn'); ?>');
             });
         });
-
-        // Clear All Cache functionality
-        $('#clear-all-cache').on('click', function() {
-            console.log('Clear All Configuration Cache button clicked, starting AJAX request');
-            var button = $(this);
-
-            // Confirm action
-            if (!confirm('Clear all cached configurations and decision flows?\n\nThis will:\n• Clear all WordPress transients\n• Clear object cache\n• Force reload all configurations\n\nThis action is safe and recommended when configurations aren\'t updating.')) {
-                return;
-            }
-
-            button.prop('disabled', true).text('Clearing Cache...');
-            showCacheOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Clearing all configuration cache...</div>', false);
-
-            $.post(ajaxurl, {
-                action: 'operaton_clear_all_cache',
-                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
-            }, function(response) {
-                if (response.success) {
-                    console.log('AJAX response:', response);
-                    showCacheOperationFeedback('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
-                        '✅ <strong>All cache cleared successfully!</strong><br>' +
-                        '<small>Cleared ' + (response.data.transients_cleared || 0) + ' transients and ' +
-                        (response.data.configs_reloaded || 0) + ' configurations reloaded.</small></div>');
-                } else {
-                    showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
-                        '❌ <strong>Cache clear failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>', false);
-                }
-            }).fail(function(xhr, status, error) {
-                showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
-                    '❌ <strong>Cache clear failed:</strong> Connection error (' + status + ')</div>', false);
-            }).always(function() {
-                button.prop('disabled', false).text('Clear All Configuration Cache');
-            });
-        });
-
-        // Force Reload Configurations functionality
-        $('#force-reload-configs').on('click', function() {
-            console.log('Force Reload Configurations button clicked, starting AJAX request');
-            var button = $(this);
-
-            button.prop('disabled', true).text('Reloading...');
-            showCacheOperationFeedback('<div style="color: #666; padding: 8px 12px; background: #f1f1f1; border-radius: 4px;">⏳ Force reloading configurations from database...</div>', false);
-
-            $.post(ajaxurl, {
-                action: 'operaton_force_reload_configs',
-                _ajax_nonce: '<?php echo wp_create_nonce('operaton_admin_nonce'); ?>'
-            }, function(response) {
-                if (response.success) {
-                    console.log('AJAX response:', response);
-                    showCacheOperationFeedback('<div style="color: #155724; padding: 8px 12px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;">' +
-                        '✅ <strong>Configurations reloaded successfully!</strong><br>' +
-                        '<small>Reloaded ' + (response.data.configs_reloaded || 0) + ' configurations from database.</small></div>');
-                } else {
-                    showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
-                        '❌ <strong>Reload failed:</strong> ' + (response.data ? response.data.message : 'Unknown error') + '</div>', false);
-                }
-            }).fail(function(xhr, status, error) {
-                showCacheOperationFeedback('<div style="color: #721c24; padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">' +
-                    '❌ <strong>Reload failed:</strong> Connection error (' + status + ')</div>', false);
-            }).always(function() {
-                button.prop('disabled', false).text('Force Reload Configurations');
-            });
-        });
     });
 </script>
 
 <style>
-    /* Additional inline styles for this specific page */
-    .operaton-config-table tbody tr:hover {
-        background-color: #f8f9fa;
+    /* Enhanced styles for the reorganized interface */
+    .operaton-stats-bar {
+        font-size: 14px;
     }
 
-    .operaton-config-actions .button {
-        margin-bottom: 3px;
+    .operaton-search-filters {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
     }
 
+    .operaton-config-table th.sortable {
+        cursor: pointer;
+        position: relative;
+        user-select: none;
+    }
+
+    .operaton-config-table th.sortable:hover {
+        background-color: #f1f1f1;
+    }
+
+    .sort-indicator {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        opacity: 0.5;
+        font-size: 12px;
+    }
+
+    .sort-indicator::after {
+        content: '↕';
+    }
+
+    .sort-asc .sort-indicator::after {
+        content: '↑';
+        opacity: 1;
+    }
+
+    .sort-desc .sort-indicator::after {
+        content: '↓';
+        opacity: 1;
+    }
+
+    /* Improved button styling */
+    .button-hero {
+        font-size: 16px;
+        padding: 12px 24px;
+        height: auto;
+        line-height: 1.2;
+    }
+
+    /* Better visual hierarchy */
+    .operaton-update-section {
+        border: 1px solid #e1e1e1;
+        border-radius: 6px;
+        padding: 20px;
+        margin-bottom: 25px;
+        background: #fff;
+    }
+
+    .operaton-update-section h3 {
+        margin-top: 0;
+        color: #1d2327;
+        border-bottom: 2px solid #0073aa;
+        padding-bottom: 8px;
+        margin-bottom: 15px;
+    }
+
+    /* Configuration status badges */
     .operaton-config-status.active {
         background: #d1ecf1;
         color: #0c5460;
@@ -994,12 +1058,42 @@ if (!defined('ABSPATH'))
         text-transform: uppercase;
     }
 
+    /* Table improvements */
+    .operaton-config-table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .operaton-config-actions .button {
+        margin-bottom: 3px;
+    }
+
+    /* Responsive improvements */
+    @media (max-width: 1200px) {
+        .operaton-search-filters {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .operaton-search-filters input,
+        .operaton-search-filters select {
+            width: 100%;
+        }
+    }
+
     @media (max-width: 782px) {
+        .operaton-config-table {
+            font-size: 12px;
+        }
 
         .operaton-config-table th,
         .operaton-config-table td {
-            padding: 8px 6px;
-            font-size: 12px;
+            padding: 6px 4px;
+        }
+
+        .operaton-search-filters input {
+            font-size: 16px;
+            /* Prevents zoom on iOS */
         }
 
         .operaton-config-endpoint {
