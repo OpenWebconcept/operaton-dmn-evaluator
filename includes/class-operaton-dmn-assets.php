@@ -223,6 +223,7 @@ class Operaton_DMN_Assets
         wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
             'url' => rest_url('operaton-dmn/v1/evaluate'),
             'nonce' => wp_create_nonce('wp_rest'),
+            'test_nonce' => wp_create_nonce('operaton_test_endpoint'),
             'debug' => defined('WP_DEBUG') && WP_DEBUG,
             'strings' => array(
                 'evaluating' => __('Evaluating...', 'operaton-dmn'),
@@ -359,6 +360,15 @@ class Operaton_DMN_Assets
             'operaton-dmn-admin',
             $this->plugin_url . 'assets/js/admin.js',
             array('jquery'),
+            $this->version,
+            true
+        );
+
+        // NEW: Enqueue API testing module
+        wp_enqueue_script(
+            'operaton-dmn-api-test',
+            $this->plugin_url . 'assets/js/api-test.js',
+            array('jquery', 'operaton-dmn-admin'),
             $this->version,
             true
         );
@@ -728,45 +738,61 @@ class Operaton_DMN_Assets
      */
     public static function should_load_frontend_assets()
     {
+        // Skip detection for asset requests (CSS, JS, images)
+        $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+        if (preg_match('/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)(\?|$)/i', $request_uri))
+        {
+            return false;
+        }
+
         // Use cached result if available and fresh (5 minutes)
         if (
             self::$detection_complete &&
             self::$cache_timestamp &&
             (time() - self::$cache_timestamp) < 300
-        ) {
+        )
+        {
             return self::$detection_cache['should_load'] ?? false;
         }
 
         $should_load = false;
 
         // Method 1: Gravity Forms class exists (most reliable)
-        if (class_exists('GFForms')) {
+        if (class_exists('GFForms'))
+        {
             $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG) {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
                 error_log('Operaton DMN Assets: Detection: GFForms class available');
             }
         }
 
         // Method 2: Admin GF pages
-        elseif (is_admin() && self::is_gravity_forms_admin_page_static()) {
+        elseif (is_admin() && self::is_gravity_forms_admin_page_static())
+        {
             $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG) {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
                 error_log('Operaton DMN Assets: Detection: GF admin page');
             }
         }
 
         // Method 3: Content analysis (frontend only)
-        elseif (!is_admin() && self::has_gravity_forms_in_content_static()) {
+        elseif (!is_admin() && self::has_gravity_forms_in_content_static())
+        {
             $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG) {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
                 error_log('Operaton DMN Assets: Detection: GF content found');
             }
         }
 
         // Method 4: URL indicators
-        elseif (self::has_gravity_forms_url_indicators_static()) {
+        elseif (self::has_gravity_forms_url_indicators_static())
+        {
             $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG) {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
                 error_log('Operaton DMN Assets: Detection: GF URL indicators');
             }
         }
@@ -776,13 +802,14 @@ class Operaton_DMN_Assets
         self::$detection_complete = true;
         self::$cache_timestamp = time();
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
             error_log('Operaton DMN Assets: Detection complete: ' . ($should_load ? 'LOAD' : 'SKIP'));
         }
 
         return $should_load;
     }
-
+    
     /**
      * Static helper methods for compatibility
      */
