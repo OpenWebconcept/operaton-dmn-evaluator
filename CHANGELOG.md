@@ -7,9 +7,11 @@ All notable changes to this project will be documented in this file.
 - [Issue #53](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/53) - Test connection dashboard not in sync with live
 - [Issue #54](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/54) - Plugin failing to extract the result value because it's looking for different data structure
 - [Issue #55](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/55) - Health check false positive
+- [Issue #56](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/56) - Reorganize Admin Dashboard
 - [Issue #57](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/57) - Add Test functionality for each configuration record
 
 ### Admin Dashboard
+- ✅ **Reorganized ordering** configurations, cache management, debug tools & plugin update check
 - ✅ **Proper URL construction** - Matching exactly what aadmin test connection is validating, ensuring consistency between the test and actual evaluation.
 ![Test Connection Fixed](./assets/images/Test-Connection-Fixed.png)
 
