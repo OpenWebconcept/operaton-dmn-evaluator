@@ -214,7 +214,7 @@ operaton-dmn-evaluator/
 
 2. **Download Latest Release:**
    - Visit [GitLab Releases](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/releases)
-   - Download the latest `v1.0.0-beta.11` package
+   - Download the latest `v1.0.0-beta.16` package
    - Extract files to plugin directory
 
 3. **Activate Plugin:**
@@ -226,6 +226,8 @@ operaton-dmn-evaluator/
    - Go to **Operaton DMN** → **Configurations**
    - Use the "🔧 Debug Tools" → "Get Plugin Status" button to verify all managers are loaded
 
+![Debug Tools -> Plugin Status](./assets/images/Debug-Tools-Plugin-Status.png)
+
 ---
 
 # Demo Heusden Pass and Child Package
@@ -233,7 +235,7 @@ operaton-dmn-evaluator/
 A live demo of the plugin is available at https://owc-gemeente.open-regels.nl/
 
 - **Page 1**: The start form opens with pre-filled data via the Haal Centraal BRP API using a test citizen service number (BSN). A fictitious income has been prefilled as well. Click “Next”.
-- **Page 2**: Adjust the radio buttons as needed and click “Evaluate.” If left unchanged, the value “true” will appear for both “eligibilityHeusdenPass” and “eligibilityChildPackage”. A green confirmation notification will briefly appear in the top right corner. Click “Next.”
+- **Page 2**: Adjust the radio buttons as needed and click .” If left unchanged, the value “true” will appear for both “eligibilityHeusdenPass” and “eligibilityChildPackage”. A green confirmation notification will briefly appear in the top right corner. Click “Next.”
 - **Page 3**: The final step shows an overview of all input and output values per decision table. In this example, there are 11 tables, making it 100% transparent how decisions regarding Heusden Pass and Child Package eligibility are made.
 
 
@@ -344,12 +346,12 @@ Selecting a configuration opens the corresponding dashboard.
 #### Base Endpoint URL
 - **Purpose**: Base URL to your Operaton engine
 - **Required**: Yes (for both modes)
-- **Format**: Should end with `/engine-rest/`
+- **Format**: Should NOT end with `/engine-rest/`
 - **Auto-Detection**: Plugin detects and suggests correct format
 - **Examples**:
-  - Operaton Cloud: `https://your-tenant.operaton.cloud/engine-rest/`
-  - Self-hosted: `https://operatondev.open-regels.nl/engine-rest/`
-  - Local: `http://localhost:8080/engine-rest/`
+  - Operaton Cloud: `https://your-tenant.operaton.cloud/`
+  - Self-hosted: `https://operaton-dev.open-regels.nl/`
+  - Local: `http://localhost:8080/`
 
 ### Advanced Field Mapping
 
