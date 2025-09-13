@@ -728,3 +728,114 @@
     margin-bottom: 15px;
   }
 }
+
+/* =============================================================================
+   MODAL SUPPORT ADDITIONS
+   Add these to the end of your existing admin.css file
+   ============================================================================= */
+
+/* Modal body overflow prevention */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* Ensure modal appears above WordPress admin elements */
+.operaton-test-modal {
+  z-index: 160000; /* Higher than WP admin bar (99999) and WordPress modals (100000) */
+  font-family: var(--operaton-admin-font);
+}
+
+/* Admin-specific modal content styling */
+.operaton-test-modal-content {
+  font-family: inherit;
+}
+
+/* Ensure buttons in modal inherit WordPress admin button styles */
+.operaton-test-modal .button {
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+/* Fix button spacing in modal footer */
+.operaton-test-modal-footer .button {
+  margin-left: 10px;
+}
+
+.operaton-test-modal-footer .button:first-child {
+  margin-left: 0;
+}
+
+/* Responsive modal adjustments for WordPress admin */
+@media screen and (max-width: 782px) {
+  .operaton-test-modal-content {
+    margin: 20px 10px;
+    width: calc(100% - 20px);
+    max-height: calc(100vh - 40px);
+  }
+
+  .operaton-test-modal-header,
+  .operaton-test-modal-body,
+  .operaton-test-modal-footer {
+    padding: 15px;
+  }
+
+  .operaton-test-modal-footer .button {
+    display: block;
+    margin: 5px 0;
+    width: 100%;
+  }
+}
+
+/* Integration with existing admin notice styles */
+.operaton-test-summary.success {
+  background: #d4edda;
+  border-color: var(--operaton-admin-success);
+  color: #155724;
+}
+
+.operaton-test-summary.error {
+  background: #f8d7da;
+  border-color: var(--operaton-admin-error);
+  color: #721c24;
+}
+
+/* Ensure modal doesn't interfere with WordPress admin pointers */
+.wp-pointer {
+  z-index: 170000;
+}
+
+/* Accessibility: Focus management for modal */
+.operaton-test-modal:focus {
+  outline: none;
+}
+
+.operaton-test-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    position: relative;
+    z-index: 1;
+    line-height: 1;
+}
+
+.operaton-test-modal-close:hover {
+    background: #e1e1e1;
+    color: #000;
+}
+
+.operaton-test-modal-close:focus {
+    outline: 2px solid var(--operaton-admin-primary);
+    outline-offset: 2px;
+}

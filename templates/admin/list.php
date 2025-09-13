@@ -15,6 +15,13 @@ if (!defined('ABSPATH'))
 {
     exit;
 }
+
+// Add to your admin page temporarily
+if (defined('WP_DEBUG') && WP_DEBUG)
+{
+    global $wp_filter;
+    error_log('AJAX handlers: ' . print_r($wp_filter['wp_ajax_operaton_test_configuration_complete'], true));
+}
 ?>
 
 <!-- Add New Configuration Button - Now at the top -->
@@ -211,7 +218,7 @@ if (!defined('ABSPATH'))
                             <?php if ($is_complete): ?>
                                 <br style="margin-bottom: 5px;">
                                 <button type="button" class="button button-small"
-                                    onclick="testConfig(<?php echo $config->id; ?>)"
+                                    onclick="testConfig(<?php echo $config->id; ?>, '<?php echo esc_js($config->name); ?>')"
                                     title="<?php _e('Test Configuration', 'operaton-dmn'); ?>">
                                     <?php _e('Test', 'operaton-dmn'); ?>
                                 </button>
@@ -473,8 +480,24 @@ if (!defined('ABSPATH'))
         }
     }
 
-    function testConfig(configId) {
-        alert('<?php _e('Testing functionality will be implemented in the next update.', 'operaton-dmn'); ?>');
+    // Test configuration function
+    function testConfig(configId, configName) {
+        // Check if the testing module is available
+        if (typeof window.OperatonDMNTesting !== 'undefined') {
+            window.OperatonDMNTesting.testConfig(configId, configName || 'Configuration #' + configId);
+        } else {
+            // Fallback for when api-test.js hasn't loaded yet
+            console.warn('Operaton DMN Testing module not loaded yet, retrying...');
+
+            // Try again after a short delay
+            setTimeout(function() {
+                if (typeof window.OperatonDMNTesting !== 'undefined') {
+                    window.OperatonDMNTesting.testConfig(configId, configName || 'Configuration #' + configId);
+                } else {
+                    alert('Testing functionality is not available. Please refresh the page and try again.');
+                }
+            }, 500);
+        }
     }
 
     // Global variables to manage feedback timers

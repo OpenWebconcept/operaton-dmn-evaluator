@@ -223,6 +223,7 @@ class Operaton_DMN_Assets
         wp_localize_script('operaton-dmn-frontend', 'operaton_ajax', array(
             'url' => rest_url('operaton-dmn/v1/evaluate'),
             'nonce' => wp_create_nonce('wp_rest'),
+            'test_nonce' => wp_create_nonce('operaton_test_endpoint'),
             'debug' => defined('WP_DEBUG') && WP_DEBUG,
             'strings' => array(
                 'evaluating' => __('Evaluating...', 'operaton-dmn'),
@@ -359,6 +360,15 @@ class Operaton_DMN_Assets
             'operaton-dmn-admin',
             $this->plugin_url . 'assets/js/admin.js',
             array('jquery'),
+            $this->version,
+            true
+        );
+
+        // NEW: Enqueue API testing module
+        wp_enqueue_script(
+            'operaton-dmn-api-test',
+            $this->plugin_url . 'assets/js/api-test.js',
+            array('jquery', 'operaton-dmn-admin'),
             $this->version,
             true
         );
