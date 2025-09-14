@@ -37,6 +37,88 @@ This plugin is part of the [OpenWebconcept](https://github.com/OpenWebconcept) e
 
 ---
 
+## Sequence diagram user exeperience flow
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#cccccc', 'lineColor': '#666666', 'secondaryColor': '#ffffff', 'tertiaryColor': '#ffffff', 'background': '#ffffff', 'mainBkg': '#ffffff', 'secondBkg': '#f8f9fa', 'tertiaryBkg': '#ffffff'}}}%%
+
+sequenceDiagram
+    participant C as 👤 Citizen
+    participant F as 📋 WordPress Form<br/>(Gravity Forms)
+    participant R as 🏛️ Data Registrars<br/>(Government & Private)
+    participant P as ⚙️ Operaton DMN<br/>Plugin
+    participant O as 🔧 Operaton BPMN<br/>Engine
+
+    rect rgb(230, 245, 255)
+        Note over C,O: Initial Form Access & Authentication
+        C->>F: Opens form on website
+        F->>C: Requests authentication (if required)
+        C->>F: Provides credentials
+        F->>C: Grants access to form
+    end
+
+    rect rgb(245, 230, 255)
+        Note over C,O: Personal Data Retrieval & Pre-population
+        F->>R: Request citizen's personal data
+        Note right of R: Data sources:<br/>• BRP (Basic Registration Persons)<br/>• Municipal databases<br/>• Income registrations<br/>• Family composition data
+        R->>F: Returns personal data
+        F->>C: Displays pre-filled form (Page 1)<br/>Name, birth date, address, income
+    end
+
+    rect rgb(230, 255, 230)
+        Note over C,O: Form Completion - Page 1
+        C->>F: Reviews and corrects data if needed
+        C->>F: Clicks "Next" button
+        F->>C: Shows Page 2 with decision criteria
+    end
+
+    rect rgb(255, 250, 230)
+        Note over C,O: Decision Criteria Input - Page 2
+        C->>F: Completes radio button selections<br/>• Previously applied this year?<br/>• Student financing?<br/>• Other benefits?<br/>• Has children 4-17 years old?
+        C->>F: Clicks "Evaluate" button
+    end
+
+    rect rgb(255, 245, 230)
+        Note over C,O: DMN Evaluation Process
+        F->>P: Triggers evaluation with form data
+        P->>P: Collects all input variables<br/>Maps to DMN process variables
+        P->>O: API call: Start BPMN process<br/>Sends input data as variables
+
+        Note right of O: Process execution:<br/>• Runs decision tables<br/>• Applies business rules<br/>• Calculates eligibility<br/>• Generates decision flow
+
+        O->>P: Returns process results<br/>• Process instance ID<br/>• Decision outcomes<br/>• Variable values
+        P->>P: Processes API response<br/>Maps results to form fields
+        P->>F: Updates result fields<br/>• aanmerkingHeusdenPas: true<br/>• aanmerkingKindPakket: true
+        F->>C: Shows success notification<br/>Displays updated results
+    end
+
+    rect rgb(240, 255, 240)
+        Note over C,O: Final Page & Decision Flow Summary
+        C->>F: Clicks "Next" to final page
+        F->>P: Check if decision flow enabled
+
+        alt Decision Flow Summary Enabled
+            P->>O: Request decision flow data<br/>Get process instance details
+            O->>P: Returns decision instance data<br/>All 11 decision tables<br/>Input/output values
+            P->>F: Generates Excel-style summary
+            F->>C: Shows Page 3 with complete<br/>decision flow analysis
+            Note over C: Citizen sees:<br/>• All decision tables used<br/>• Input values for each<br/>• Output values generated<br/>• Complete transparency
+        else Decision Flow Disabled
+            F->>C: Shows Page 3 with<br/>standard summary
+        end
+    end
+
+    rect rgb(230, 255, 245)
+        Note over C,O: Process Completion
+        C->>F: Reviews final results
+        C->>F: Submits form
+        F->>F: Stores submission data
+        F->>C: Confirmation of completion
+    end
+
+    rect rgb(255, 255, 230)
+        Note over C,O: Key Benefits Delivered
+        Note left of C: ✓ Seamless data pre-population<br/>✓ Real-time decision evaluation<br/>✓ Complete process transparency<br/>✓ Professional user experience
+    end
+
 ## Change Log
 
 All notable changes to this project are documented in the [CHANGELOG.md](./CHANGELOG.md).
