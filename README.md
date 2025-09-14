@@ -38,6 +38,7 @@ This plugin is part of the [OpenWebconcept](https://github.com/OpenWebconcept) e
 ---
 
 ## Sequence diagram user exeperience flow
+```mermaid
 %%{init: {'theme':'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#cccccc', 'lineColor': '#666666', 'secondaryColor': '#ffffff', 'tertiaryColor': '#ffffff', 'background': '#ffffff', 'mainBkg': '#ffffff', 'secondBkg': '#f8f9fa', 'tertiaryBkg': '#ffffff'}}}%%
 
 sequenceDiagram
@@ -118,6 +119,7 @@ sequenceDiagram
         Note over C,O: Key Benefits Delivered
         Note left of C: ✓ Seamless data pre-population<br/>✓ Real-time decision evaluation<br/>✓ Complete process transparency<br/>✓ Professional user experience
     end
+```
 
 ## Change Log
 
