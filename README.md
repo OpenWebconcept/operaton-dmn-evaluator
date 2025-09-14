@@ -38,6 +38,12 @@ This plugin is part of the [OpenWebconcept](https://github.com/OpenWebconcept) e
 ---
 
 ## Sequence diagram user exeperience flow
+ The sequence diagram shows the interaction flow between all the key components.
+ - **Clear Actor Separation:** Each participant (Citizen, Form, Registrars, Plugin, BPMN Engine) has their own swimlane, making interactions crystal clear
+ - **Chronological Flow:** Time flows top to bottom, showing exactly when each interaction happens
+ - **Bidirectional Communication:** Shows both requests and responses between systems
+ - **Real-World Context:** Uses example data (Heusdenpas and Kindpakket, BRP data, the 11 decision tables)
+
 ```mermaid
 %%{init: {'theme':'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#cccccc', 'lineColor': '#666666', 'secondaryColor': '#ffffff', 'tertiaryColor': '#ffffff', 'background': '#ffffff', 'mainBkg': '#ffffff', 'secondBkg': '#f8f9fa', 'tertiaryBkg': '#ffffff'}}}%%
 
