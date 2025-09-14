@@ -127,6 +127,8 @@ sequenceDiagram
     end
 ```
 
+---
+
 ## Change Log
 
 All notable changes to this project are documented in the [CHANGELOG.md](./CHANGELOG.md).
