@@ -25,6 +25,9 @@ class Operaton_DMN_Assets
      */
     private $performance;
 
+    private static $localized_configs = array();
+    private static $localization_attempts = array();
+
     /**
      * Simple state tracking - one source of truth
      */
@@ -293,9 +296,51 @@ class Operaton_DMN_Assets
      */
     private function localize_form_config($form_id, $config, $handle)
     {
+        // STEP 1 FIX: Enhanced duplicate prevention with multiple checks
+        $config_key = 'form_' . $form_id . '_' . ($config->id ?? 0);
+
+        // Check 1: Our internal tracking (most reliable)
+        if (isset(self::$localized_configs[$config_key]))
+        {
+            $this->log_debug('STEP 1 FIX: Configuration already localized (internal check) - Form: ' . $form_id);
+            return;
+        }
+
+        // Check 2: Enhanced WordPress script data check
+        $all_script_data = wp_scripts()->get_data('operaton-dmn-gravity-integration', 'data');
+        if ($all_script_data && strpos($all_script_data, '"form_id":' . $form_id) !== false)
+        {
+            $this->log_debug('STEP 1 FIX: Configuration already localized (WP script check) - Form: ' . $form_id);
+            self::$localized_configs[$config_key] = true;
+            return;
+        }
+
+        // Check 3: Prevent rapid-fire attempts
+        if (isset(self::$localization_attempts[$form_id]))
+        {
+            $last_attempt = self::$localization_attempts[$form_id];
+            if ((time() - $last_attempt) < 2)
+            {
+                $this->log_debug('STEP 1 FIX: Preventing rapid localization attempt - Form: ' . $form_id);
+                return;
+            }
+        }
+
+        // Mark attempt
+        self::$localization_attempts[$form_id] = time();
+
+        // Validate configuration before localizing
+        if (empty($config->dmn_endpoint))
+        {
+            $this->log_debug('STEP 1 FIX: Skipping localization - No DMN endpoint for form: ' . $form_id);
+            return;
+        }
+
+        // Your existing field mapping logic (keep unchanged)
         $field_mappings = $this->safe_json_decode($config->field_mappings ?? '{}');
         $result_mappings = $this->safe_json_decode($config->result_mappings ?? '{}');
 
+        // Your existing wp_localize_script call (keep unchanged)
         wp_localize_script('operaton-dmn-gravity-integration', $handle, array(
             'config_id' => $config->id ?? 0,
             'form_id' => $form_id,
@@ -311,8 +356,17 @@ class Operaton_DMN_Assets
             'debug' => defined('WP_DEBUG') && WP_DEBUG
         ));
 
-        $this->log_debug('Form config localized - Form: ' . $form_id .
-            ' | Endpoint: ' . ($config->dmn_endpoint ?? 'NONE'));
+        // Mark as successfully localized in our tracking
+        self::$localized_configs[$config_key] = array(
+            'timestamp' => time(),
+            'handle' => $handle,
+            'form_id' => $form_id,
+            'config_id' => $config->id ?? 0
+        );
+
+        // Enhanced debug log
+        $this->log_debug('STEP 1 FIX: Configuration successfully localized - Form: ' . $form_id .
+            ' | Handle: ' . $handle . ' | Endpoint: ' . ($config->dmn_endpoint ?? 'NONE'));
     }
 
     /**
@@ -638,6 +692,25 @@ class Operaton_DMN_Assets
             self::$cache_timestamp = time();
         }
 
+        if ($form_id)
+        {
+            // Clear specific form from our new tracking
+            foreach (self::$localized_configs as $key => $data)
+            {
+                if (strpos($key, 'form_' . $form_id . '_') === 0)
+                {
+                    unset(self::$localized_configs[$key]);
+                }
+            }
+            unset(self::$localization_attempts[$form_id]);
+        }
+        else
+        {
+            // Clear all from our new tracking
+            self::$localized_configs = array();
+            self::$localization_attempts = array();
+        }
+
         $this->log_debug('Form cache cleared' . ($form_id ? ' for form: ' . $form_id : ' (all)'));
     }
 
@@ -809,7 +882,7 @@ class Operaton_DMN_Assets
 
         return $should_load;
     }
-    
+
     /**
      * Static helper methods for compatibility
      */

@@ -23,6 +23,9 @@ class Operaton_DMN_Gravity_Forms
     private static $form_config_cache = array();
     private static $form_fields_cache = array();
 
+    private static $localized_form_configs = array();
+    private static $localization_timestamps = array();
+
     /**
      * Core plugin instance reference
      */
@@ -371,15 +374,58 @@ class Operaton_DMN_Gravity_Forms
         $form_id = $form['id'];
         $config_var_name = 'operaton_config_' . $form_id;
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
+        // STEP 1 PART 2: Enhanced duplicate prevention for Gravity Forms localization
+        $localization_key = $form_id . '_' . ($config->id ?? 0);
+
+        // Check 1: Our internal tracking (most reliable)
+        if (isset(self::$localized_form_configs[$localization_key]))
         {
-            error_log('Operaton DMN Gravity Forms: Localizing config for form ' . $form_id);
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('STEP 1 PART 2: Gravity Forms config already localized (internal check) - Form: ' . $form_id);
+            }
+            return;
         }
 
+        // Check 2: Check if the window object already exists (browser-side check)
+        $check_script = "
+        <script type=\"text/javascript\">
+        (function() {
+            if (typeof window.{$config_var_name} !== 'undefined') {
+                if (window.console && window.console.log) {
+                    console.log('STEP 1 PART 2: Config already exists for form {$form_id}, skipping duplicate');
+                }
+                return;
+            }
+        ";
+
+        // Check 3: Prevent rapid-fire attempts (timing protection)
+        if (isset(self::$localization_timestamps[$form_id]))
+        {
+            $last_attempt = self::$localization_timestamps[$form_id];
+            if ((time() - $last_attempt) < 3)
+            { // Prevent within 3 seconds
+                if (defined('WP_DEBUG') && WP_DEBUG)
+                {
+                    error_log('STEP 1 PART 2: Preventing rapid Gravity Forms localization - Form: ' . $form_id);
+                }
+                return;
+            }
+        }
+
+        // Mark attempt
+        self::$localization_timestamps[$form_id] = time();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('STEP 1 PART 2: Gravity Forms localizing config for form ' . $form_id);
+        }
+
+        // Your existing field mappings logic (keep unchanged)
         $field_mappings = $this->get_field_mappings($config);
         $result_mappings = $this->get_result_mappings($config);
 
-        // CORRECTED: Extract ONLY actual result field IDs
+        // Your existing result field extraction logic (keep unchanged)
         $result_field_ids = array();
 
         // Primary: Extract from result_mappings (most reliable)
@@ -399,7 +445,6 @@ class Operaton_DMN_Gravity_Forms
         }
 
         // Secondary: ONLY look for clear result variables in field_mappings
-        // Exclude input fields that were incorrectly included
         if (is_array($field_mappings))
         {
             foreach ($field_mappings as $dmn_variable => $mapping)
@@ -407,9 +452,6 @@ class Operaton_DMN_Gravity_Forms
                 if (isset($mapping['field_id']) && is_numeric($mapping['field_id']))
                 {
                     $field_id = intval($mapping['field_id']);
-
-                    // STRICT filtering - only include variables that start with "aanmerking"
-                    // These are the actual result fields for your form
                     if (strpos($dmn_variable, 'aanmerking') === 0)
                     {
                         if (!in_array($field_id, $result_field_ids))
@@ -421,14 +463,11 @@ class Operaton_DMN_Gravity_Forms
             }
         }
 
-        // For your specific form 8, ensure we only have the correct result fields
+        // For your specific form 8, ensure correct result fields
         if ($form_id == 8)
         {
-            // Based on your form structure, only fields 35 and 36 are result fields
             $correct_result_fields = array(35, 36); // aanmerkingHeusdenPas, aanmerkingKindPakket
             $result_field_ids = array_intersect($result_field_ids, $correct_result_fields);
-
-            // Ensure we have at least the known result fields
             foreach ($correct_result_fields as $field_id)
             {
                 if (!in_array($field_id, $result_field_ids))
@@ -438,14 +477,9 @@ class Operaton_DMN_Gravity_Forms
             }
         }
 
-        // Sort for consistency
         sort($result_field_ids);
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN: CORRECTED result field IDs for form ' . $form_id . ': ' . implode(', ', $result_field_ids));
-        }
-
+        // Your existing config building (keep unchanged)
         $js_config = array(
             'config_id' => $config->id,
             'button_text' => $config->button_text ?? 'Evaluate',
@@ -457,20 +491,35 @@ class Operaton_DMN_Gravity_Forms
             'show_decision_flow' => ($config->show_decision_flow ?? false) ? true : false,
             'result_display_field' => $config->result_display_field ?? null,
             'debug' => defined('WP_DEBUG') && WP_DEBUG,
-            'result_field_ids' => $result_field_ids, // Now correctly filtered
+            'result_field_ids' => $result_field_ids,
             'clear_results_on_change' => true
         );
 
-        echo '<script type="text/javascript">';
+        // STEP 1 PART 2: Output the config with duplicate protection
+        echo $check_script; // Start of the check script from above
+
+        // The actual localization (only runs if not already exists)
         echo 'window.' . $config_var_name . ' = ' . wp_json_encode($js_config) . ';';
         echo 'if (window.console && window.console.log) {';
-        echo '  console.log("CORRECTED config localized for form ' . $form_id . '", window.' . $config_var_name . ');';
+        echo '  console.log("STEP 1 PART 2: Gravity Forms config localized for form ' . $form_id . '", window.' . $config_var_name . ');';
         echo '}';
-        echo '</script>';
+
+        // Close the check script
+        echo '
+            })();
+        </script>';
+
+        // Mark as successfully localized in our tracking
+        self::$localized_form_configs[$localization_key] = array(
+            'timestamp' => time(),
+            'form_id' => $form_id,
+            'config_id' => $config->id ?? 0,
+            'config_var_name' => $config_var_name
+        );
 
         if (defined('WP_DEBUG') && WP_DEBUG)
         {
-            error_log('Operaton DMN Gravity Forms: CORRECTED config localized for form ' . $form_id);
+            error_log('STEP 1 PART 2: Gravity Forms config successfully localized for form ' . $form_id);
         }
     }
 
@@ -1081,9 +1130,44 @@ class Operaton_DMN_Gravity_Forms
                 unset(self::$form_fields_cache[$key]);
             }
 
+            // STEP 1 PART 2: Clear Gravity Forms localization tracking
+            $this->clear_gravity_forms_localization_cache($form_id);
+
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
                 error_log('Operaton DMN: Cleared cache for form ' . $form_id);
+            }
+        }
+    }
+
+    public function clear_gravity_forms_localization_cache($form_id = null)
+    {
+        if ($form_id)
+        {
+            // Clear specific form
+            foreach (self::$localized_form_configs as $key => $data)
+            {
+                if (strpos($key, $form_id . '_') === 0)
+                {
+                    unset(self::$localized_form_configs[$key]);
+                }
+            }
+            unset(self::$localization_timestamps[$form_id]);
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('STEP 1 PART 2: Cleared Gravity Forms localization cache for form: ' . $form_id);
+            }
+        }
+        else
+        {
+            // Clear all
+            self::$localized_form_configs = array();
+            self::$localization_timestamps = array();
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('STEP 1 PART 2: Cleared all Gravity Forms localization cache');
             }
         }
     }
