@@ -1198,6 +1198,7 @@ class Operaton_DMN_Database
         }
 
         // STEP 1 PART 2: Clear Gravity Forms localization cache
+        $plugin_instance = OperatonDMNEvaluator::get_instance();
         $gravity_forms_manager = $plugin_instance->get_gravity_forms_instance();
         if ($gravity_forms_manager && method_exists($gravity_forms_manager, 'clear_gravity_forms_localization_cache'))
         {
