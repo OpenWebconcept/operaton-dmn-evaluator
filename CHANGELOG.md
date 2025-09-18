@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 ### Admin Dashboard
 - ✅ **Reorganized ordering** configurations, cache management, debug tools & plugin update check
 - ✅ **Proper URL construction** - Matching exactly what aadmin test connection is validating, ensuring consistency between the test and actual evaluation.
+
 ![Test Connection Fixed](./assets/images/Test-Connection-Fixed.png)
 
 ### Complete configuration testing system
@@ -22,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - ✅ **Makes actual API calls** with realistic test data
 - ✅ **Validates response** structure and expected fields
 - ✅ **Modal interface** with detailed results
+
 ![Modal Test Config Interface](./assets/images/Modal-Test-Config-Interfase.png)
 
 ### Enhanced test data generation
