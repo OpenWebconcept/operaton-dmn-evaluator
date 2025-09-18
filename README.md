@@ -328,10 +328,10 @@ operaton-dmn-evaluator/
 
 # Demo Heusden Pass and Child Package
 
-A live demo of the plugin is available at https://owc-gemeente.open-regels.nl/
+A live demo of the plugin is available at https://owc.open-regels.nl/
 
 - **Page 1**: The start form opens with pre-filled data via the Haal Centraal BRP API using a test citizen service number (BSN). A fictitious income has been prefilled as well. Click “Next”.
-- **Page 2**: Adjust the radio buttons as needed and click .” If left unchanged, the value “true” will appear for both “eligibilityHeusdenPass” and “eligibilityChildPackage”. A green confirmation notification will briefly appear in the top right corner. Click “Next.”
+- **Page 2**: Adjust the radio buttons as needed and click .” If left unchanged, the value “true” will appear for “eligibilityHeusdenPass” and “eligibilityChildPackage” will be "false". A green confirmation notification will briefly appear in the top right corner. Click “Next.”
 - **Page 3**: The final step shows an overview of all input and output values per decision table. In this example, there are 11 tables, making it 100% transparent how decisions regarding Heusden Pass and Child Package eligibility are made.
 
 
@@ -700,4 +700,3 @@ class Operaton_DMN_API {
     }
 }
 ```
-
