@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - [Issue #55](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/55) - Health check false positive
 - [Issue #56](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/56) - Reorganize Admin Dashboard
 - [Issue #57](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/57) - Add Test functionality for each configuration record
+- [Issue #58](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/58) - Saving new configuration error shown in Admin page
 
 ### Admin Dashboard
 - ✅ **Reorganized ordering** configurations, cache management, debug tools & plugin update check
