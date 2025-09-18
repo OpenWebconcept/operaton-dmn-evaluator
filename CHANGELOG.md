@@ -107,9 +107,11 @@ Issue - Multiple Frontend Asset Calls:
 
 ### Admin Dashboard
 - ✅ **Connection Efficiency** - Shows HTTP connection reuse statistics and optimization performance
+
 ![Connection-efficiency-report](./assets/images/connection-efficiency.png)
 
 - ✅ **Connection Pool Setting** - Configure how long connections are kept alive for reuse optimization
+
 ![Connection-timeout-settings-save](./assets/images/connection-timeout-setting-save-admin.png)
 
 ### Enhanced Batching Optimization
