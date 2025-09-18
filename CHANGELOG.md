@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.0.0-beta.17] - 2025-09-XX
+## [1.0.0-beta.17] - 2025-09-18
 
 ## Issues
 - [Issue #53](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/53) - Test connection dashboard not in sync with live
@@ -31,6 +31,31 @@ All notable changes to this project will be documented in this file.
 ### Bug fixes
 - ✅ **Date conversion** function has a bug where it converts `DD/MM/YYYY` format incorrectly, which was the root cause of [Issue #54](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/54)
 - ✅ **Eliminated false positives** - No more misleading health warnings when the API actually works
+
+### Optimization
+Issue - Multiple Configuration Localization:
+- ✅ **Assets manager** duplicate prevention
+- ✅ **Gravity Forms** duplicate prevention
+
+Issue - Asset Detection Multiple Times:
+- ✅ **Request-based singleton** with intelligent caching
+- ✅ **Single detection** run per HTTP request
+
+Issue - Multiple Frontend Asset Calls:
+- ✅ **Global state management** across all WordPress contexts
+- ✅ **Cross-context coordination** preventing conflicts
+
+### Plugin performance
+**Before optimization (original beta.16):**
+- Total time: 719ms
+- Memory: 6MB
+- Performance grade: C (Acceptable)
+
+**After optimization (current results):**
+- Total time: 177ms (75% improvement!)
+- Memory: 8MB (slightly higher but well within limits)
+- Performance grade: A (Very Good)
+
 
 ## [1.0.0-beta.16] - 2025-09-10
 
