@@ -1193,3 +1193,24 @@ function operaton_dmn_debug_status()
 
     error_log('==================================');
 }
+
+/**
+ * ISSUE 4 FIX: Global function for debugging asset loading
+ *
+ * @since 1.0.0
+ */
+if (!function_exists('operaton_dmn_debug_asset_loading_status'))
+{
+    function operaton_dmn_debug_asset_loading_status()
+    {
+        if (defined('WP_DEBUG') && WP_DEBUG && current_user_can('administrator'))
+        {
+            $status = Operaton_DMN_Assets::get_asset_loading_status();
+            error_log('=== ISSUE 4 ASSET LOADING STATUS ===');
+            error_log(print_r($status, true));
+            error_log('====================================');
+            return $status;
+        }
+        return null;
+    }
+}

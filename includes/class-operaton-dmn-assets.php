@@ -20,10 +20,23 @@ if (!defined('ABSPATH')) {
 
 class Operaton_DMN_Assets
 {
+    // ADD these new static properties for Issue 4 fix:
+    private static $global_asset_state = array();
+    private static $context_locks = array();
+    private static $asset_load_attempts = 0;
+
+    // ADD these new static properties for Issue 3 fix:
+    private static $detection_lock = false;
+    private static $detection_result = null;
+    private static $detection_request_id = null;
+
     /**
      * Performance monitor instance
      */
     private $performance;
+
+    private static $localized_configs = array();
+    private static $localization_attempts = array();
 
     /**
      * Simple state tracking - one source of truth
@@ -139,25 +152,111 @@ class Operaton_DMN_Assets
     // =============================================================================
 
     /**
-     * Maybe enqueue frontend assets
+     * ISSUE 4 FIX: Enhanced maybe_enqueue_frontend_assets with global state tracking
      */
     public function maybe_enqueue_frontend_assets()
     {
-        if (is_admin() || !self::should_load_frontend_assets()) {
+        // ISSUE 4 FIX: Initialize global state
+        self::init_global_asset_state();
+
+        $context = is_admin() ? 'admin' : 'frontend';
+        $context_key = $context . '_attempted';
+
+        // ISSUE 4 FIX: Check global state across all contexts
+        if (self::$global_asset_state[$context_key])
+        {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('ISSUE 4 FIX: Assets already attempted in ' . $context . ' context for this request');
+            }
             return;
         }
 
-        $this->enqueue_frontend_assets();
+        // ISSUE 4 FIX: Prevent concurrent loading from different contexts
+        if (isset(self::$context_locks[$context]))
+        {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('ISSUE 4 FIX: Context lock active for ' . $context . ', waiting...');
+            }
+            return;
+        }
+
+        // ISSUE 4 FIX: Set context lock
+        self::$context_locks[$context] = true;
+        self::$asset_load_attempts++;
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('ISSUE 4 FIX: Processing assets for ' . $context . ' context - Attempt #' . self::$asset_load_attempts);
+        }
+
+        try
+        {
+            // Skip admin context if not relevant
+            if (is_admin() && strpos($_SERVER['REQUEST_URI'] ?? '', 'operaton-dmn') === false)
+            {
+                self::$global_asset_state[$context_key] = true;
+                return;
+            }
+
+            // Skip if detection says not to load
+            if (!self::should_load_frontend_assets())
+            {
+                self::$global_asset_state[$context_key] = true;
+                return;
+            }
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('ISSUE 4 FIX: Enqueuing assets for ' . $context . ' context - Request: ' . self::$global_asset_state['request_signature']);
+            }
+
+            $this->enqueue_frontend_assets();
+
+            // ISSUE 4 FIX: Mark as completed
+            self::$global_asset_state[$context_key] = true;
+            self::$global_asset_state[str_replace('_attempted', '_completed', $context_key)] = true;
+        }
+        finally
+        {
+            // ISSUE 4 FIX: Always release context lock
+            unset(self::$context_locks[$context]);
+        }
     }
 
     /**
-     * Enqueue frontend assets - simplified
+     * ISSUE 4 FIX: Enhanced enqueue_frontend_assets with global completion tracking
      */
     public function enqueue_frontend_assets()
     {
-        // Trust WordPress - if already enqueued, it won't duplicate
-        if (wp_script_is('operaton-dmn-frontend', 'done')) {
+        // ISSUE 4 FIX: Initialize global state
+        self::init_global_asset_state();
+
+        // ISSUE 4 FIX: Check if already completed globally
+        if (self::$global_asset_state['frontend_completed'])
+        {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('ISSUE 4 FIX: Frontend assets already completed globally');
+            }
             return;
+        }
+
+        // Trust WordPress - if already enqueued, it won't duplicate
+        if (wp_script_is('operaton-dmn-frontend', 'done'))
+        {
+            self::$global_asset_state['frontend_completed'] = true;
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('ISSUE 4 FIX: Frontend assets already done in WordPress');
+            }
+            return;
+        }
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('ISSUE 4 FIX: Actually enqueuing frontend assets - Request: ' . self::$global_asset_state['request_signature']);
         }
 
         $timer_id = $this->performance ?
@@ -182,7 +281,8 @@ class Operaton_DMN_Assets
         );
 
         // Register and enqueue decision flow if needed
-        if ($this->should_load_decision_flow_assets()) {
+        if ($this->should_load_decision_flow_assets())
+        {
             wp_enqueue_script(
                 'operaton-dmn-decision-flow',
                 $this->plugin_url . 'assets/js/decision-flow.js',
@@ -203,11 +303,14 @@ class Operaton_DMN_Assets
         // Localize script once
         $this->localize_frontend_script();
 
-        if ($timer_id) {
+        if ($timer_id)
+        {
             $this->performance->stop_timer($timer_id, 'Frontend assets loaded');
         }
 
-        $this->log_debug('Frontend assets enqueued');
+        // ISSUE 4 FIX: Mark as globally completed
+        self::$global_asset_state['frontend_completed'] = true;
+        $this->log_debug('ISSUE 4 FIX: Frontend assets enqueued and marked complete');
     }
 
     /**
@@ -241,33 +344,133 @@ class Operaton_DMN_Assets
     // =============================================================================
 
     /**
-     * Enqueue assets for specific Gravity Form
+     * ISSUE 4 FIX: Enhanced enqueue_gravity_form_assets with global form tracking
      */
     public function enqueue_gravity_form_assets($form, $config)
     {
-        // Ensure frontend assets are loaded first
-        $this->enqueue_frontend_assets();
-
         $form_id = $form['id'];
-        $handle = 'operaton_config_form_' . $form_id;
 
-        // Check if this form's config is already localized
-        if (wp_scripts()->get_data('operaton-dmn-gravity-integration', $handle)) {
+        // ISSUE 4 FIX: Initialize global state
+        self::init_global_asset_state();
+
+        // ISSUE 4 FIX: Check global form processing state
+        if (in_array($form_id, self::$global_asset_state['gravity_forms_processed']))
+        {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('ISSUE 4 FIX: Form ' . $form_id . ' already processed globally across all contexts');
+            }
             return;
         }
 
-        // Get fresh config from database
-        $fresh_config = $this->get_fresh_form_config($form_id, $config);
-
-        // Localize form-specific configuration
-        $this->localize_form_config($form_id, $fresh_config, $handle);
-
-        // Enqueue radio sync if needed
-        if ($this->form_needs_radio_sync($form_id)) {
-            $this->enqueue_radio_sync_assets($form_id);
+        // ISSUE 4 FIX: Prevent concurrent processing of same form
+        if (isset(self::$context_locks['form_' . $form_id]))
+        {
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('ISSUE 4 FIX: Form ' . $form_id . ' processing locked, waiting...');
+            }
+            return;
         }
 
-        $this->log_debug('Gravity form assets enqueued for form: ' . $form_id);
+        // ISSUE 4 FIX: Set form processing lock
+        self::$context_locks['form_' . $form_id] = true;
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('ISSUE 4 FIX: Processing form assets for form ' . $form_id . ' - Global first time - Request: ' . self::$global_asset_state['request_signature']);
+        }
+
+        try
+        {
+            // Ensure frontend assets are loaded first
+            $this->enqueue_frontend_assets();
+
+            $handle = 'operaton_config_form_' . $form_id;
+
+            // Check if this form's config is already localized
+            if (wp_scripts()->get_data('operaton-dmn-gravity-integration', $handle))
+            {
+                if (defined('WP_DEBUG') && WP_DEBUG)
+                {
+                    error_log('ISSUE 4 FIX: Form ' . $form_id . ' config already localized in WordPress');
+                }
+                self::$global_asset_state['gravity_forms_processed'][] = $form_id;
+                return;
+            }
+
+            // Get fresh config from database
+            $fresh_config = $this->get_fresh_form_config($form_id, $config);
+
+            // Localize form-specific configuration
+            $this->localize_form_config($form_id, $fresh_config, $handle);
+
+            // Enqueue radio sync if needed
+            if ($this->form_needs_radio_sync($form_id))
+            {
+                $this->enqueue_radio_sync_assets($form_id);
+            }
+
+            // ISSUE 4 FIX: Mark form as globally processed
+            self::$global_asset_state['gravity_forms_processed'][] = $form_id;
+
+            $this->log_debug('ISSUE 4 FIX: Gravity form assets enqueued and marked complete for form: ' . $form_id);
+        }
+        finally
+        {
+            // ISSUE 4 FIX: Always release form lock
+            unset(self::$context_locks['form_' . $form_id]);
+        }
+    }
+
+    /**
+     * ISSUE 3 FIX: Method to reset detection state (for testing/debugging)
+     */
+    public static function reset_detection_state()
+    {
+        self::$detection_lock = false;
+        self::$detection_result = null;
+        self::$detection_request_id = null;
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('ISSUE 3 FIX: Detection state reset');
+        }
+    }
+
+    /**
+     * ISSUE 3 FIX: Get detection status for debugging
+     */
+    public static function get_detection_status()
+    {
+        return array(
+            'detection_lock' => self::$detection_lock,
+            'detection_result' => self::$detection_result,
+            'detection_request_id' => self::$detection_request_id,
+            'current_request_id' => self::generate_request_id()
+        );
+    }
+
+    /**
+     * ISSUE 3 FIX: Generate a unique request identifier
+     */
+    private static function generate_request_id()
+    {
+        static $request_id = null;
+
+        if ($request_id === null)
+        {
+            // Create unique ID based on request characteristics
+            $request_id = md5(
+                ($_SERVER['REQUEST_URI'] ?? '') .
+                    ($_SERVER['HTTP_USER_AGENT'] ?? '') .
+                    ($_SERVER['REMOTE_ADDR'] ?? '') .
+                    (microtime(true)) .
+                    (is_admin() ? 'admin' : 'frontend')
+            );
+        }
+
+        return $request_id;
     }
 
     /**
@@ -293,9 +496,51 @@ class Operaton_DMN_Assets
      */
     private function localize_form_config($form_id, $config, $handle)
     {
+        // STEP 1 FIX: Enhanced duplicate prevention with multiple checks
+        $config_key = 'form_' . $form_id . '_' . ($config->id ?? 0);
+
+        // Check 1: Our internal tracking (most reliable)
+        if (isset(self::$localized_configs[$config_key]))
+        {
+            $this->log_debug('STEP 1 FIX: Configuration already localized (internal check) - Form: ' . $form_id);
+            return;
+        }
+
+        // Check 2: Enhanced WordPress script data check
+        $all_script_data = wp_scripts()->get_data('operaton-dmn-gravity-integration', 'data');
+        if ($all_script_data && strpos($all_script_data, '"form_id":' . $form_id) !== false)
+        {
+            $this->log_debug('STEP 1 FIX: Configuration already localized (WP script check) - Form: ' . $form_id);
+            self::$localized_configs[$config_key] = true;
+            return;
+        }
+
+        // Check 3: Prevent rapid-fire attempts
+        if (isset(self::$localization_attempts[$form_id]))
+        {
+            $last_attempt = self::$localization_attempts[$form_id];
+            if ((time() - $last_attempt) < 2)
+            {
+                $this->log_debug('STEP 1 FIX: Preventing rapid localization attempt - Form: ' . $form_id);
+                return;
+            }
+        }
+
+        // Mark attempt
+        self::$localization_attempts[$form_id] = time();
+
+        // Validate configuration before localizing
+        if (empty($config->dmn_endpoint))
+        {
+            $this->log_debug('STEP 1 FIX: Skipping localization - No DMN endpoint for form: ' . $form_id);
+            return;
+        }
+
+        // Your existing field mapping logic (keep unchanged)
         $field_mappings = $this->safe_json_decode($config->field_mappings ?? '{}');
         $result_mappings = $this->safe_json_decode($config->result_mappings ?? '{}');
 
+        // Your existing wp_localize_script call (keep unchanged)
         wp_localize_script('operaton-dmn-gravity-integration', $handle, array(
             'config_id' => $config->id ?? 0,
             'form_id' => $form_id,
@@ -311,8 +556,17 @@ class Operaton_DMN_Assets
             'debug' => defined('WP_DEBUG') && WP_DEBUG
         ));
 
-        $this->log_debug('Form config localized - Form: ' . $form_id .
-            ' | Endpoint: ' . ($config->dmn_endpoint ?? 'NONE'));
+        // Mark as successfully localized in our tracking
+        self::$localized_configs[$config_key] = array(
+            'timestamp' => time(),
+            'handle' => $handle,
+            'form_id' => $form_id,
+            'config_id' => $config->id ?? 0
+        );
+
+        // Enhanced debug log
+        $this->log_debug('STEP 1 FIX: Configuration successfully localized - Form: ' . $form_id .
+            ' | Handle: ' . $handle . ' | Endpoint: ' . ($config->dmn_endpoint ?? 'NONE'));
     }
 
     /**
@@ -565,6 +819,46 @@ class Operaton_DMN_Assets
     // =============================================================================
 
     /**
+     * ISSUE 4 FIX: Global asset state management across all contexts
+     */
+    private static function init_global_asset_state()
+    {
+        if (empty(self::$global_asset_state))
+        {
+            self::$global_asset_state = array(
+                'frontend_attempted' => false,
+                'frontend_completed' => false,
+                'admin_attempted' => false,
+                'admin_completed' => false,
+                'gravity_forms_processed' => array(),
+                'request_signature' => self::get_request_signature(),
+                'init_time' => microtime(true)
+            );
+        }
+    }
+
+    /**
+     * ISSUE 4 FIX: Generate consistent request signature across contexts
+     */
+    private static function get_request_signature()
+    {
+        static $signature = null;
+
+        if ($signature === null)
+        {
+            $signature = md5(
+                ($_SERVER['REQUEST_URI'] ?? '') . '|' .
+                    ($_SERVER['HTTP_HOST'] ?? '') . '|' .
+                    (defined('DOING_AJAX') && DOING_AJAX ? 'ajax' : 'normal') . '|' .
+                    (is_admin() ? 'admin' : 'frontend') . '|' .
+                    (wp_doing_cron() ? 'cron' : 'web')
+            );
+        }
+
+        return $signature;
+    }
+
+    /**
      * Output compatibility check script
      */
     public function output_compatibility_check()
@@ -626,19 +920,82 @@ class Operaton_DMN_Assets
     // =============================================================================
 
     /**
-     * Clear form configuration cache
+     * ISSUE 4 FIX: Enhanced clear_form_cache with global state reset
      */
     public function clear_form_cache($form_id = null)
     {
-        if ($form_id) {
+        // Your existing cache clearing logic...
+        if ($form_id)
+        {
             unset(self::$detection_cache['content_' . $form_id]);
-        } else {
+        }
+        else
+        {
             self::$detection_cache = array();
             self::$detection_complete = false;
             self::$cache_timestamp = time();
         }
 
-        $this->log_debug('Form cache cleared' . ($form_id ? ' for form: ' . $form_id : ' (all)'));
+        // ISSUE 3 FIX: Reset detection state when clearing cache
+        if (!$form_id)
+        {
+            self::reset_detection_state();
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('ISSUE 3 FIX: Detection state reset during cache clear');
+            }
+        }
+
+        // ISSUE 4 FIX: Reset global asset state when clearing cache
+        if (!$form_id)
+        {
+            // Full cache clear - reset everything
+            self::$global_asset_state = array();
+            self::$context_locks = array();
+            self::$asset_load_attempts = 0;
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('ISSUE 4 FIX: Global asset state reset during full cache clear');
+            }
+        }
+        else
+        {
+            // Form-specific clear - remove from processed forms
+            if (isset(self::$global_asset_state['gravity_forms_processed']))
+            {
+                self::$global_asset_state['gravity_forms_processed'] = array_filter(
+                    self::$global_asset_state['gravity_forms_processed'],
+                    function ($processed_form_id) use ($form_id)
+                    {
+                        return $processed_form_id != $form_id;
+                    }
+                );
+                if (defined('WP_DEBUG') && WP_DEBUG)
+                {
+                    error_log('ISSUE 4 FIX: Removed form ' . $form_id . ' from global processed forms');
+                }
+            }
+        }
+
+        // Your existing Step 1 cache clearing...
+        if ($form_id)
+        {
+            foreach (self::$localized_configs as $key => $data)
+            {
+                if (strpos($key, 'form_' . $form_id . '_') === 0)
+                {
+                    unset(self::$localized_configs[$key]);
+                }
+            }
+            unset(self::$localization_attempts[$form_id]);
+        }
+        else
+        {
+            self::$localized_configs = array();
+            self::$localization_attempts = array();
+        }
+
+        $this->log_debug('ISSUE 4 FIX: Form cache cleared' . ($form_id ? ' for form: ' . $form_id : ' (all)'));
     }
 
     /**
@@ -654,6 +1011,47 @@ class Operaton_DMN_Assets
     // =============================================================================
     // STATUS AND DEBUGGING
     // =============================================================================
+
+    /**
+     * ISSUE 4 FIX: Get comprehensive asset loading status for debugging
+     */
+    public static function get_asset_loading_status()
+    {
+        self::init_global_asset_state();
+
+        return array(
+            'global_asset_state' => self::$global_asset_state,
+            'context_locks' => self::$context_locks,
+            'asset_load_attempts' => self::$asset_load_attempts,
+            'current_context' => is_admin() ? 'admin' : 'frontend',
+            'request_signature' => self::get_request_signature(),
+            'wordpress_script_status' => array(
+                'frontend_registered' => wp_script_is('operaton-dmn-frontend', 'registered'),
+                'frontend_enqueued' => wp_script_is('operaton-dmn-frontend', 'enqueued'),
+                'frontend_done' => wp_script_is('operaton-dmn-frontend', 'done'),
+                'gravity_registered' => wp_script_is('operaton-dmn-gravity-integration', 'registered'),
+                'gravity_enqueued' => wp_script_is('operaton-dmn-gravity-integration', 'enqueued'),
+            )
+        );
+    }
+
+    /**
+     * ISSUE 4 FIX: Force reset all asset loading states (for emergency/testing)
+     */
+    public static function emergency_reset_all_asset_states()
+    {
+        self::$global_asset_state = array();
+        self::$context_locks = array();
+        self::$asset_load_attempts = 0;
+
+        // Also reset Issue 3 states
+        self::reset_detection_state();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('ISSUE 4 FIX: EMERGENCY - All asset states reset');
+        }
+    }
 
     /**
      * Get current status for debugging
@@ -736,80 +1134,121 @@ class Operaton_DMN_Assets
     /**
      * Static detection method for compatibility with existing code
      */
+    /**
+     * ISSUE 3 FIX: Replace your current should_load_frontend_assets() method with this:
+     */
     public static function should_load_frontend_assets()
     {
-        // Skip detection for asset requests (CSS, JS, images)
-        $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-        if (preg_match('/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)(\?|$)/i', $request_uri))
-        {
-            return false;
-        }
+        // ISSUE 3 FIX: Generate unique request ID for this detection run
+        $current_request_id = self::generate_request_id();
 
-        // Use cached result if available and fresh (5 minutes)
-        if (
-            self::$detection_complete &&
-            self::$cache_timestamp &&
-            (time() - self::$cache_timestamp) < 300
-        )
+        // ISSUE 3 FIX: If we already have a result for this exact request, return it immediately
+        if (self::$detection_result !== null && self::$detection_request_id === $current_request_id)
         {
-            return self::$detection_cache['should_load'] ?? false;
-        }
-
-        $should_load = false;
-
-        // Method 1: Gravity Forms class exists (most reliable)
-        if (class_exists('GFForms'))
-        {
-            $should_load = true;
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
-                error_log('Operaton DMN Assets: Detection: GFForms class available');
+                error_log('ISSUE 3 FIX: Using cached detection result: ' . (self::$detection_result ? 'LOAD' : 'SKIP'));
             }
+            return self::$detection_result;
         }
 
-        // Method 2: Admin GF pages
-        elseif (is_admin() && self::is_gravity_forms_admin_page_static())
+        // ISSUE 3 FIX: Prevent concurrent detection runs with lock
+        if (self::$detection_lock)
         {
-            $should_load = true;
             if (defined('WP_DEBUG') && WP_DEBUG)
             {
-                error_log('Operaton DMN Assets: Detection: GF admin page');
+                error_log('ISSUE 3 FIX: Detection in progress, waiting for result...');
             }
-        }
-
-        // Method 3: Content analysis (frontend only)
-        elseif (!is_admin() && self::has_gravity_forms_in_content_static())
-        {
-            $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG)
+            // Wait briefly for the locked detection to complete
+            $wait_attempts = 0;
+            while (self::$detection_lock && $wait_attempts < 10)
             {
-                error_log('Operaton DMN Assets: Detection: GF content found');
+                usleep(1000); // Wait 1ms
+                $wait_attempts++;
             }
+            // Return the result from the completed detection
+            return self::$detection_result ?? false;
         }
 
-        // Method 4: URL indicators
-        elseif (self::has_gravity_forms_url_indicators_static())
-        {
-            $should_load = true;
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN Assets: Detection: GF URL indicators');
-            }
-        }
-
-        // Cache the result
-        self::$detection_cache['should_load'] = $should_load;
-        self::$detection_complete = true;
-        self::$cache_timestamp = time();
+        // ISSUE 3 FIX: Set lock to prevent multiple simultaneous detections
+        self::$detection_lock = true;
+        self::$detection_request_id = $current_request_id;
 
         if (defined('WP_DEBUG') && WP_DEBUG)
         {
-            error_log('Operaton DMN Assets: Detection complete: ' . ($should_load ? 'LOAD' : 'SKIP'));
+            error_log('ISSUE 3 FIX: Starting detection run - Request ID: ' . $current_request_id);
         }
 
-        return $should_load;
+        try
+        {
+            // Skip detection for asset requests (CSS, JS, images)
+            $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+            if (preg_match('/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)(\?|$)/i', $request_uri))
+            {
+                self::$detection_result = false;
+                if (defined('WP_DEBUG') && WP_DEBUG)
+                {
+                    error_log('ISSUE 3 FIX: Skipping detection - Asset request');
+                }
+                return false;
+            }
+
+            $should_load = false;
+
+            // Method 1: Gravity Forms class exists (most reliable)
+            if (class_exists('GFForms'))
+            {
+                $should_load = true;
+                if (defined('WP_DEBUG') && WP_DEBUG)
+                {
+                    error_log('ISSUE 3 FIX: Detection method 1 - GFForms class available');
+                }
+            }
+            // Method 2: Admin GF pages
+            elseif (is_admin() && self::is_gravity_forms_admin_page_static())
+            {
+                $should_load = true;
+                if (defined('WP_DEBUG') && WP_DEBUG)
+                {
+                    error_log('ISSUE 3 FIX: Detection method 2 - GF admin page');
+                }
+            }
+            // Method 3: Content analysis (frontend only)
+            elseif (!is_admin() && self::has_gravity_forms_in_content_static())
+            {
+                $should_load = true;
+                if (defined('WP_DEBUG') && WP_DEBUG)
+                {
+                    error_log('ISSUE 3 FIX: Detection method 3 - GF content found');
+                }
+            }
+            // Method 4: URL indicators
+            elseif (self::has_gravity_forms_url_indicators_static())
+            {
+                $should_load = true;
+                if (defined('WP_DEBUG') && WP_DEBUG)
+                {
+                    error_log('ISSUE 3 FIX: Detection method 4 - GF URL indicators');
+                }
+            }
+
+            // ISSUE 3 FIX: Store result for this request
+            self::$detection_result = $should_load;
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('ISSUE 3 FIX: Detection complete - Result: ' . ($should_load ? 'LOAD' : 'SKIP') . ' - Request ID: ' . $current_request_id);
+            }
+
+            return $should_load;
+        }
+        finally
+        {
+            // ISSUE 3 FIX: Always release the lock
+            self::$detection_lock = false;
+        }
     }
-    
+
     /**
      * Static helper methods for compatibility
      */

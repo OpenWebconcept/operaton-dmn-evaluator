@@ -1197,6 +1197,26 @@ class Operaton_DMN_Database
             error_log('Operaton DMN Database: Clearing configuration cache' . ($form_id ? ' for form ' . $form_id : ' (all)'));
         }
 
+        // STEP 1 PART 2: Clear Gravity Forms localization cache
+        $plugin_instance = OperatonDMNEvaluator::get_instance();
+        $gravity_forms_manager = $plugin_instance->get_gravity_forms_instance();
+        if ($gravity_forms_manager && method_exists($gravity_forms_manager, 'clear_gravity_forms_localization_cache'))
+        {
+            if ($form_id)
+            {
+                $gravity_forms_manager->clear_gravity_forms_localization_cache($form_id);
+            }
+            else
+            {
+                $gravity_forms_manager->clear_gravity_forms_localization_cache();
+            }
+
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN Database: Gravity Forms localization cache cleared for form: ' . ($form_id ?: 'ALL'));
+            }
+        }
+
         // FIXED: Clear static cache in get_config_by_form_id
         if ($form_id) {
             // Clear specific form cache
