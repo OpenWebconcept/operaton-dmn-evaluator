@@ -47,7 +47,7 @@ The `class-operaton-dmn-api.php` file is the core API handler class managing all
 **Visibility**: Public
 **Description**: Creates endpoint for decision flow summary retrieval and visualization. Provides process instance tracking and decision flow analysis for complex BPMN workflows with multiple decision points.
 
-### Main Evaluation Methods - CRITICAL FUNCTIONALITY
+### Main Evaluation Methods
 
 #### `rest_evaluate($request)`
 **Purpose**: Enhanced evaluation handler that routes to either process execution or direct decision evaluation
