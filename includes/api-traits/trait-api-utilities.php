@@ -1,42 +1,396 @@
 <?php
 
 /**
- * Operaton DMN API Utilities Trait
+ * Utilities and helper methods trait for Operaton DMN Plugin
  *
- * Consolidated trait containing data processing, URL construction, HTTP communication,
- * configuration management, debug utilities, and helper methods.
+ * Contains all utility methods including connection pooling, HTTP optimization,
+ * data processing helpers, and configuration management functions.
  *
  * @package OperatonDMN
- * @subpackage API\Traits
  * @since 1.0.0
  */
 
 // Prevent direct access
-if (!defined('ABSPATH'))
-{
+if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Consolidated utilities trait
- *
- * Contains all utility methods including data processing, HTTP communication,
- * URL construction, configuration management, and debug functionality.
- *
- * @since 1.0.0
- */
 trait Operaton_DMN_API_Utilities
 {
-    // =============================================================================
-    // DATA PROCESSING & TRANSFORMATION UTILITIES
-    // =============================================================================
+    /**
+     * Get optimized HTTP client options with connection reuse
+     *
+     * @param string $endpoint_url Full endpoint URL
+     * @return array HTTP client options optimized for connection reuse
+     * @since 1.0.0
+     */
+    private function get_optimized_http_options($endpoint_url)
+    {
+        $host = parse_url($endpoint_url, PHP_URL_HOST);
+        $connection_key = $this->get_connection_key($host);
+
+        // Check if we have a valid cached connection
+        if ($this->has_valid_connection($connection_key))
+        {
+            self::$pool_stats['hits']++;
+            $this->update_connection_stats('hits');  // Wordpress persistence for admin dashboard
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN API: Reusing connection for host: ' . $host);
+            }
+            return $this->get_cached_connection_options($connection_key);
+        }
+
+        // Create new optimized connection
+        self::$pool_stats['misses']++;
+        self::$pool_stats['created']++;
+        $this->update_connection_stats('misses'); // Wordpress persistence for admin dashboard
+        $this->update_connection_stats('created');
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Creating new connection for host: ' . $host);
+        }
+
+        $options = $this->create_optimized_connection_options($host);
+        $this->cache_connection($connection_key, $options);
+
+        return $options;
+    }
+
+    /**
+     * Create optimized HTTP connection options
+     *
+     * @param string $host Hostname
+     * @return array Optimized HTTP options
+     * @since 1.0.0
+     */
+    private function create_optimized_connection_options($host)
+    {
+        return array(
+            'timeout' => $this->api_timeout,
+            'sslverify' => $this->ssl_verify,
+            'headers' => $this->get_api_headers_with_keepalive(),
+            'httpversion' => '1.1',
+            'blocking' => true,
+            'stream' => false,
+            'decompress' => true,
+            'redirection' => 3,
+            // Connection reuse optimizations
+            'user-agent' => $this->get_optimized_user_agent(),
+            // Force HTTP/1.1 with keep-alive
+            'curl_options' => array(
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                CURLOPT_TCP_KEEPALIVE => 1,
+                CURLOPT_TCP_KEEPIDLE => 60,
+                CURLOPT_TCP_KEEPINTVL => 30,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_DNS_CACHE_TIMEOUT => 300,
+                CURLOPT_MAXCONNECTS => $this->max_connections_per_host,
+                // Reuse connections
+                CURLOPT_FORBID_REUSE => false,
+                CURLOPT_FRESH_CONNECT => false,
+            )
+        );
+    }
+
+    /**
+     * Get API headers optimized for connection reuse
+     *
+     * @return array Headers with keep-alive directives
+     * @since 1.0.0
+     */
+    private function get_api_headers_with_keepalive()
+    {
+        $headers = $this->get_api_headers();
+
+        // Add connection keep-alive headers
+        $headers['Connection'] = 'keep-alive';
+        $headers['Keep-Alive'] = 'timeout=60, max=10';
+
+        return $headers;
+    }
+
+    /**
+     * Get optimized user agent string
+     *
+     * @return string User agent with connection info
+     * @since 1.0.0
+     */
+    private function get_optimized_user_agent()
+    {
+        return sprintf(
+            'WordPress/%s; Operaton-DMN/%s; Connection-Pool/1.0',
+            get_bloginfo('version'),
+            OPERATON_DMN_VERSION ?? '1.0.0'
+        );
+    }
+
+    /**
+     * Generate connection pool key
+     *
+     * @param string $host Hostname
+     * @return string Connection key
+     * @since 1.0.0
+     */
+    private function get_connection_key($host)
+    {
+        return 'operaton_conn_' . md5($host . $this->ssl_verify);
+    }
+
+    /**
+     * Check if we have a valid cached connection
+     *
+     * @param string $connection_key Connection cache key
+     * @return bool True if valid connection exists
+     * @since 1.0.0
+     */
+    private function has_valid_connection($connection_key)
+    {
+        if (!isset(self::$connection_pool[$connection_key]))
+        {
+            return false;
+        }
+
+        $connection = self::$connection_pool[$connection_key];
+        $age = time() - $connection['created_at'];
+
+        if ($age > $this->connection_max_age)
+        {
+            unset(self::$connection_pool[$connection_key]);
+            self::$pool_stats['cleaned']++;
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Get cached connection options
+     *
+     * @param string $connection_key Connection cache key
+     * @return array Cached connection options
+     * @since 1.0.0
+     */
+    private function get_cached_connection_options($connection_key)
+    {
+        $connection = self::$connection_pool[$connection_key];
+        $connection['last_used'] = time();
+        $connection['use_count']++;
+
+        // Update the cached connection
+        self::$connection_pool[$connection_key] = $connection;
+
+        return $connection['options'];
+    }
+
+    /**
+     * Cache connection options
+     *
+     * @param string $connection_key Connection cache key
+     * @param array $options HTTP options to cache
+     * @since 1.0.0
+     */
+    private function cache_connection($connection_key, $options)
+    {
+        // Clean old connections first
+        $this->cleanup_old_connections();
+        $this->update_connection_stats('cleaned'); // Wordpress persistence for admin dashboard
+
+        self::$connection_pool[$connection_key] = array(
+            'options' => $options,
+            'created_at' => time(),
+            'last_used' => time(),
+            'use_count' => 1,
+            'host' => parse_url($options['user-agent'] ?? '', PHP_URL_HOST)
+        );
+    }
+
+    /**
+     * Clean up old connections from the pool
+     *
+     * @since 1.0.0
+     */
+    private function cleanup_old_connections()
+    {
+        $current_time = time();
+        $cleaned = 0;
+
+        foreach (self::$connection_pool as $key => $connection)
+        {
+            $age = $current_time - $connection['created_at'];
+            $idle_time = $current_time - $connection['last_used'];
+
+            // Remove if too old or idle too long
+            if ($age > $this->connection_max_age || $idle_time > 120)
+            {
+                unset(self::$connection_pool[$key]);
+                $cleaned++;
+            }
+        }
+
+        if ($cleaned > 0)
+        {
+            self::$pool_stats['cleaned'] += $cleaned;
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Operaton DMN API: Cleaned ' . $cleaned . ' old connections');
+            }
+        }
+    }
+
+    /**
+     * Enhanced API call method with connection reuse
+     * Replace your existing wp_remote_post calls with this method
+     *
+     * @param string $endpoint Full endpoint URL
+     * @param array $data Request data
+     * @param string $method HTTP method (POST, GET, etc.)
+     * @return array|WP_Error HTTP response
+     * @since 1.0.0
+     */
+    private function make_optimized_api_call($endpoint, $data = array(), $method = 'POST')
+    {
+        // Get optimized connection options
+        $options = $this->get_optimized_http_options($endpoint);
+
+        // Add request-specific data
+        if (!empty($data))
+        {
+            $options['body'] = is_array($data) ? wp_json_encode($data) : $data;
+        }
+
+        // Make the request using the appropriate method
+        if ($method === 'POST')
+        {
+            return wp_remote_post($endpoint, $options);
+        }
+        elseif ($method === 'GET')
+        {
+            return wp_remote_get($endpoint, $options);
+        }
+        else
+        {
+            $options['method'] = $method;
+            return wp_remote_request($endpoint, $options);
+        }
+    }
+
+    /**
+     * Set connection pool timeout from admin setting
+     *
+     * @param int $timeout Timeout in seconds
+     * @since 1.0.0
+     */
+    public function set_connection_pool_timeout($timeout)
+    {
+        $this->connection_max_age = max(60, min(1800, intval($timeout)));
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Connection pool timeout updated to ' . $this->connection_max_age . ' seconds');
+        }
+
+        // Clear existing connections to apply new timeout immediately
+        $cleared = $this->clear_connection_pool();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Cleared ' . $cleared . ' connections to apply new timeout');
+        }
+    }
+
+    /**
+     * Clear connection pool cache for testing/debugging
+     * Add this method for manual cache management
+     *
+     * @return int Number of connections cleared
+     * @since 1.0.0
+     */
+    public function clear_connection_pool_for_batching()
+    {
+        $cleared = $this->clear_connection_pool();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Cleared connection pool for batching optimization: ' . $cleared . ' connections');
+        }
+
+        return $cleared;
+    }
+
+    /**
+     * Get connection pool statistics with WordPress persistence
+     *
+     * @return array Connection pool statistics and details
+     * @since 1.0.0
+     */
+    public function get_connection_pool_stats()
+    {
+        // Get stats from WordPress options (persistent storage)
+        $stored_stats = get_option('operaton_connection_stats', array(
+            'hits' => 0,
+            'misses' => 0,
+            'created' => 0,
+            'cleaned' => 0
+        ));
+
+        return array(
+            'stats' => $stored_stats,
+            'active_connections' => count(self::$connection_pool),
+            'pool_details' => array_map(function ($conn)
+            {
+                return array(
+                    'age' => time() - $conn['created_at'],
+                    'idle_time' => time() - $conn['last_used'],
+                    'use_count' => $conn['use_count']
+                );
+            }, self::$connection_pool)
+        );
+    }
+
+    /**
+     * Update persistent statistics
+     *
+     * @param string $type Type of statistic to update
+     * @since 1.0.0
+     */
+    private function update_connection_stats($type)
+    {
+        $stats = get_option('operaton_connection_stats', array(
+            'hits' => 0,
+            'misses' => 0,
+            'created' => 0,
+            'cleaned' => 0
+        ));
+
+        $stats[$type]++;
+        update_option('operaton_connection_stats', $stats);
+    }
+
+    /**
+     * Clear connection pool (useful for testing or debugging)
+     *
+     * @return int Number of connections cleared
+     * @since 1.0.0
+     */
+    public function clear_connection_pool()
+    {
+        $cleared = count(self::$connection_pool);
+        self::$connection_pool = array();
+        self::$pool_stats['cleaned'] += $cleared;
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Manually cleared ' . $cleared . ' connections');
+        }
+
+        return $cleared;
+    }
 
     /**
      * Process input variables with type conversion and validation
-     *
-     * Converts form data to properly typed variables for DMN evaluation.
-     * Handles type conversion, validation, and sanitization of input values
-     * according to DMN engine requirements and field mapping specifications.
+     * Converts form data to properly typed variables for DMN evaluation
      *
      * @param array $field_mappings Field mapping configuration
      * @param array $form_data Raw form data
@@ -47,257 +401,94 @@ trait Operaton_DMN_API_Utilities
     {
         $variables = array();
 
-        foreach ($field_mappings as $dmn_variable => $form_field)
-        {
+        foreach ($field_mappings as $dmn_variable => $form_field) {
             $value = isset($form_data[$dmn_variable]) ? $form_data[$dmn_variable] : null;
 
-            // Skip empty values unless explicitly configured to include them
-            if ($value === null || $value === '')
-            {
+            if ($value === null || $value === 'null' || $value === '') {
+                $variables[$dmn_variable] = array(
+                    'value' => null,
+                    'type' => $form_field['type']
+                );
                 continue;
             }
 
-            // Process and validate the value
-            $processed_value = $this->process_variable_value($value, $dmn_variable);
-
-            if (is_wp_error($processed_value))
-            {
-                return $processed_value;
+            // Type conversion with validation
+            $converted_value = $this->convert_variable_type($value, $form_field['type'], $dmn_variable);
+            if (is_wp_error($converted_value)) {
+                return $converted_value;
             }
 
-            $variables[$dmn_variable] = $processed_value;
-        }
-
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Processed ' . count($variables) . ' input variables');
-        }
-
-        return $variables;
-    }
-
-    /**
-     * Process and validate individual variable value with type conversion
-     *
-     * Converts individual form field values to appropriate types for DMN evaluation.
-     * Handles string, numeric, boolean, and date type conversions with validation
-     * and error handling for invalid data types or formats.
-     *
-     * CRITICAL: This method preserves the original working logic to prevent evaluation failures.
-     *
-     * @param mixed $value Raw field value from form data
-     * @param string $variable_name Variable name for error reporting
-     * @return mixed|WP_Error Processed value or validation error
-     * @since 1.0.0
-     */
-    private function process_variable_value($value, $variable_name)
-    {
-        // PRESERVED ORIGINAL LOGIC: Keep exact same type conversion as working version
-
-        // Skip empty values unless explicitly configured to include them
-        if ($value === null || $value === '')
-        {
-            return $value;
-        }
-
-        // Handle different value types exactly as the original working version did
-        if (is_numeric($value))
-        {
-            if (strpos($value, '.') !== false)
-            {
-                return (float) $value;
-            }
-            else
-            {
-                return (int) $value;
-            }
-        }
-
-        if (is_string($value))
-        {
-            // Handle boolean-like strings
-            $lower_value = strtolower(trim($value));
-            if (in_array($lower_value, array('true', 'false', 'yes', 'no')))
-            {
-                return in_array($lower_value, array('true', 'yes'));
-            }
-
-            // CRITICAL FIX: DO NOT convert dates - let Operaton handle them as strings
-            // The original working code did not have date conversion
-            return sanitize_text_field($value);
-        }
-
-        if (is_bool($value))
-        {
-            return $value;
-        }
-
-        if (is_array($value))
-        {
-            return array_map('sanitize_text_field', $value);
-        }
-
-        // Handle type conversion for other values
-        if ($value === 1 || $value === '1')
-        {
-            return true;
-        }
-        if ($value === 0 || $value === '0')
-        {
-            return false;
-        }
-
-        return sanitize_text_field(strval($value));
-    }
-
-    /**
-     * Extract mapped results from API response data
-     *
-     * Extracts and maps result values from DMN API response according to
-     * configured result mappings. Handles different response formats from
-     * both decision evaluation and process execution endpoints.
-     *
-     * @param array $response_data API response data containing results
-     * @param array $result_mappings Result field mapping configuration
-     * @return array Mapped results ready for form field population
-     * @since 1.0.0
-     */
-    private function extract_mapped_results($response_data, $result_mappings)
-    {
-        $results = array();
-
-        if (empty($result_mappings) || empty($response_data))
-        {
-            return $results;
-        }
-
-        // Handle different response formats
-        $data_source = $response_data;
-        if (isset($response_data[0]) && is_array($response_data[0]))
-        {
-            // Decision evaluation format - use first result
-            $data_source = $response_data[0];
-        }
-
-        foreach ($result_mappings as $dmn_variable => $form_field)
-        {
-            if (isset($data_source[$dmn_variable]))
-            {
-                $value = $data_source[$dmn_variable];
-
-                // Handle Operaton engine response format with value wrapper
-                if (is_array($value) && isset($value['value']))
-                {
-                    $results[$form_field] = $value['value'];
-                }
-                else
-                {
-                    $results[$form_field] = $value;
-                }
-            }
-        }
-
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Extracted ' . count($results) . ' result values');
-        }
-
-        return $results;
-    }
-
-    /**
-     * Transform historical variable data to standard variables format
-     *
-     * Converts historical variable instance data from Operaton engine
-     * to standard variable format for consistent processing. Handles
-     * the transformation from history API format to active variables format.
-     *
-     * @param array $history_data Historical variable instance data
-     * @return array Transformed variables in standard format
-     * @since 1.0.0
-     */
-    private function transform_history_to_variables($history_data)
-    {
-        $variables = array();
-
-        if (!is_array($history_data))
-        {
-            return $variables;
-        }
-
-        foreach ($history_data as $variable_instance)
-        {
-            if (isset($variable_instance['name']) && isset($variable_instance['value']))
-            {
-                $variables[$variable_instance['name']] = array(
-                    'value' => $variable_instance['value'],
-                    'type' => $variable_instance['type'] ?? 'String'
-                );
-            }
-        }
-
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Transformed ' . count($variables) . ' historical variables');
-        }
-
-        return $variables;
-    }
-
-    /**
-     * Retrieve process variables with intelligent fallback strategy
-     *
-     * Attempts to retrieve process variables using multiple strategies with
-     * intelligent fallback from active instance to historical data. Optimizes
-     * for performance while ensuring data availability across different
-     * process execution states.
-     *
-     * @param string $base_url Base engine REST API URL
-     * @param string $process_instance_id Process instance identifier
-     * @return array|WP_Error Variables data with source information or error
-     * @since 1.0.0
-     */
-    private function retrieve_process_variables_with_fallback($base_url, $process_instance_id)
-    {
-        // Strategy 1: Try active process instance variables (fastest)
-        $active_url = $base_url . '/process-instance/' . $process_instance_id . '/variables';
-        $active_response = $this->make_api_call($active_url, array(), 'GET');
-
-        if (!is_wp_error($active_response) && !empty($active_response))
-        {
-            return array(
-                'variables' => $active_response,
-                'source' => 'active_instance'
+            $variables[$dmn_variable] = array(
+                'value' => $converted_value,
+                'type' => $form_field['type']
             );
         }
 
-        // Strategy 2: Fallback to historical variables
-        $history_url = $base_url . '/history/variable-instance?processInstanceId=' . $process_instance_id;
-        $history_response = $this->make_api_call($history_url, array(), 'GET');
-
-        if (is_wp_error($history_response))
-        {
-            return $history_response;
-        }
-
-        $transformed_variables = $this->transform_history_to_variables($history_response);
-
-        return array(
-            'variables' => $transformed_variables,
-            'source' => 'historical_data'
-        );
+        return $variables;
     }
 
-    // =============================================================================
-    // URL CONSTRUCTION & VALIDATION HELPERS
-    // =============================================================================
+    /**
+     * Convert variable to the correct type with validation
+     * Handles type conversion for DMN variables
+     *
+     * @param mixed $value Raw value from form
+     * @param string $type Target type (Integer, Double, Boolean, String)
+     * @param string $variable_name Variable name for error messages
+     * @return mixed|WP_Error Converted value or error
+     * @since 1.0.0
+     */
+    private function convert_variable_type($value, $type, $variable_name)
+    {
+        switch ($type) {
+            case 'Integer':
+                if (!is_numeric($value)) {
+                    return new WP_Error(
+                        'invalid_type',
+                        sprintf(__('Value for %s must be numeric', 'operaton-dmn'), $variable_name),
+                        array('status' => 400)
+                    );
+                }
+                return intval($value);
+
+            case 'Double':
+                if (!is_numeric($value)) {
+                    return new WP_Error(
+                        'invalid_type',
+                        sprintf(__('Value for %s must be numeric', 'operaton-dmn'), $variable_name),
+                        array('status' => 400)
+                    );
+                }
+                return floatval($value);
+
+            case 'Boolean':
+                if (is_string($value)) {
+                    $value = strtolower($value);
+                    if ($value === 'true' || $value === '1') {
+                        return true;
+                    } elseif ($value === 'false' || $value === '0') {
+                        return false;
+                    } else {
+                        $converted = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                        if ($converted === null) {
+                            return new WP_Error(
+                                'invalid_type',
+                                sprintf(__('Value for %s must be boolean', 'operaton-dmn'), $variable_name),
+                                array('status' => 400)
+                            );
+                        }
+                        return $converted;
+                    }
+                }
+                return (bool) $value;
+
+            default:
+                return sanitize_text_field($value);
+        }
+    }
 
     /**
      * Build the full DMN evaluation endpoint URL from base endpoint and decision key
-     *
-     * Constructs complete evaluation URL following Operaton REST API conventions.
-     * Normalizes base URL formatting, removes incorrect path components, ensures
-     * proper engine-rest path structure, and builds complete evaluation endpoint.
+     * Constructs complete evaluation URL following Operaton REST API conventions
      *
      * @param string $base_endpoint Base DMN endpoint URL
      * @param string $decision_key Decision definition key
@@ -344,11 +535,8 @@ trait Operaton_DMN_API_Utilities
     }
 
     /**
-     * Build the full process execution endpoint URL from base endpoint and process key
-     *
-     * Constructs complete process start URL following Operaton REST API conventions.
-     * Normalizes base URL, ensures proper engine-rest path structure, and builds
-     * process definition start endpoint for process orchestration.
+     * Build process execution endpoint URL from base endpoint and process key
+     * Constructs complete process start URL following Operaton REST API conventions
      *
      * @param string $base_endpoint Base DMN endpoint URL
      * @param string $process_key Process definition key
@@ -357,477 +545,486 @@ trait Operaton_DMN_API_Utilities
      */
     private function build_process_endpoint($base_endpoint, $process_key)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Building process endpoint for process: ' . $process_key);
+        // Clean up base endpoint to get engine-rest base
+        $base_url = rtrim($base_endpoint, '/');
+        $base_url = str_replace('/decision-definition/key', '', $base_url);
+        $base_url = str_replace('/decision-definition', '', $base_url);
+
+        if (strpos($base_url, '/engine-rest') === false) {
+            $base_url .= '/engine-rest';
         }
 
-        $base_url = $this->get_engine_rest_base_url($base_endpoint);
-        $process_url = $base_url . '/process-definition/key/' . $process_key . '/start';
-
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Final process endpoint: ' . $process_url);
-        }
-
-        return $process_url;
+        return $base_url . '/process-definition/key/' . $process_key . '/start';
     }
 
     /**
-     * Get normalized engine REST base URL from any endpoint variant
+     * Get process variables from completed or running process instance
+     * Retrieves variables from process execution for result extraction
      *
-     * Extracts and normalizes the base engine REST URL from various endpoint
-     * formats. Handles different URL structures, removes specific endpoint paths,
-     * and ensures consistent /engine-rest base URL format.
-     *
-     * @param string $endpoint Any Operaton engine endpoint URL
-     * @return string Normalized base engine REST URL
+     * @param object $config Configuration object
+     * @param string $process_instance_id Process instance identifier
+     * @param bool $process_ended Whether process has ended
+     * @return array|WP_Error Process variables or error
      * @since 1.0.0
      */
-    private function get_engine_rest_base_url($endpoint)
+    private function get_process_variables($config, $process_instance_id, $process_ended)
     {
-        $clean_url = rtrim($endpoint, '/');
+        $base_url = $this->get_engine_rest_base_url($config->dmn_endpoint);
 
-        // Remove specific endpoint paths to get base URL
-        $patterns_to_remove = array(
-            '/\/decision-definition.*$/',
-            '/\/process-definition.*$/',
-            '/\/process-instance.*$/',
-            '/\/history.*$/',
-            '/\/version.*$/'
-        );
-
-        foreach ($patterns_to_remove as $pattern)
-        {
-            $clean_url = preg_replace($pattern, '', $clean_url);
-        }
-
-        // Ensure it ends with /engine-rest
-        if (!str_ends_with($clean_url, '/engine-rest'))
-        {
-            if (str_ends_with($clean_url, '/'))
-            {
-                $clean_url .= 'engine-rest';
+        if ($process_ended) {
+            // Process completed immediately - get variables from history
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN API: Process completed immediately, getting variables from history');
             }
-            else
-            {
-                $clean_url .= '/engine-rest';
-            }
-        }
 
-        return $clean_url;
+            return $this->get_historical_variables($base_url, $process_instance_id);
+        } else {
+            // Process is still running - wait and try to get active variables
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Operaton DMN API: Process still running, waiting for completion');
+            }
+
+            sleep(3); // Wait for process completion
+
+            $active_variables = $this->get_active_process_variables($base_url, $process_instance_id);
+
+            // If active variables failed, try history as fallback
+            if (empty($active_variables)) {
+                return $this->get_historical_variables($base_url, $process_instance_id);
+            }
+
+            return $active_variables;
+        }
     }
 
-    // =============================================================================
-    // HTTP COMMUNICATION & API UTILITIES
-    // =============================================================================
-
     /**
-     * Make HTTP API call to Operaton DMN engine with comprehensive error handling
+     * Get historical variables from completed process
+     * Retrieves variables from process history API
      *
-     * Executes HTTP requests to Operaton DMN engine endpoints with proper error handling,
-     * timeout management, response validation, and detailed logging. Supports both
-     * GET and POST methods with appropriate headers and request formatting.
-     *
-     * @param string $url Complete API endpoint URL
-     * @param array $data Request payload data
-     * @param string $method HTTP method (GET, POST, PUT, DELETE)
-     * @param array $additional_headers Optional additional HTTP headers
-     * @return array|WP_Error API response data or error object
+     * @param string $base_url Engine REST base URL
+     * @param string $process_instance_id Process instance identifier
+     * @return array|WP_Error Historical variables or error
      * @since 1.0.0
      */
-    private function make_api_call($url, $data = array(), $method = 'GET', $additional_headers = array())
+    private function get_historical_variables($base_url, $process_instance_id)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Making ' . $method . ' request to: ' . $url);
+        $history_endpoint = $base_url . '/history/variable-instance';
+        $history_url = $history_endpoint . '?processInstanceId=' . $process_instance_id;
+
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN API: Getting historical variables from: ' . $history_url);
         }
 
-        // Build request headers
-        $headers = $this->build_api_headers($method, $additional_headers);
+        $response = wp_remote_get($history_url, array(
+            'headers' => array('Accept' => 'application/json'),
+            'timeout' => 15,
+            'sslverify' => $this->ssl_verify,
+        ));
 
-        // Prepare request arguments
-        $args = array(
-            'method' => $method,
-            'headers' => $headers,
-            'timeout' => $this->connection_timeout,
-            'sslverify' => true,
-            'user-agent' => 'WordPress/OperatonDMN/' . OPERATON_DMN_VERSION
-        );
-
-        // Add request body for POST/PUT methods
-        if (in_array($method, array('POST', 'PUT', 'PATCH')) && !empty($data))
-        {
-            $args['body'] = json_encode($data);
-
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN API: Request payload: ' . json_encode($data));
-            }
-        }
-        elseif ($method === 'GET' && !empty($data))
-        {
-            // Add query parameters for GET requests
-            $url = add_query_arg($data, $url);
-        }
-
-        // Execute the HTTP request
-        $response = wp_remote_request($url, $args);
-
-        // Handle WordPress HTTP errors
-        if (is_wp_error($response))
-        {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN API: HTTP error: ' . $response->get_error_message());
-            }
-
+        if (is_wp_error($response)) {
             return new WP_Error(
-                'http_error',
-                sprintf(__('HTTP request failed: %s', 'operaton-dmn'), $response->get_error_message()),
+                'api_error',
+                sprintf(__('Failed to get historical variables: %s', 'operaton-dmn'), $response->get_error_message()),
                 array('status' => 500)
             );
         }
 
-        // Get response details
-        $response_code = wp_remote_retrieve_response_code($response);
-        $response_body = wp_remote_retrieve_body($response);
+        $history_body = wp_remote_retrieve_body($response);
+        $historical_variables = json_decode($history_body, true);
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Response code: ' . $response_code);
-            error_log('Operaton DMN API: Response body: ' . substr($response_body, 0, 500) . '...');
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($historical_variables)) {
+            return array();
         }
 
-        // Handle HTTP error status codes
-        if ($response_code >= 400)
-        {
-            $error_message = $this->parse_api_error_message($response_body, $response_code);
-
-            return new WP_Error(
-                'api_error',
-                $error_message,
-                array('status' => $response_code, 'response_body' => $response_body)
-            );
-        }
-
-        // Parse JSON response
-        $parsed_response = json_decode($response_body, true);
-
-        if (json_last_error() !== JSON_ERROR_NONE)
-        {
-            return new WP_Error(
-                'json_error',
-                sprintf(__('Invalid JSON response: %s', 'operaton-dmn'), json_last_error_msg()),
-                array('status' => 500, 'response_body' => $response_body)
-            );
-        }
-
-        return $parsed_response;
-    }
-
-    /**
-     * Build API request headers for Operaton engine communication
-     *
-     * Constructs appropriate HTTP headers for DMN engine API requests
-     * including content type, authentication (if configured), user agent,
-     * and other required headers for successful API communication.
-     *
-     * @param string $method HTTP method (GET, POST, etc.)
-     * @param array $additional_headers Optional additional headers
-     * @return array Complete headers array for API requests
-     * @since 1.0.0
-     */
-    private function build_api_headers($method = 'GET', $additional_headers = array())
-    {
-        $headers = array(
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-            'User-Agent' => 'WordPress/OperatonDMN/' . OPERATON_DMN_VERSION,
-        );
-
-        // Add method-specific headers
-        if ($method === 'POST' || $method === 'PUT')
-        {
-            $headers['Cache-Control'] = 'no-cache';
-        }
-
-        // Merge additional headers
-        if (!empty($additional_headers))
-        {
-            $headers = array_merge($headers, $additional_headers);
-        }
-
-        return $headers;
-    }
-
-    /**
-     * Parse API error message from response body
-     *
-     * Extracts meaningful error messages from Operaton engine API error responses.
-     * Handles different error response formats and provides user-friendly error
-     * messages for common API error scenarios.
-     *
-     * @param string $response_body Raw HTTP response body
-     * @param int $response_code HTTP response status code
-     * @return string User-friendly error message
-     * @since 1.0.0
-     */
-    private function parse_api_error_message($response_body, $response_code)
-    {
-        // Try to parse JSON error response
-        $parsed_error = json_decode($response_body, true);
-
-        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed_error))
-        {
-            // Extract error message from different possible fields
-            $possible_fields = array('message', 'error', 'detail', 'description');
-
-            foreach ($possible_fields as $field)
-            {
-                if (isset($parsed_error[$field]) && !empty($parsed_error[$field]))
-                {
-                    return sanitize_text_field($parsed_error[$field]);
-                }
-            }
-
-            // Handle Operaton specific error format
-            if (isset($parsed_error['type']) && isset($parsed_error['message']))
-            {
-                return sprintf(
-                    __('%s: %s', 'operaton-dmn'),
-                    sanitize_text_field($parsed_error['type']),
-                    sanitize_text_field($parsed_error['message'])
+        // Convert historical variables to expected format
+        $final_variables = array();
+        foreach ($historical_variables as $var) {
+            if (isset($var['name']) && array_key_exists('value', $var)) {
+                $final_variables[$var['name']] = array(
+                    'value' => $var['value'],
+                    'type' => isset($var['type']) ? $var['type'] : 'String'
                 );
             }
         }
 
-        // Fallback to generic HTTP status messages
-        $generic_messages = array(
-            400 => __('Bad request - invalid parameters', 'operaton-dmn'),
-            401 => __('Unauthorized - authentication required', 'operaton-dmn'),
-            403 => __('Forbidden - access denied', 'operaton-dmn'),
-            404 => __('Not found - endpoint or resource does not exist', 'operaton-dmn'),
-            405 => __('Method not allowed', 'operaton-dmn'),
-            408 => __('Request timeout', 'operaton-dmn'),
-            429 => __('Too many requests - rate limit exceeded', 'operaton-dmn'),
-            500 => __('Internal server error', 'operaton-dmn'),
-            502 => __('Bad gateway - upstream server error', 'operaton-dmn'),
-            503 => __('Service unavailable', 'operaton-dmn'),
-            504 => __('Gateway timeout', 'operaton-dmn')
-        );
+        return $final_variables;
+    }
 
-        if (isset($generic_messages[$response_code]))
-        {
-            return $generic_messages[$response_code];
+    /**
+     * Get active process variables from running process
+     * Retrieves variables from active process instance
+     *
+     * @param string $base_url Engine REST base URL
+     * @param string $process_instance_id Process instance identifier
+     * @return array Active process variables
+     * @since 1.0.0
+     */
+    private function get_active_process_variables($base_url, $process_instance_id)
+    {
+        $variables_endpoint = $base_url . '/process-instance/' . $process_instance_id . '/variables';
+
+        $response = wp_remote_get($variables_endpoint, array(
+            'headers' => array('Accept' => 'application/json'),
+            'timeout' => 15,
+            'sslverify' => $this->ssl_verify,
+        ));
+
+        if (is_wp_error($response)) {
+            return array();
         }
 
-        return sprintf(
-            __('HTTP error %d: %s', 'operaton-dmn'),
-            $response_code,
-            !empty($response_body) ? substr(strip_tags($response_body), 0, 100) : __('Unknown error', 'operaton-dmn')
-        );
-    }
+        $variables_body = wp_remote_retrieve_body($response);
+        $variables = json_decode($variables_body, true);
 
-    // =============================================================================
-    // CONFIGURATION & SETTINGS MANAGEMENT
-    // =============================================================================
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return array();
+        }
 
-    /**
-     * Get current connection timeout setting
-     *
-     * Retrieves the currently configured connection timeout value with bounds
-     * checking to ensure reasonable timeout values. Provides fallback to default
-     * timeout if configuration is invalid or missing.
-     *
-     * @return int Connection timeout in seconds
-     * @since 1.0.0
-     */
-    public function get_connection_timeout()
-    {
-        return $this->connection_timeout;
+        return $variables;
     }
 
     /**
-     * Set connection timeout with validation
+     * Extract results from process variables based on configuration
+     * Processes complex variable structures to extract mapped results
      *
-     * Updates connection timeout setting with validation to ensure reasonable
-     * bounds (5-300 seconds). Updates both instance variable and persistent
-     * storage for consistent timeout across requests.
-     *
-     * @param int $timeout Timeout value in seconds
-     * @return bool Success status of timeout update
+     * @param object $config Configuration object
+     * @param array $final_variables Process variables
+     * @return array Extracted results
      * @since 1.0.0
      */
-    public function set_connection_timeout($timeout)
+    private function extract_process_results($config, $final_variables)
     {
-        $validated_timeout = max(5, min(300, intval($timeout)));
+        $result_mappings = $this->parse_result_mappings($config);
+        $results = array();
 
-        if ($validated_timeout !== intval($timeout))
-        {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN API: Timeout value adjusted from ' . $timeout . ' to ' . $validated_timeout);
+        foreach ($result_mappings as $dmn_result_field => $mapping) {
+            $result_value = $this->find_result_value($dmn_result_field, $final_variables);
+
+            if ($result_value !== null) {
+                // Handle boolean conversion (DMN often returns 1/0 instead of true/false)
+                if (is_numeric($result_value) && ($result_value === 1 || $result_value === 0 || $result_value === '1' || $result_value === '0')) {
+                    $result_value = (bool) $result_value;
+                }
+
+                $results[$dmn_result_field] = array(
+                    'value' => $result_value,
+                    'field_id' => $mapping['field_id']
+                );
+
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('Operaton DMN API: Extracted result for ' . $dmn_result_field . ': ' . print_r($result_value, true));
+                }
+            } else {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('Operaton DMN API: No result found for ' . $dmn_result_field);
+                }
             }
         }
 
-        $this->connection_timeout = $validated_timeout;
-
-        // Save to database for persistence
-        $update_result = update_option('operaton_dmn_connection_timeout', $validated_timeout);
-
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Connection timeout updated to ' . $validated_timeout . ' seconds');
-        }
-
-        return $update_result;
+        return $results;
     }
 
-    // =============================================================================
-    // UTILITY & HELPER METHODS
-    // =============================================================================
-
     /**
-     * Clear all API-related caches and transients
+     * Find result value in complex variable structures
+     * Searches through nested process variables to find result values
      *
-     * Removes all cached data related to API operations including connectivity
-     * test results, configuration caches, and performance data. Used for
-     * troubleshooting and ensuring fresh data retrieval.
-     *
-     * @return int Number of cache entries cleared
+     * @param string $field_name Field name to search for
+     * @param array $variables Process variables
+     * @return mixed|null Found value or null
      * @since 1.0.0
      */
-    public function clear_api_caches()
+    private function find_result_value($field_name, $variables)
     {
-        global $wpdb;
+        // Strategy 1: Direct variable access
+        if (isset($variables[$field_name]['value'])) {
+            return $variables[$field_name]['value'];
+        } elseif (isset($variables[$field_name])) {
+            return $variables[$field_name];
+        }
 
-        $cleared = 0;
-
-        // Clear WordPress transients with our prefix
-        $transient_patterns = array(
-            'operaton_dmn_api_%',
-            'operaton_dmn_connectivity_%',
-            'operaton_dmn_config_%',
-            'operaton_dmn_performance_%'
+        // Strategy 2: Search in nested result objects
+        $possible_containers = array(
+            'heusdenpasResult',
+            'kindpakketResult',
+            'finalResult',
+            'autoApprovalResult',
+            'knockoffsResult'
         );
 
-        foreach ($transient_patterns as $pattern)
-        {
-            $query = $wpdb->prepare(
-                "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
-                '_transient_' . $pattern,
-                '_transient_timeout_' . $pattern
-            );
+        foreach ($possible_containers as $container) {
+            if (isset($variables[$container]['value']) && is_array($variables[$container]['value'])) {
+                $container_data = $variables[$container]['value'];
 
-            $result = $wpdb->query($query);
-            if ($result !== false)
-            {
-                $cleared += $result;
+                // Check if it's an array of results
+                if (isset($container_data[0]) && is_array($container_data[0])) {
+                    if (isset($container_data[0][$field_name])) {
+                        return $container_data[0][$field_name];
+                    }
+                } elseif (isset($container_data[$field_name])) {
+                    return $container_data[$field_name];
+                }
             }
         }
 
-        // Clear object cache if available
-        if (function_exists('wp_cache_flush'))
-        {
-            wp_cache_flush();
+        // Strategy 3: Comprehensive search through all variables
+        foreach ($variables as $var_name => $var_data) {
+            if (isset($var_data['value']) && is_array($var_data['value'])) {
+                if (isset($var_data['value'][0]) && is_array($var_data['value'][0])) {
+                    if (isset($var_data['value'][0][$field_name])) {
+                        return $var_data['value'][0][$field_name];
+                    }
+                }
+            }
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Cleared ' . $cleared . ' cache entries');
-        }
-
-        return $cleared;
+        return null;
     }
 
     /**
-     * Log debug message with timestamp and context
+     * Extract results from direct decision evaluation response
+     * Processes DMN decision table results based on configuration
      *
-     * Provides consistent debug logging with timestamp, context, and proper
-     * formatting for API-related debug messages. Only logs when WP_DEBUG
-     * is enabled to prevent log pollution in production.
-     *
-     * @param string $message Debug message to log
-     * @param array $context Optional context data to include
+     * @param array $result_mappings Result mapping configuration
+     * @param array $data API response data
+     * @return array Extracted results
      * @since 1.0.0
      */
-    private function log_debug($message, $context = array())
+    private function extract_decision_results($result_mappings, $data)
     {
-        if (!defined('WP_DEBUG') || !WP_DEBUG)
-        {
-            return;
+        $results = array();
+
+        foreach ($result_mappings as $dmn_result_field => $mapping) {
+            $result_value = null;
+
+            if (isset($data[0][$dmn_result_field]['value'])) {
+                $result_value = $data[0][$dmn_result_field]['value'];
+            } elseif (isset($data[0][$dmn_result_field])) {
+                $result_value = $data[0][$dmn_result_field];
+            }
+
+            if ($result_value !== null) {
+                $results[$dmn_result_field] = array(
+                    'value' => $result_value,
+                    'field_id' => $mapping['field_id']
+                );
+            }
         }
 
-        $timestamp = current_time('Y-m-d H:i:s');
-        $formatted_message = sprintf('[%s] Operaton DMN API: %s', $timestamp, $message);
-
-        if (!empty($context))
-        {
-            $formatted_message .= ' | Context: ' . json_encode($context);
-        }
-
-        error_log($formatted_message);
+        return $results;
     }
 
     /**
-     * Check if string is valid JSON
+     * Parse result mappings from configuration
+     * Extracts and validates result mappings configuration
      *
-     * Validates whether a string contains valid JSON data without
-     * attempting to decode it. Useful for validation before processing.
-     *
-     * @param string $string String to validate
-     * @return bool True if string is valid JSON
+     * @param object $config Configuration object
+     * @return array Parsed result mappings
      * @since 1.0.0
      */
-    private function is_valid_json($string)
+    private function parse_result_mappings($config)
     {
-        if (!is_string($string))
-        {
-            return false;
+        $result_mappings = json_decode($config->result_mappings, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return array();
         }
-
-        json_decode($string);
-        return json_last_error() === JSON_ERROR_NONE;
+        return $result_mappings;
     }
 
     /**
-     * Get default configuration values
+     * Get engine REST base URL from endpoint configuration
+     * Extracts base engine-rest URL from various endpoint formats
      *
-     * Provides default configuration values for new configurations to ensure
-     * consistent initialization and prevent undefined property errors.
-     *
-     * @return array Default configuration values
+     * @param string $endpoint_url Configured endpoint URL
+     * @return string Base engine-rest URL
      * @since 1.0.0
      */
-    public function get_default_configuration_values()
+    private function get_engine_rest_base_url($endpoint_url)
+    {
+        $base_url = rtrim($endpoint_url, '/');
+        $base_url = str_replace('/decision-definition/key', '', $base_url);
+        $base_url = str_replace('/decision-definition', '', $base_url);
+
+        if (strpos($base_url, '/engine-rest') === false) {
+            $base_url .= '/engine-rest';
+        }
+
+        return $base_url;
+    }
+
+    /**
+     * Format evaluation time for display with timezone handling
+     * Converts ISO timestamps to WordPress timezone for user-friendly display
+     *
+     * @param string $iso_timestamp ISO format timestamp from Operaton API
+     * @return string Formatted timestamp in site timezone
+     * @since 1.0.0
+     */
+    private function format_evaluation_time($iso_timestamp)
+    {
+        if (empty($iso_timestamp)) {
+            return 'Unknown';
+        }
+
+        try {
+            // Parse the ISO timestamp
+            $datetime = new DateTime($iso_timestamp);
+
+            // Convert to WordPress site timezone
+            $wp_timezone = wp_timezone();
+            $datetime->setTimezone($wp_timezone);
+
+            // Format in a user-friendly way
+            $formatted_date = $datetime->format('Y-m-d H:i:s');
+            $timezone_name = $datetime->format('T');
+
+            return $formatted_date . ' (' . $timezone_name . ')';
+        } catch (Exception $e) {
+            // Fallback: just clean up the original timestamp
+            return str_replace(['T', '+0000'], [' ', ' UTC'], $iso_timestamp);
+        }
+    }
+
+    /**
+     * Get standard API headers for Operaton requests
+     * Returns consistent headers for all API calls
+     *
+     * @return array API headers
+     * @since 1.0.0
+     */
+    private function get_api_headers()
     {
         return array(
-            'dmn_endpoint' => '',
-            'decision_key' => '',
-            'process_key' => '',
-            'field_mappings' => '{}',
-            'result_mappings' => '{}',
-            'use_process' => false,
-            'show_decision_flow' => false,
-            'active' => true,
-            'evaluation_step' => 'auto'
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+            'User-Agent' => 'WordPress/' . get_bloginfo('version') . '; Operaton DMN Plugin/' . OPERATON_DMN_VERSION
         );
     }
 
     /**
-     * Merge configuration with defaults
+     * Check if debug mode is enabled
+     * Determines if debug information should be included in responses
      *
-     * Merges provided configuration with default values to ensure all
-     * required fields are present with appropriate fallback values.
-     *
-     * @param array $config Configuration array to merge
-     * @return array Complete configuration with defaults applied
+     * @return bool True if debug mode is enabled
      * @since 1.0.0
      */
-    public function merge_configuration_with_defaults($config)
+    private function get_debug_info()
     {
-        $defaults = $this->get_default_configuration_values();
-        return array_merge($defaults, $config);
+        return defined('WP_DEBUG') && WP_DEBUG;
+    }
+
+    /**
+     * Set API timeout for external requests
+     * Allows configuration of API timeout settings
+     *
+     * @param int $timeout Timeout in seconds
+     * @since 1.0.0
+     */
+    public function set_api_timeout($timeout)
+    {
+        $this->api_timeout = max(5, min(60, intval($timeout))); // Between 5 and 60 seconds
+    }
+
+    /**
+     * Set SSL verification setting
+     * Allows configuration of SSL verification for API calls
+     *
+     * @param bool $verify Whether to verify SSL certificates
+     * @since 1.0.0
+     */
+    public function set_ssl_verify($verify)
+    {
+        $this->ssl_verify = (bool) $verify;
+    }
+
+    /**
+     * Get API configuration status
+     * Returns current API configuration for debugging
+     *
+     * @return array API configuration status
+     * @since 1.0.0
+     */
+    public function get_api_status()
+    {
+        return array(
+            'timeout' => $this->api_timeout,
+            'ssl_verify' => $this->ssl_verify,
+            'debug_enabled' => $this->get_debug_info(),
+            'hooks_registered' => array(
+                'rest_api_init' => has_action('rest_api_init', array($this, 'register_rest_routes')),
+                'ajax_handlers' => array(
+                    'test_endpoint' => has_action('wp_ajax_operaton_test_endpoint', array($this, 'ajax_test_endpoint')),
+                    'test_full_config' => has_action('wp_ajax_operaton_test_full_config', array($this, 'ajax_test_full_config')),
+                    'clear_update_cache' => has_action('wp_ajax_operaton_clear_update_cache', array($this, 'ajax_clear_update_cache'))
+                )
+            )
+        );
+    }
+
+    /**
+     * Validate API configuration
+     * Checks if API is properly configured
+     *
+     * @return array|WP_Error Validation results or error
+     * @since 1.0.0
+     */
+    public function validate_configuration()
+    {
+        $issues = array();
+
+        // Check database connection
+        if (!$this->database) {
+            $issues[] = __('Database manager not initialized', 'operaton-dmn');
+        }
+
+        // Check core plugin connection
+        if (!$this->core) {
+            $issues[] = __('Core plugin instance not available', 'operaton-dmn');
+        }
+
+        // Check if REST API is accessible
+        $rest_url = rest_url('operaton-dmn/v1/test');
+        $response = wp_remote_get($rest_url, array('timeout' => 5));
+
+        if (is_wp_error($response)) {
+            $issues[] = sprintf(__('REST API not accessible: %s', 'operaton-dmn'), $response->get_error_message());
+        }
+
+        if (!empty($issues)) {
+            return new WP_Error('api_configuration_error', implode('; ', $issues), $issues);
+        }
+
+        return array(
+            'status' => 'ok',
+            'message' => __('API configuration is valid', 'operaton-dmn'),
+            'endpoints' => array(
+                'evaluate' => rest_url('operaton-dmn/v1/evaluate'),
+                'test' => rest_url('operaton-dmn/v1/test'),
+                'decision_flow' => rest_url('operaton-dmn/v1/decision-flow/{form_id}')
+            )
+        );
+    }
+
+    /**
+     * Get core plugin instance for external access
+     * Provides access to core plugin functionality
+     *
+     * @return OperatonDMNEvaluator Core plugin instance
+     * @since 1.0.0
+     */
+    public function get_core_instance()
+    {
+        return $this->core;
+    }
+
+    /**
+     * Get database manager instance for external access
+     * Provides access to database functionality
+     *
+     * @return Operaton_DMN_Database Database manager instance
+     * @since 1.0.0
+     */
+    public function get_database_instance()
+    {
+        return $this->database;
     }
 }

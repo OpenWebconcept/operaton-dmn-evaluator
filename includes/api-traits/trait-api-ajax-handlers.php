@@ -1,210 +1,105 @@
 <?php
 
 /**
- * Operaton DMN API AJAX Handlers Trait
+ * AJAX handlers trait for Operaton DMN Plugin
  *
- * Contains all AJAX handler methods for admin interface integration
- * including endpoint testing, configuration validation, and debug operations.
+ * Contains all AJAX endpoint handlers for admin functionality including
+ * endpoint testing, configuration validation, and debug operations.
  *
  * @package OperatonDMN
- * @subpackage API\Traits
  * @since 1.0.0
  */
 
 // Prevent direct access
-if (!defined('ABSPATH'))
-{
+if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * AJAX handlers trait for admin interface integration
- *
- * Provides AJAX endpoint handlers for configuration testing, validation,
- * debugging, and administrative functions used by the WordPress admin interface.
- *
- * @since 1.0.0
- */
-trait Operaton_DMN_API_Ajax_Handlers
+trait Operaton_DMN_API_AJAX_Handlers
 {
-    // =============================================================================
-    // AJAX HANDLERS - ADMIN INTERFACE INTEGRATION
-    // =============================================================================
-
     /**
-     * AJAX handler for endpoint connectivity testing
-     *
-     * Tests basic connectivity to a DMN endpoint with minimal payload.
-     * Provides quick validation of endpoint accessibility and basic authentication.
-     * Used by admin interface for initial endpoint validation.
+     * AJAX handler for testing DMN endpoint connectivity and basic response validation
+     * Validates endpoint accessibility using OPTIONS or HEAD requests for configuration testing
      *
      * @since 1.0.0
      */
     public function ajax_test_endpoint()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: AJAX endpoint test initiated');
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN API: Testing endpoint connectivity');
         }
 
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
-        {
-            wp_send_json_error(array(
-                'message' => __('Insufficient permissions', 'operaton-dmn')
-            ));
+        // Verify nonce and permissions
+        if (!wp_verify_nonce($_POST['nonce'], 'operaton_test_endpoint') || !current_user_can('manage_options')) {
+            wp_die(__('Security check failed', 'operaton-dmn'));
         }
 
         $endpoint = sanitize_url($_POST['endpoint']);
-        if (empty($endpoint))
-        {
+
+        if (empty($endpoint)) {
             wp_send_json_error(array(
-                'message' => __('Endpoint URL is required', 'operaton-dmn')
+                'message' => __('Endpoint URL is required.', 'operaton-dmn')
             ));
         }
 
-        // Test basic connectivity
-        $test_url = rtrim($endpoint, '/') . '/engine-rest/version';
-        $response = $this->make_api_call($test_url, array(), 'GET');
+        // Test the endpoint
+        $test_result = $this->test_endpoint_connectivity($endpoint);
 
-        if (is_wp_error($response))
-        {
-            wp_send_json_error(array(
-                'message' => $response->get_error_message(),
-                'endpoint' => $endpoint
-            ));
-        }
-
-        wp_send_json_success(array(
-            'message' => __('Endpoint connectivity test successful', 'operaton-dmn'),
-            'endpoint' => $endpoint,
-            'engine_version' => isset($response['version']) ? $response['version'] : 'Unknown'
-        ));
-    }
-
-    /**
-     * AJAX handler for comprehensive configuration testing
-     *
-     * Performs complete configuration validation including endpoint connectivity,
-     * decision key availability, field mapping validation, and sample evaluation
-     * execution. Provides detailed feedback for troubleshooting configuration issues.
-     *
-     * @since 1.0.0
-     */
-    public function ajax_test_configuration_complete()
-    {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Complete configuration test initiated');
-        }
-
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
-        {
-            wp_send_json_error(array(
-                'message' => __('Insufficient permissions', 'operaton-dmn')
-            ));
-        }
-
-        $config_id = intval($_POST['config_id']);
-        if (empty($config_id))
-        {
-            wp_send_json_error(array(
-                'message' => __('Configuration ID is required', 'operaton-dmn')
-            ));
-        }
-
-        $config = $this->database->get_configuration($config_id);
-        if (!$config)
-        {
-            wp_send_json_error(array(
-                'message' => __('Configuration not found', 'operaton-dmn')
-            ));
-        }
-
-        // Determine test method based on configuration
-        $use_process = isset($config->use_process) ? $config->use_process : false;
-
-        if ($use_process && !empty($config->process_key))
-        {
-            $test_result = $this->test_process_configuration_comprehensive($config);
-        }
-        else
-        {
-            $test_result = $this->test_decision_configuration_comprehensive($config);
-        }
-
-        if ($test_result['success'])
-        {
+        if ($test_result['success']) {
             wp_send_json_success($test_result);
-        }
-        else
-        {
+        } else {
             wp_send_json_error($test_result);
         }
     }
 
     /**
-     * AJAX handler for full endpoint and decision key configuration testing
-     *
-     * Legacy AJAX handler that provides backward compatibility for existing
-     * admin interfaces. Performs endpoint connectivity and decision key validation
-     * with comprehensive error reporting.
+     * AJAX handler for comprehensive endpoint configuration testing with DMN payload validation
+     * Tests complete endpoint setup including decision key validation and response parsing
      *
      * @since 1.0.0
      */
     public function ajax_test_full_config()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Full config test initiated');
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Operaton DMN API: Testing full configuration');
         }
 
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
-        {
-            wp_send_json_error(array(
-                'message' => __('Insufficient permissions', 'operaton-dmn')
-            ));
+        // Verify nonce and permissions
+        if (!wp_verify_nonce($_POST['nonce'], 'operaton_test_endpoint') || !current_user_can('manage_options')) {
+            wp_die(__('Security check failed', 'operaton-dmn'));
         }
 
         $base_endpoint = sanitize_url($_POST['base_endpoint']);
         $decision_key = sanitize_text_field($_POST['decision_key']);
 
-        if (empty($base_endpoint) || empty($decision_key))
-        {
+        if (empty($base_endpoint) || empty($decision_key)) {
             wp_send_json_error(array(
-                'message' => __('Base endpoint and decision key are required', 'operaton-dmn')
+                'message' => __('Both base endpoint and decision key are required.', 'operaton-dmn')
             ));
         }
 
         $test_result = $this->test_full_endpoint_configuration($base_endpoint, $decision_key);
 
-        if ($test_result['success'])
-        {
+        if ($test_result['success']) {
             wp_send_json_success($test_result);
-        }
-        else
-        {
+        } else {
             wp_send_json_error($test_result);
         }
     }
 
     /**
      * AJAX handler for clearing WordPress update cache and forcing update checks
-     *
-     * Removes cached update information to trigger fresh plugin update detection.
-     * Clears WordPress update transients and forces a fresh check for plugin
-     * updates. Used by admin interface for manual update cache management.
+     * Removes cached update information to trigger fresh plugin update detection
      *
      * @since 1.0.0
      */
     public function ajax_clear_update_cache()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN API: Clearing update cache');
         }
 
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
-        {
+        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce')) {
             wp_send_json_error(array(
                 'message' => __('Insufficient permissions', 'operaton-dmn')
             ));
@@ -224,26 +119,79 @@ trait Operaton_DMN_API_Ajax_Handlers
     }
 
     /**
-     * AJAX handler for comprehensive DMN debug operations
+     * AJAX handler for debug tests
+     * Handles debug test execution requests
      *
-     * Provides detailed debugging information including server configuration,
-     * plugin initialization status, REST API availability, and API connectivity tests.
-     * Used by debug interface for comprehensive system diagnostics.
+     * @since 1.0.0
+     */
+    public function run_operaton_dmn_debug()
+    {
+        if (!current_user_can('manage_options'))
+        {
+            wp_send_json_error('Unauthorized');
+            return;
+        }
+
+        try
+        {
+            error_log("Starting Operaton DMN REST API Debug Session");
+
+            $results = array();
+            $results['server_config'] = $this->test_server_config();
+            $results['plugin_init'] = $this->test_plugin_initialization();
+            $results['rest_api'] = $this->test_rest_api_availability();
+            $results['api_call'] = $this->test_rest_api_call();
+
+            error_log("=== END OPERATON DMN DEBUG ===");
+
+            wp_send_json_success(array(
+                'message' => 'Debug completed successfully',
+                'results' => $results,
+                'check_logs' => 'See error log for detailed output'
+            ));
+        }
+        catch (Exception $e)
+        {
+            error_log("Debug error: " . $e->getMessage());
+            wp_send_json_error('Debug failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Handle AJAX request for DMN debug tests
+     * Main AJAX handler for comprehensive debug testing
      *
      * @since 1.0.0
      */
     public function handle_dmn_debug_ajax()
     {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
+        {
+            wp_send_json_error('Invalid nonce');
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options'))
+        {
+            wp_send_json_error('Insufficient permissions');
+        }
+
         try
         {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN API: Debug AJAX handler called');
-            }
+            // Call your existing debug method and capture any output
+            ob_start();
+            $this->run_operaton_dmn_debug();
+            $debug_output = ob_get_clean();
+
+            // Also get the debug results if your method returns them
+            // You might want to modify run_operaton_dmn_debug to return structured data
 
             wp_send_json_success([
-                'message' => 'Debug test completed successfully',
-                'debug_data' => [
+                'message' => 'Debug completed successfully',
+                'check_logs' => 'See error log for detailed output',
+                'timestamp' => current_time('mysql'),
+                'results' => [
                     'server_config' => [
                         'allow_url_fopen' => ini_get('allow_url_fopen') ? 'Enabled' : 'Disabled',
                         'curl_available' => function_exists('curl_init') ? 'Available' : 'Not Available',
@@ -267,33 +215,63 @@ trait Operaton_DMN_API_Ajax_Handlers
     }
 
     /**
-     * Public AJAX handler for DMN debug operations
-     *
-     * Provides public access to basic debug functionality for testing
-     * REST API accessibility from frontend contexts. Used for connectivity
-     * validation from public-facing forms and interfaces.
+     * AJAX handler for testing complete configuration
+     * Enhanced version of the existing test functionality
      *
      * @since 1.0.0
      */
-    public function run_operaton_dmn_debug()
+    public function ajax_test_configuration_complete()
     {
+        // Prevent any output before JSON response
+        ob_clean();
+
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
+            error_log('Operaton DMN API: Testing complete configuration via AJAX');
+        }
+
+        // Verify nonce and permissions
+        if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce') || !current_user_can('manage_options'))
+        {
+            wp_send_json_error(array(
+                'message' => __('Security check failed', 'operaton-dmn')
+            ));
+            return;
+        }
+
+        $config_id = intval($_POST['config_id']);
+
+        if (empty($config_id))
+        {
+            wp_send_json_error(array(
+                'message' => __('Configuration ID is required', 'operaton-dmn')
+            ));
+            return;
+        }
+
         try
         {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN API: Public debug handler called');
-            }
+            $test_result = $this->test_configuration_complete($config_id);
 
-            wp_send_json_success([
-                'message' => 'Public debug test completed',
-                'rest_api_available' => rest_url('operaton-dmn/v1/') ? true : false,
-                'timestamp' => current_time('mysql')
-            ]);
+            if ($test_result['success'])
+            {
+                wp_send_json_success($test_result);
+            }
+            else
+            {
+                wp_send_json_error($test_result);
+            }
         }
         catch (Exception $e)
         {
-            error_log('Operaton DMN Public Debug Error: ' . $e->getMessage());
-            wp_send_json_error('Public debug test failed: ' . $e->getMessage());
+            if (defined('WP_DEBUG') && WP_DEBUG)
+            {
+                error_log('Test configuration error: ' . $e->getMessage());
+            }
+
+            wp_send_json_error(array(
+                'message' => 'Test execution failed: ' . $e->getMessage()
+            ));
         }
     }
 }

@@ -1,41 +1,25 @@
 <?php
 
 /**
- * Operaton DMN API Core Trait
+ * Core API functionality trait for Operaton DMN Plugin
  *
- * Handles core class properties, constructor, and fundamental WordPress
- * integration including hooks setup and timeout management.
+ * Contains constructor, properties initialization, and core setup methods.
+ * Handles the fundamental API initialization and dependency injection.
  *
  * @package OperatonDMN
- * @subpackage API\Traits
  * @since 1.0.0
  */
 
 // Prevent direct access
-if (!defined('ABSPATH'))
-{
+if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Core API functionality trait
- *
- * Provides the fundamental class properties, constructor logic, and
- * WordPress integration setup for the DMN API manager.
- *
- * @since 1.0.0
- */
 trait Operaton_DMN_API_Core
 {
-    // =============================================================================
-    // CLASS PROPERTIES & CONFIGURATION
-    // =============================================================================
-
     /**
      * Core plugin instance reference
-     *
-     * Provides access to centralized plugin functionality and manager instances
-     * for coordinated operations across the plugin ecosystem.
+     * Provides access to main plugin functionality and configuration
      *
      * @var OperatonDMNEvaluator
      * @since 1.0.0
@@ -43,10 +27,8 @@ trait Operaton_DMN_API_Core
     private $core;
 
     /**
-     * Database manager instance reference
-     *
-     * Handles configuration storage, retrieval, caching, and data persistence
-     * operations for DMN configurations and evaluation results.
+     * Database manager instance
+     * Handles configuration retrieval and process tracking
      *
      * @var Operaton_DMN_Database
      * @since 1.0.0
@@ -54,27 +36,55 @@ trait Operaton_DMN_API_Core
     private $database;
 
     /**
-     * HTTP connection timeout in seconds
-     *
-     * Configurable timeout for external API calls to Operaton DMN engines.
-     * Initialized from database settings with fallback to default value.
+     * API request timeout in seconds
+     * Default timeout for external API calls
      *
      * @var int
      * @since 1.0.0
      */
-    private $connection_timeout = 30;
+    private $api_timeout = 30;
 
-    // =============================================================================
-    // CORE INITIALIZATION & WORDPRESS INTEGRATION
-    // =============================================================================
+    /**
+     * SSL verification setting for API calls
+     * Should be true in production, false for development
+     *
+     * @var bool
+     * @since 1.0.0
+     */
+    private $ssl_verify = false;
+
+    /**
+     * HTTP connection pool for reusing connections to the same host
+     * @var array
+     */
+    private static $connection_pool = array();
+
+    /**
+     * Connection pool statistics for monitoring
+     * @var array
+     */
+    private static $pool_stats = array(
+        'hits' => 0,
+        'misses' => 0,
+        'created' => 0,
+        'cleaned' => 0
+    );
+
+    /**
+     * Maximum age for pooled connections (in seconds)
+     * @var int
+     */
+    private $connection_max_age = 300; // 5 minutes
+
+    /**
+     * Maximum number of connections per host
+     * @var int
+     */
+    private $max_connections_per_host = 3;
 
     /**
      * Constructor for API handler
-     *
-     * Initializes API functionality with required dependencies including core
-     * plugin instance and database manager. Sets up connection timeout from
-     * saved settings and initializes WordPress hooks for REST API routes and
-     * AJAX handlers.
+     * Initializes API functionality with required dependencies
      *
      * @param OperatonDMNEvaluator $core Core plugin instance
      * @param Operaton_DMN_Database $database Database manager instance
@@ -88,8 +98,7 @@ trait Operaton_DMN_API_Core
         // Initialize connection timeout from saved setting
         $this->init_connection_timeout();
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Operaton DMN API: Handler initialized');
         }
 
@@ -98,11 +107,7 @@ trait Operaton_DMN_API_Core
 
     /**
      * Initialize WordPress hooks for API functionality
-     *
-     * Sets up REST API routes and AJAX handlers for evaluation requests,
-     * configuration testing, debug operations, decision flow endpoints,
-     * and administrative functions. Registers both authenticated and
-     * public AJAX handlers as needed.
+     * Sets up REST API routes and AJAX handlers
      *
      * @since 1.0.0
      */
@@ -117,7 +122,7 @@ trait Operaton_DMN_API_Core
         add_action('wp_ajax_operaton_test_full_config', array($this, 'ajax_test_full_config'));
         add_action('wp_ajax_operaton_clear_update_cache', array($this, 'ajax_clear_update_cache'));
 
-        // Enhanced configuration testing
+        // NEW: Enhanced configuration testing
         add_action('wp_ajax_operaton_test_configuration_complete', array($this, 'ajax_test_configuration_complete'));
 
         // API Debug tests
@@ -129,22 +134,14 @@ trait Operaton_DMN_API_Core
     }
 
     /**
-     * Initialize connection timeout from database settings
-     *
-     * Loads connection timeout setting from database with fallback to default
-     * value of 30 seconds. Ensures timeout is within reasonable bounds to
-     * prevent excessively long waits or premature timeouts.
+     * Initialize connection timeout from saved setting
+     * Retrieves and applies saved timeout configuration
      *
      * @since 1.0.0
      */
     private function init_connection_timeout()
     {
-        $timeout = get_option('operaton_dmn_connection_timeout', 30);
-        $this->connection_timeout = max(5, min(300, intval($timeout))); // Between 5-300 seconds
-
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Connection timeout initialized to ' . $this->connection_timeout . ' seconds');
-        }
+        $saved_timeout = get_option('operaton_connection_timeout', 300);
+        $this->set_connection_pool_timeout($saved_timeout);
     }
 }
