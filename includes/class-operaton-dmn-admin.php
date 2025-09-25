@@ -10,6 +10,7 @@
  * @since 1.0.0
  */
 
+
 // Prevent direct access
 if (!defined('ABSPATH'))
 {
@@ -128,13 +129,15 @@ class Operaton_DMN_Admin
     {
         error_log('AJAX clear_all_cache called'); // Add this line first
         // Security check
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
+        {
             wp_send_json_error(array('message' => 'Insufficient permissions or invalid nonce'));
             return;
         }
         error_log('Security check passed, proceeding with cache clear'); // Add this line
 
-        try {
+        try
+        {
             global $wpdb;
 
             $stats = array(
@@ -148,7 +151,8 @@ class Operaton_DMN_Admin
             $stats['transients_cleared'] = $transients_deleted + $timeout_deleted;
 
             // 2. Clear object cache if available
-            if (function_exists('wp_cache_flush')) {
+            if (function_exists('wp_cache_flush'))
+            {
                 wp_cache_flush();
             }
 
@@ -159,14 +163,18 @@ class Operaton_DMN_Admin
             $plugin_instance = OperatonDMNEvaluator::get_instance();
             $database = $plugin_instance->get_database_instance();
 
-            if ($database && method_exists($database, 'force_reload_all_configurations')) {
+            if ($database && method_exists($database, 'force_reload_all_configurations'))
+            {
                 $stats['configs_reloaded'] = $database->force_reload_all_configurations();
-            } elseif ($database && method_exists($database, 'clear_configuration_cache')) {
+            }
+            elseif ($database && method_exists($database, 'clear_configuration_cache'))
+            {
                 $database->clear_configuration_cache();
 
                 // Manually count configurations
                 $configs_table = $wpdb->prefix . 'operaton_dmn_configs';
-                if ($wpdb->get_var("SHOW TABLES LIKE '{$configs_table}'") === $configs_table) {
+                if ($wpdb->get_var("SHOW TABLES LIKE '{$configs_table}'") === $configs_table)
+                {
                     $stats['configs_reloaded'] = $wpdb->get_var("SELECT COUNT(*) FROM {$configs_table}");
                 }
             }
@@ -183,7 +191,9 @@ class Operaton_DMN_Admin
                 'transients_cleared' => $stats['transients_cleared'],
                 'configs_reloaded' => $stats['configs_reloaded']
             ));
-        } catch (Exception $e) {
+        }
+        catch (Exception $e)
+        {
             error_log('Operaton DMN: Cache clear failed - ' . $e->getMessage());
             wp_send_json_error(array('message' => 'Cache clear failed: ' . $e->getMessage()));
         }
@@ -195,16 +205,19 @@ class Operaton_DMN_Admin
     public function ajax_force_reload_configs()
     {
         // Security check
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
+        {
             wp_send_json_error(array('message' => 'Insufficient permissions or invalid nonce'));
             return;
         }
 
-        try {
+        try
+        {
             $plugin_instance = OperatonDMNEvaluator::get_instance();
             $database = $plugin_instance->get_database_instance();
 
-            if (!$database) {
+            if (!$database)
+            {
                 wp_send_json_error(array('message' => 'Database manager not available'));
                 return;
             }
@@ -212,25 +225,32 @@ class Operaton_DMN_Admin
             $configs_reloaded = 0;
 
             // Method 1: Use database manager's force reload if available
-            if (method_exists($database, 'force_reload_all_configurations')) {
+            if (method_exists($database, 'force_reload_all_configurations'))
+            {
                 $configs_reloaded = $database->force_reload_all_configurations();
-            } else {
+            }
+            else
+            {
                 // Method 2: Manual force reload
                 global $wpdb;
                 $configs_table = $wpdb->prefix . 'operaton_dmn_configs';
 
-                if ($wpdb->get_var("SHOW TABLES LIKE '{$configs_table}'") === $configs_table) {
+                if ($wpdb->get_var("SHOW TABLES LIKE '{$configs_table}'") === $configs_table)
+                {
                     // Get all form IDs with configurations
                     $form_ids = $wpdb->get_col("SELECT DISTINCT form_id FROM {$configs_table}");
 
-                    foreach ($form_ids as $form_id) {
+                    foreach ($form_ids as $form_id)
+                    {
                         // Clear specific cache first
-                        if (method_exists($database, 'clear_configuration_cache')) {
+                        if (method_exists($database, 'clear_configuration_cache'))
+                        {
                             $database->clear_configuration_cache($form_id);
                         }
 
                         // Force reload from database (bypass cache)
-                        if (method_exists($database, 'get_config_by_form_id')) {
+                        if (method_exists($database, 'get_config_by_form_id'))
+                        {
                             $database->get_config_by_form_id($form_id, false);
                             $configs_reloaded++;
                         }
@@ -244,7 +264,9 @@ class Operaton_DMN_Admin
                 'message' => 'Configurations reloaded successfully',
                 'configs_reloaded' => $configs_reloaded
             ));
-        } catch (Exception $e) {
+        }
+        catch (Exception $e)
+        {
             error_log('Operaton DMN: Configuration reload failed - ' . $e->getMessage());
             wp_send_json_error(array('message' => 'Configuration reload failed: ' . $e->getMessage()));
         }
@@ -256,12 +278,14 @@ class Operaton_DMN_Admin
     public function ajax_clear_decision_cache()
     {
         // Security check
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
+        {
             wp_send_json_error(array('message' => 'Insufficient permissions or invalid nonce'));
             return;
         }
 
-        try {
+        try
+        {
             // Clear decision flow cache - this replicates what your URL parameter method was doing
             // You can adjust this to match your specific cache clearing logic
 
@@ -281,7 +305,8 @@ class Operaton_DMN_Admin
             $plugin_instance = OperatonDMNEvaluator::get_instance();
             $database = $plugin_instance->get_database_instance();
 
-            if ($database && method_exists($database, 'clear_decision_flow_cache')) {
+            if ($database && method_exists($database, 'clear_decision_flow_cache'))
+            {
                 $database->clear_decision_flow_cache();
             }
 
@@ -291,7 +316,9 @@ class Operaton_DMN_Admin
                 'message' => 'Decision flow cache cleared successfully',
                 'cache_cleared' => true
             ));
-        } catch (Exception $e) {
+        }
+        catch (Exception $e)
+        {
             error_log('Operaton DMN: Decision flow cache clear failed - ' . $e->getMessage());
             wp_send_json_error(array('message' => 'Cache clear failed: ' . $e->getMessage()));
         }
@@ -305,14 +332,16 @@ class Operaton_DMN_Admin
         error_log('AJAX debug_status called - comprehensive version');
 
         // Security check
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
+        {
             wp_send_json_error(array('message' => 'Insufficient permissions or invalid nonce'));
             return;
         }
 
         error_log('Security check passed, building comprehensive status');
 
-        try {
+        try
+        {
             // Initialize the status array with basic info
             $status = array(
                 'plugin_version' => OPERATON_DMN_VERSION,
@@ -320,21 +349,28 @@ class Operaton_DMN_Admin
             );
 
             // Add managers status safely
-            try {
+            try
+            {
                 $status['managers'] = $this->core->get_managers_status();
-            } catch (Exception $e) {
+            }
+            catch (Exception $e)
+            {
                 $status['managers'] = array('error' => 'Could not retrieve managers status: ' . $e->getMessage());
             }
 
             // Add health check safely
-            try {
+            try
+            {
                 $status['health'] = $this->core->health_check();
-            } catch (Exception $e) {
+            }
+            catch (Exception $e)
+            {
                 $status['health'] = array('error' => 'Could not perform health check: ' . $e->getMessage());
             }
 
             // Add assets status safely - using basic WordPress functions instead of missing method
-            try {
+            try
+            {
                 // Create basic assets status without calling the missing method
                 $asset_status = array(
                     'scripts_registered' => array(),
@@ -365,28 +401,36 @@ class Operaton_DMN_Admin
                 );
 
                 // Check script registration status
-                if (isset($wp_scripts->registered)) {
-                    foreach ($operaton_scripts as $script) {
+                if (isset($wp_scripts->registered))
+                {
+                    foreach ($operaton_scripts as $script)
+                    {
                         $asset_status['scripts_registered'][$script] = isset($wp_scripts->registered[$script]);
                     }
                 }
 
                 // Check style registration status
-                if (isset($wp_styles->registered)) {
-                    foreach ($operaton_styles as $style) {
+                if (isset($wp_styles->registered))
+                {
+                    foreach ($operaton_styles as $style)
+                    {
                         $asset_status['styles_registered'][$style] = isset($wp_styles->registered[$style]);
                     }
                 }
 
                 $status['assets'] = $asset_status;
-            } catch (Exception $e) {
+            }
+            catch (Exception $e)
+            {
                 $status['assets'] = array('error' => 'Could not retrieve assets status: ' . $e->getMessage());
             }
 
             // Add performance data safely
             $performance_data = array();
-            if (class_exists('Operaton_DMN_Performance_Monitor')) {
-                try {
+            if (class_exists('Operaton_DMN_Performance_Monitor'))
+            {
+                try
+                {
                     $performance_monitor = Operaton_DMN_Performance_Monitor::get_instance();
                     $performance_summary = $performance_monitor->get_summary();
 
@@ -402,7 +446,8 @@ class Operaton_DMN_Admin
                     );
 
                     // Add initialization timing safely
-                    if (isset($performance_summary['milestones'])) {
+                    if (isset($performance_summary['milestones']))
+                    {
                         $performance_data['initialization_timing'] = array(
                             'plugin_construct' => $this->get_milestone_duration($performance_summary['milestones'], 'plugin_construct'),
                             'assets_manager' => $this->get_milestone_time($performance_summary['milestones'], 'assets_manager_loaded'),
@@ -415,12 +460,16 @@ class Operaton_DMN_Admin
                     // Add performance grade and recommendations safely
                     $performance_data['performance_grade'] = $this->calculate_performance_grade($performance_summary);
                     $performance_data['recommendations'] = $this->get_performance_recommendations($performance_summary);
-                } catch (Exception $e) {
+                }
+                catch (Exception $e)
+                {
                     $performance_data = array(
                         'error' => 'Performance monitor error: ' . $e->getMessage()
                     );
                 }
-            } else {
+            }
+            else
+            {
                 $performance_data = array(
                     'status' => 'Performance monitor class not available'
                 );
@@ -455,7 +504,9 @@ class Operaton_DMN_Admin
 
             error_log('Debug status retrieved successfully');
             wp_send_json_success($status);
-        } catch (Exception $e) {
+        }
+        catch (Exception $e)
+        {
             error_log('Operaton DMN Debug Status Error: ' . $e->getMessage());
             error_log('Error trace: ' . $e->getTraceAsString());
             wp_send_json_error(array('message' => 'Failed to retrieve debug status: ' . $e->getMessage()));
@@ -467,10 +518,13 @@ class Operaton_DMN_Admin
      */
     private function count_configurations()
     {
-        try {
+        try
+        {
             $configs = $this->core->get_database_instance()->get_all_configurations();
             return count($configs);
-        } catch (Exception $e) {
+        }
+        catch (Exception $e)
+        {
             return 0;
         }
     }
@@ -489,7 +543,8 @@ class Operaton_DMN_Admin
             'operaton_dmn_endpoint_status'
         );
 
-        foreach ($transients_to_check as $transient) {
+        foreach ($transients_to_check as $transient)
+        {
             $cache_info[$transient] = get_transient($transient) !== false ? 'Cached' : 'Not cached';
         }
 
@@ -512,7 +567,8 @@ class Operaton_DMN_Admin
         $start_key = $base_name . '_start';
         $end_key = $base_name . '_complete';
 
-        if (isset($milestones[$start_key]) && isset($milestones[$end_key])) {
+        if (isset($milestones[$start_key]) && isset($milestones[$end_key]))
+        {
             return round($milestones[$end_key]['time_ms'] - $milestones[$start_key]['time_ms'], 3);
         }
 
@@ -528,15 +584,24 @@ class Operaton_DMN_Admin
         $memory_mb = $performance_summary['peak_memory'] / (1024 * 1024);
 
         // Grading based on WordPress performance standards
-        if ($total_time < 100 && $memory_mb < 16) {
+        if ($total_time < 100 && $memory_mb < 16)
+        {
             return 'A+ (Excellent)';
-        } elseif ($total_time < 200 && $memory_mb < 32) {
+        }
+        elseif ($total_time < 200 && $memory_mb < 32)
+        {
             return 'A (Very Good)';
-        } elseif ($total_time < 500 && $memory_mb < 64) {
+        }
+        elseif ($total_time < 500 && $memory_mb < 64)
+        {
             return 'B (Good)';
-        } elseif ($total_time < 1000 && $memory_mb < 128) {
+        }
+        elseif ($total_time < 1000 && $memory_mb < 128)
+        {
             return 'C (Acceptable)';
-        } else {
+        }
+        else
+        {
             return 'D (Needs Optimization)';
         }
     }
@@ -550,19 +615,23 @@ class Operaton_DMN_Admin
         $total_time = $performance_summary['total_time_ms'];
         $memory_mb = $performance_summary['peak_memory'] / (1024 * 1024);
 
-        if ($total_time < 100) {
+        if ($total_time < 100)
+        {
             $recommendations[] = '🚀 Excellent loading speed!';
         }
 
-        if ($memory_mb < 16) {
+        if ($memory_mb < 16)
+        {
             $recommendations[] = '🧠 Very efficient memory usage!';
         }
 
-        if ($performance_summary['milestone_count'] > 20) {
+        if ($performance_summary['milestone_count'] > 20)
+        {
             $recommendations[] = '📊 Consider reducing performance monitoring in production';
         }
 
-        if (empty($recommendations)) {
+        if (empty($recommendations))
+        {
             $recommendations[] = '✨ Performance is optimal - no recommendations needed!';
         }
 
@@ -572,11 +641,12 @@ class Operaton_DMN_Admin
     // Add debug button to admin pages
     public function add_debug_button()
     {
-        if (!current_user_can('manage_options') || !defined('WP_DEBUG') || !WP_DEBUG) {
+        if (!current_user_can('manage_options') || !defined('WP_DEBUG') || !WP_DEBUG)
+        {
             return;
         }
 
-        ?>
+?>
         <div style="margin: 20px 0; padding: 15px; background: #f0f8ff; border: 1px solid #0073aa; border-radius: 4px;">
             <h3>🔧 Debug Tools</h3>
             <button type="button" id="operaton-debug-status" class="button">
@@ -605,7 +675,7 @@ class Operaton_DMN_Admin
                 });
             });
         </script>
-        <?php
+    <?php
     }
 
     /**
@@ -650,7 +720,8 @@ class Operaton_DMN_Admin
         );
 
         // Add debug menu in development mode
-        if (defined('WP_DEBUG') && WP_DEBUG) {
+        if (defined('WP_DEBUG') && WP_DEBUG)
+        {
             $this->add_debug_menu();
         }
     }
@@ -718,7 +789,8 @@ class Operaton_DMN_Admin
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
         $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
 
-        if (!in_array('result_mappings', $columns)) {
+        if (!in_array('result_mappings', $columns))
+        {
             echo '<div class="notice notice-error">';
             echo '<p><strong>' . __('Database Update Failed', 'operaton-dmn') . '</strong></p>';
             echo '<p>' . __('The plugin attempted to update the database but it failed. Please contact your administrator.', 'operaton-dmn') . '</p>';
@@ -728,14 +800,16 @@ class Operaton_DMN_Admin
         }
 
         // Check for database update success message
-        if (isset($_GET['database_updated'])) {
+        if (isset($_GET['database_updated']))
+        {
             echo '<div class="notice notice-success is-dismissible">';
             echo '<p>' . __('Database schema updated successfully!', 'operaton-dmn') . '</p>';
             echo '</div>';
         }
 
         // Handle configuration deletion
-        if (isset($_POST['delete_config']) && wp_verify_nonce($_POST['_wpnonce'], 'delete_config')) {
+        if (isset($_POST['delete_config']) && wp_verify_nonce($_POST['_wpnonce'], 'delete_config'))
+        {
             $this->handle_config_deletion($_POST['config_id']);
         }
 
@@ -770,7 +844,8 @@ class Operaton_DMN_Admin
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
         $columns = $wpdb->get_col("SHOW COLUMNS FROM $table_name");
 
-        if (!in_array('result_mappings', $columns)) {
+        if (!in_array('result_mappings', $columns))
+        {
             echo '<div class="wrap">';
             echo '<h1>' . __('Database Update Required', 'operaton-dmn') . '</h1>';
             echo '<div class="notice notice-error">';
@@ -782,7 +857,8 @@ class Operaton_DMN_Admin
         }
 
         // Handle form submission
-        if (isset($_POST['save_config']) && wp_verify_nonce($_POST['_wpnonce'], 'save_config')) {
+        if (isset($_POST['save_config']) && wp_verify_nonce($_POST['_wpnonce'], 'save_config'))
+        {
             $this->handle_config_save($_POST);
         }
 
@@ -849,7 +925,8 @@ class Operaton_DMN_Admin
      */
     private function add_performance_debug_section()
     {
-        if (!class_exists('Operaton_DMN_Performance_Monitor')) {
+        if (!class_exists('Operaton_DMN_Performance_Monitor'))
+        {
             return;
         }
 
@@ -882,13 +959,16 @@ class Operaton_DMN_Admin
         echo '</div>';
 
         // Show recent milestones
-        if (!empty($summary['milestones'])) {
+        if (!empty($summary['milestones']))
+        {
             echo '<h4>Recent Performance Milestones</h4>';
             echo '<div style="max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px;">';
-            foreach (array_slice($summary['milestones'], -10, 10, true) as $name => $milestone) {
+            foreach (array_slice($summary['milestones'], -10, 10, true) as $name => $milestone)
+            {
                 echo '<div style="margin: 5px 0; font-family: monospace; font-size: 12px;">';
                 echo '<strong>' . esc_html($name) . ':</strong> ' . $milestone['time_ms'] . 'ms';
-                if ($milestone['details']) {
+                if ($milestone['details'])
+                {
                     echo ' - ' . esc_html($milestone['details']);
                 }
                 echo '</div>';
@@ -912,7 +992,8 @@ class Operaton_DMN_Admin
         $this->log_verbose('Enqueuing admin scripts', ['hook' => $hook]);
 
         // Only enqueue on our plugin pages
-        if (strpos($hook, 'operaton-dmn') !== false) {
+        if (strpos($hook, 'operaton-dmn') !== false)
+        {
             $this->assets->enqueue_admin_assets($hook);
 
             // Add admin-specific localizations
@@ -942,7 +1023,8 @@ class Operaton_DMN_Admin
         $this->log_standard('Ensuring frontend assets are loaded');
 
         // Only enqueue on frontend
-        if (!is_admin()) {
+        if (!is_admin())
+        {
             // Force enqueue frontend assets to ensure operaton_ajax is available
             $this->assets->enqueue_frontend_assets();
         }
@@ -960,18 +1042,21 @@ class Operaton_DMN_Admin
      */
     public function admin_notices()
     {
-        if (!current_user_can($this->capability)) {
+        if (!current_user_can($this->capability))
+        {
             return;
         }
 
         $this->log_verbose('Checking for admin notices');
 
         $issues = $this->check_plugin_health();
-        if (!empty($issues)) {
+        if (!empty($issues))
+        {
             echo '<div class="notice notice-warning">';
             echo '<p><strong>' . __('Operaton DMN Plugin Issues:', 'operaton-dmn') . '</strong></p>';
             echo '<ul>';
-            foreach ($issues as $issue) {
+            foreach ($issues as $issue)
+            {
                 echo '<li>' . esc_html($issue) . '</li>';
             }
             echo '</ul>';
@@ -1011,9 +1096,12 @@ class Operaton_DMN_Admin
     {
         $result = $this->core->get_database_instance()->delete_config($config_id);
 
-        if ($result !== false) {
+        if ($result !== false)
+        {
             echo '<div class="notice notice-success"><p>' . __('Configuration deleted successfully!', 'operaton-dmn') . '</p></div>';
-        } else {
+        }
+        else
+        {
             echo '<div class="notice notice-error"><p>' . __('Error deleting configuration.', 'operaton-dmn') . '</p></div>';
         }
     }
@@ -1029,7 +1117,8 @@ class Operaton_DMN_Admin
     {
         $result = $this->core->get_database_instance()->save_configuration($data);
 
-        if ($result) {
+        if ($result)
+        {
             echo '<div class="notice notice-success"><p>' . __('Configuration saved successfully!', 'operaton-dmn') . '</p></div>';
         }
         // Error messages are handled by the core class
@@ -1046,7 +1135,8 @@ class Operaton_DMN_Admin
     {
         $gravity_forms_manager = $this->core->get_gravity_forms_instance();
 
-        if (!$gravity_forms_manager || !$gravity_forms_manager->is_gravity_forms_available()) {
+        if (!$gravity_forms_manager || !$gravity_forms_manager->is_gravity_forms_available())
+        {
             $this->log_minimal('Gravity Forms not available');
             return array();
         }
@@ -1066,11 +1156,14 @@ class Operaton_DMN_Admin
     {
         $template_path = OPERATON_DMN_PLUGIN_PATH . "templates/admin/{$template}.php";
 
-        if (file_exists($template_path)) {
+        if (file_exists($template_path))
+        {
             // Extract data for use in template
             extract($data);
             include $template_path;
-        } else {
+        }
+        else
+        {
             $this->log_minimal('Template not found', ['template_path' => $template_path]);
             echo '<div class="notice notice-error"><p>' . sprintf(__('Template not found: %s', 'operaton-dmn'), $template) . '</p></div>';
         }
@@ -1241,20 +1334,24 @@ class Operaton_DMN_Admin
      */
     public function show_update_management_section()
     {
-        if (!current_user_can($this->capability)) {
+        if (!current_user_can($this->capability))
+        {
             return;
         }
 
         $this->log_standard('Displaying update management section');
-        
+
         $current_version = OPERATON_DMN_VERSION;
         $update_plugins = get_site_transient('update_plugins');
         $has_update = false;
         $new_version = '';
 
-        if (isset($update_plugins->response)) {
-            foreach ($update_plugins->response as $plugin => $data) {
-                if (strpos($plugin, 'operaton-dmn') !== false) {
+        if (isset($update_plugins->response))
+        {
+            foreach ($update_plugins->response as $plugin => $data)
+            {
+                if (strpos($plugin, 'operaton-dmn') !== false)
+                {
                     $has_update = true;
                     $new_version = $data->new_version;
                     break;
@@ -1262,7 +1359,7 @@ class Operaton_DMN_Admin
             }
         }
 
-        ?>
+    ?>
         <div class="operaton-update-section" style="background: #f9f9f9; padding: 15px; margin: 20px 0; border-left: 4px solid #0073aa;">
             <h3><?php _e('Plugin Updates', 'operaton-dmn'); ?></h3>
 
@@ -1320,7 +1417,7 @@ class Operaton_DMN_Admin
                 });
             </script>
         </div>
-        <?php
+<?php
     }
 
     /**
