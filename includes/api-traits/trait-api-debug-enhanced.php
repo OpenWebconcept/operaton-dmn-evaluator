@@ -233,7 +233,7 @@ trait Operaton_DMN_API_Debug_Enhanced
      *
      * @return int Current debug level
      */
-    private function get_debug_level()
+    protected function get_debug_level()
     {
         // Use cached value if available
         if (self::$debug_level_cache !== null) {
@@ -297,7 +297,7 @@ trait Operaton_DMN_API_Debug_Enhanced
      * @param int $required_level Minimum level required for logging
      * @return bool True if logging should occur
      */
-    private function should_log($required_level = null)
+    protected function should_log($required_level = null)
     {
         if ($required_level === null) {
             $required_level = static::DEBUG_LEVEL_STANDARD;
@@ -313,7 +313,7 @@ trait Operaton_DMN_API_Debug_Enhanced
      * @param int $level Debug level required
      * @param array $additional_sensitive_keys Additional keys to sanitize
      */
-    private function debug_log($message, $data = null, $level = null, $additional_sensitive_keys = array())
+    protected function debug_log($message, $data = null, $level = null, $additional_sensitive_keys = array())
     {
         if ($level === null) {
             $level = static::DEBUG_LEVEL_STANDARD;
@@ -348,16 +348,32 @@ trait Operaton_DMN_API_Debug_Enhanced
      * @param int $level Debug level
      * @return string Debug prefix
      */
-    private function get_debug_prefix($level)
+    protected function get_debug_prefix($level)
     {
-        $prefixes = array(
-            static::DEBUG_LEVEL_MINIMAL => 'Operaton DMN API [MIN]: ',
-            static::DEBUG_LEVEL_STANDARD => 'Operaton DMN API: ',
-            static::DEBUG_LEVEL_VERBOSE => 'Operaton DMN API [VERBOSE]: ',
-            static::DEBUG_LEVEL_DIAGNOSTIC => 'Operaton DMN API [DIAG]: '
+        // Automatically detect the class context
+        $class_name = get_class($this);
+
+        // Map class names to friendly prefixes
+        $class_prefixes = array(
+            'Operaton_DMN_API' => 'Operaton DMN API',
+            'Operaton_DMN_Admin' => 'Operaton DMN Admin',
+            'Operaton_DMN_Database' => 'Operaton DMN Database',
+            'Operaton_DMN_Assets' => 'Operaton DMN Assets',
+            'Operaton_DMN_Gravity_Forms' => 'Operaton DMN Gravity Forms'
         );
 
-        return $prefixes[$level] ?? 'Operaton DMN API: ';
+        // Get the appropriate prefix for this class
+        $base_prefix = $class_prefixes[$class_name] ?? 'Operaton DMN';
+
+        // Add level indicators
+        $level_suffixes = array(
+            1 => ' [MIN]: ',    // MINIMAL
+            2 => ': ',          // STANDARD
+            3 => ' [VERBOSE]: ', // VERBOSE
+            4 => ' [DIAG]: '     // DIAGNOSTIC
+        );
+
+        return $base_prefix . ($level_suffixes[$level] ?? ': ');
     }
 
     // =============================================================================
