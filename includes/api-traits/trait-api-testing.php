@@ -28,10 +28,8 @@ trait Operaton_DMN_API_Testing
      */
     public function test_full_endpoint_configuration($base_endpoint, $decision_key)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN API: Testing full endpoint configuration for decision: ' . $decision_key);
-        }
-
+        $this->log_standard('Testing full endpoint configuration', ['decision_key' => $decision_key]);
+        
         $full_endpoint = $this->build_evaluation_endpoint($base_endpoint, $decision_key);
 
         // Test with minimal DMN evaluation payload

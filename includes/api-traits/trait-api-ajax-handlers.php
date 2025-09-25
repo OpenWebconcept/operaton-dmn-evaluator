@@ -25,9 +25,7 @@ trait Operaton_DMN_API_AJAX_Handlers
      */
     public function ajax_test_endpoint()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN API: Testing endpoint connectivity');
-        }
+        $this->log_standard('Testing endpoint connectivity');
 
         // Verify nonce and permissions
         if (!wp_verify_nonce($_POST['nonce'], 'operaton_test_endpoint') || !current_user_can('manage_options')) {
@@ -60,9 +58,7 @@ trait Operaton_DMN_API_AJAX_Handlers
      */
     public function ajax_test_full_config()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN API: Testing full configuration');
-        }
+        $this->log_standard('Testing full configuration');
 
         // Verify nonce and permissions
         if (!wp_verify_nonce($_POST['nonce'], 'operaton_test_endpoint') || !current_user_can('manage_options')) {
@@ -95,9 +91,7 @@ trait Operaton_DMN_API_AJAX_Handlers
      */
     public function ajax_clear_update_cache()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN API: Clearing update cache');
-        }
+        $this->log_standard('Clearing update cache');
 
         if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce')) {
             wp_send_json_error(array(
@@ -225,10 +219,7 @@ trait Operaton_DMN_API_AJAX_Handlers
         // Prevent any output before JSON response
         ob_clean();
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Testing complete configuration via AJAX');
-        }
+        $this->log_standard('Testing complete configuration via AJAX');
 
         // Verify nonce and permissions
         if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce') || !current_user_can('manage_options'))
@@ -264,11 +255,12 @@ trait Operaton_DMN_API_AJAX_Handlers
         }
         catch (Exception $e)
         {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Test configuration error: ' . $e->getMessage());
-            }
-
+            $this->log_minimal('Test configuration error occurred', [
+                'error_message' => $e->getMessage(),
+                'error_line' => $e->getLine(),
+                'error_file' => basename($e->getFile())
+            ]);
+            
             wp_send_json_error(array(
                 'message' => 'Test execution failed: ' . $e->getMessage()
             ));

@@ -266,10 +266,8 @@ trait Operaton_DMN_API_REST_Endpoints
     {
         error_log('Operaton DMN API: register_rest_routes() called');
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN API: Registering REST API routes');
-        }
-
+        $this->log_standard('Registering REST API routes');
+        
         // Main evaluation endpoint
         register_rest_route('operaton-dmn/v1', '/evaluate', array(
             'methods' => 'POST',

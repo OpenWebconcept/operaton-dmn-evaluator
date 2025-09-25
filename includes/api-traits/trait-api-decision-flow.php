@@ -47,16 +47,12 @@ trait Operaton_DMN_API_Decision_Flow
      */
     public function get_decision_flow_summary_html($form_id)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN API: Getting decision flow summary for form ' . $form_id);
-        }
+        $this->log_standard('Getting decision flow summary', ['form_id' => $form_id]);
 
         // Check configuration and requirements
         $config = $this->database->get_config_by_form_id($form_id);
         if (!$config || !$config->show_decision_flow || !$config->use_process) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN API: Decision flow not available - not using process execution or disabled');
-            }
+            $this->log_verbose('Decision flow not available - not using process execution or disabled');
 
             return $this->get_decision_flow_placeholder();
         }
@@ -68,9 +64,7 @@ trait Operaton_DMN_API_Decision_Flow
         if (empty($cache_bust)) {
             $cached_result = get_transient($cache_key);
             if ($cached_result !== false) {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('Operaton DMN API: Returning cached decision flow for form ' . $form_id);
-                }
+                $this->log_verbose('Returning cached decision flow', ['form_id' => $form_id]);
                 return $cached_result;
             }
         } else {
@@ -135,9 +129,7 @@ trait Operaton_DMN_API_Decision_Flow
         $history_endpoint = $base_url . '/history/decision-instance';
         $history_url = $history_endpoint . '?processInstanceId=' . $process_instance_id . '&includeInputs=true&includeOutputs=true';
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN API: Getting decision flow from: ' . $history_url);
-        }
+        $this->log_verbose('Getting decision flow from URL', ['url' => $history_url]);
 
         $response = wp_remote_get($history_url, array(
             'headers' => array('Accept' => 'application/json'),
@@ -185,10 +177,8 @@ trait Operaton_DMN_API_Decision_Flow
      */
     private function format_decision_flow_summary($decision_instances, $process_instance_id)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN API: Formatting decision flow summary with ' . count($decision_instances) . ' instances');
-        }
-
+        $this->log_verbose('Formatting decision flow summary', ['instances_count' => count($decision_instances)]);
+        
         $html = '<h3>📋 Decision Flow Results Summary</h3>';
         $html .= '<p><strong>Process Instance:</strong> <code>' . esc_html($process_instance_id) . '</code></p>';
 

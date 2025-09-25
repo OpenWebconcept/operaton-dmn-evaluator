@@ -98,9 +98,7 @@ trait Operaton_DMN_API_Core
         // Initialize connection timeout from saved setting
         $this->init_connection_timeout();
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN API: Handler initialized');
-        }
+        $this->log_standard('Handler initialized');
 
         $this->init_hooks();
     }

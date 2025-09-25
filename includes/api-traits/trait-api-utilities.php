@@ -11,7 +11,8 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH')) {
+if (!defined('ABSPATH'))
+{
     exit;
 }
 
@@ -34,10 +35,9 @@ trait Operaton_DMN_API_Utilities
         {
             self::$pool_stats['hits']++;
             $this->update_connection_stats('hits');  // Wordpress persistence for admin dashboard
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN API: Reusing connection for host: ' . $host);
-            }
+
+            $this->log_verbose('Reusing connection for host', ['host' => $host]);
+
             return $this->get_cached_connection_options($connection_key);
         }
 
@@ -47,10 +47,7 @@ trait Operaton_DMN_API_Utilities
         $this->update_connection_stats('misses'); // Wordpress persistence for admin dashboard
         $this->update_connection_stats('created');
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Creating new connection for host: ' . $host);
-        }
+        $this->log_verbose('Creating new connection for host', ['host' => $host]);
 
         $options = $this->create_optimized_connection_options($host);
         $this->cache_connection($connection_key, $options);
@@ -232,10 +229,7 @@ trait Operaton_DMN_API_Utilities
         if ($cleaned > 0)
         {
             self::$pool_stats['cleaned'] += $cleaned;
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN API: Cleaned ' . $cleaned . ' old connections');
-            }
+            $this->log_verbose('Cleaned old connections', ['count' => $cleaned]);
         }
     }
 
@@ -286,18 +280,12 @@ trait Operaton_DMN_API_Utilities
     {
         $this->connection_max_age = max(60, min(1800, intval($timeout)));
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Connection pool timeout updated to ' . $this->connection_max_age . ' seconds');
-        }
+        $this->log_verbose('Connection pool timeout updated', ['timeout_seconds' => $this->connection_max_age]);
 
         // Clear existing connections to apply new timeout immediately
         $cleared = $this->clear_connection_pool();
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Cleared ' . $cleared . ' connections to apply new timeout');
-        }
+        $this->log_verbose('Cleared connections to apply new timeout', ['count' => $cleared]);
     }
 
     /**
@@ -311,10 +299,7 @@ trait Operaton_DMN_API_Utilities
     {
         $cleared = $this->clear_connection_pool();
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Cleared connection pool for batching optimization: ' . $cleared . ' connections');
-        }
+        $this->log_verbose('Cleared connection pool for batching optimization', ['count' => $cleared]);
 
         return $cleared;
     }
@@ -380,10 +365,7 @@ trait Operaton_DMN_API_Utilities
         self::$connection_pool = array();
         self::$pool_stats['cleaned'] += $cleared;
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Manually cleared ' . $cleared . ' connections');
-        }
+        $this->log_verbose('Manually cleared connections', ['count' => $cleared]);
 
         return $cleared;
     }
@@ -401,10 +383,12 @@ trait Operaton_DMN_API_Utilities
     {
         $variables = array();
 
-        foreach ($field_mappings as $dmn_variable => $form_field) {
+        foreach ($field_mappings as $dmn_variable => $form_field)
+        {
             $value = isset($form_data[$dmn_variable]) ? $form_data[$dmn_variable] : null;
 
-            if ($value === null || $value === 'null' || $value === '') {
+            if ($value === null || $value === 'null' || $value === '')
+            {
                 $variables[$dmn_variable] = array(
                     'value' => null,
                     'type' => $form_field['type']
@@ -414,7 +398,8 @@ trait Operaton_DMN_API_Utilities
 
             // Type conversion with validation
             $converted_value = $this->convert_variable_type($value, $form_field['type'], $dmn_variable);
-            if (is_wp_error($converted_value)) {
+            if (is_wp_error($converted_value))
+            {
                 return $converted_value;
             }
 
@@ -439,9 +424,11 @@ trait Operaton_DMN_API_Utilities
      */
     private function convert_variable_type($value, $type, $variable_name)
     {
-        switch ($type) {
+        switch ($type)
+        {
             case 'Integer':
-                if (!is_numeric($value)) {
+                if (!is_numeric($value))
+                {
                     return new WP_Error(
                         'invalid_type',
                         sprintf(__('Value for %s must be numeric', 'operaton-dmn'), $variable_name),
@@ -451,7 +438,8 @@ trait Operaton_DMN_API_Utilities
                 return intval($value);
 
             case 'Double':
-                if (!is_numeric($value)) {
+                if (!is_numeric($value))
+                {
                     return new WP_Error(
                         'invalid_type',
                         sprintf(__('Value for %s must be numeric', 'operaton-dmn'), $variable_name),
@@ -461,15 +449,22 @@ trait Operaton_DMN_API_Utilities
                 return floatval($value);
 
             case 'Boolean':
-                if (is_string($value)) {
+                if (is_string($value))
+                {
                     $value = strtolower($value);
-                    if ($value === 'true' || $value === '1') {
+                    if ($value === 'true' || $value === '1')
+                    {
                         return true;
-                    } elseif ($value === 'false' || $value === '0') {
+                    }
+                    elseif ($value === 'false' || $value === '0')
+                    {
                         return false;
-                    } else {
+                    }
+                    else
+                    {
                         $converted = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-                        if ($converted === null) {
+                        if ($converted === null)
+                        {
                             return new WP_Error(
                                 'invalid_type',
                                 sprintf(__('Value for %s must be boolean', 'operaton-dmn'), $variable_name),
@@ -497,11 +492,10 @@ trait Operaton_DMN_API_Utilities
      */
     private function build_evaluation_endpoint($base_endpoint, $decision_key)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Building evaluation endpoint for decision: ' . $decision_key);
-            error_log('Operaton DMN API: Input base endpoint: ' . $base_endpoint);
-        }
+        $this->log_verbose('Building evaluation endpoint', [
+            'decision_key' => $decision_key,
+            'base_endpoint' => $base_endpoint
+        ]);
 
         // Normalize base URL - remove any trailing path components that shouldn't be there
         $clean_base_url = rtrim($base_endpoint, '/');
@@ -526,10 +520,7 @@ trait Operaton_DMN_API_Utilities
         // Build the complete evaluation URL
         $evaluation_url = $clean_base_url . '/decision-definition/key/' . $decision_key . '/evaluate';
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Final evaluation endpoint: ' . $evaluation_url);
-        }
+        $this->log_verbose('Final evaluation endpoint built', ['endpoint' => $evaluation_url]);
 
         return $evaluation_url;
     }
@@ -550,7 +541,8 @@ trait Operaton_DMN_API_Utilities
         $base_url = str_replace('/decision-definition/key', '', $base_url);
         $base_url = str_replace('/decision-definition', '', $base_url);
 
-        if (strpos($base_url, '/engine-rest') === false) {
+        if (strpos($base_url, '/engine-rest') === false)
+        {
             $base_url .= '/engine-rest';
         }
 
@@ -571,25 +563,25 @@ trait Operaton_DMN_API_Utilities
     {
         $base_url = $this->get_engine_rest_base_url($config->dmn_endpoint);
 
-        if ($process_ended) {
+        if ($process_ended)
+        {
             // Process completed immediately - get variables from history
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN API: Process completed immediately, getting variables from history');
-            }
+            $this->log_verbose('Process completed immediately, getting variables from history');
 
             return $this->get_historical_variables($base_url, $process_instance_id);
-        } else {
+        }
+        else
+        {
             // Process is still running - wait and try to get active variables
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN API: Process still running, waiting for completion');
-            }
+            $this->log_verbose('Process still running, waiting for completion');
 
             sleep(3); // Wait for process completion
 
             $active_variables = $this->get_active_process_variables($base_url, $process_instance_id);
 
             // If active variables failed, try history as fallback
-            if (empty($active_variables)) {
+            if (empty($active_variables))
+            {
                 return $this->get_historical_variables($base_url, $process_instance_id);
             }
 
@@ -611,9 +603,7 @@ trait Operaton_DMN_API_Utilities
         $history_endpoint = $base_url . '/history/variable-instance';
         $history_url = $history_endpoint . '?processInstanceId=' . $process_instance_id;
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN API: Getting historical variables from: ' . $history_url);
-        }
+        $this->log_verbose('Getting historical variables', ['url' => $history_url]);
 
         $response = wp_remote_get($history_url, array(
             'headers' => array('Accept' => 'application/json'),
@@ -621,7 +611,8 @@ trait Operaton_DMN_API_Utilities
             'sslverify' => $this->ssl_verify,
         ));
 
-        if (is_wp_error($response)) {
+        if (is_wp_error($response))
+        {
             return new WP_Error(
                 'api_error',
                 sprintf(__('Failed to get historical variables: %s', 'operaton-dmn'), $response->get_error_message()),
@@ -632,14 +623,17 @@ trait Operaton_DMN_API_Utilities
         $history_body = wp_remote_retrieve_body($response);
         $historical_variables = json_decode($history_body, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE || !is_array($historical_variables)) {
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($historical_variables))
+        {
             return array();
         }
 
         // Convert historical variables to expected format
         $final_variables = array();
-        foreach ($historical_variables as $var) {
-            if (isset($var['name']) && array_key_exists('value', $var)) {
+        foreach ($historical_variables as $var)
+        {
+            if (isset($var['name']) && array_key_exists('value', $var))
+            {
                 $final_variables[$var['name']] = array(
                     'value' => $var['value'],
                     'type' => isset($var['type']) ? $var['type'] : 'String'
@@ -669,14 +663,16 @@ trait Operaton_DMN_API_Utilities
             'sslverify' => $this->ssl_verify,
         ));
 
-        if (is_wp_error($response)) {
+        if (is_wp_error($response))
+        {
             return array();
         }
 
         $variables_body = wp_remote_retrieve_body($response);
         $variables = json_decode($variables_body, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
             return array();
         }
 
@@ -697,12 +693,15 @@ trait Operaton_DMN_API_Utilities
         $result_mappings = $this->parse_result_mappings($config);
         $results = array();
 
-        foreach ($result_mappings as $dmn_result_field => $mapping) {
+        foreach ($result_mappings as $dmn_result_field => $mapping)
+        {
             $result_value = $this->find_result_value($dmn_result_field, $final_variables);
 
-            if ($result_value !== null) {
+            if ($result_value !== null)
+            {
                 // Handle boolean conversion (DMN often returns 1/0 instead of true/false)
-                if (is_numeric($result_value) && ($result_value === 1 || $result_value === 0 || $result_value === '1' || $result_value === '0')) {
+                if (is_numeric($result_value) && ($result_value === 1 || $result_value === 0 || $result_value === '1' || $result_value === '0'))
+                {
                     $result_value = (bool) $result_value;
                 }
 
@@ -711,13 +710,15 @@ trait Operaton_DMN_API_Utilities
                     'field_id' => $mapping['field_id']
                 );
 
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('Operaton DMN API: Extracted result for ' . $dmn_result_field . ': ' . print_r($result_value, true));
-                }
-            } else {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('Operaton DMN API: No result found for ' . $dmn_result_field);
-                }
+                $this->log_diagnostic('Extracted result field', [
+                    'field' => $dmn_result_field,
+                    'value' => $result_value,
+                    'type' => gettype($result_value)
+                ]);
+            }
+            else
+            {
+                $this->log_diagnostic('No result found for field', ['field' => $dmn_result_field]);
             }
         }
 
@@ -736,9 +737,12 @@ trait Operaton_DMN_API_Utilities
     private function find_result_value($field_name, $variables)
     {
         // Strategy 1: Direct variable access
-        if (isset($variables[$field_name]['value'])) {
+        if (isset($variables[$field_name]['value']))
+        {
             return $variables[$field_name]['value'];
-        } elseif (isset($variables[$field_name])) {
+        }
+        elseif (isset($variables[$field_name]))
+        {
             return $variables[$field_name];
         }
 
@@ -751,26 +755,36 @@ trait Operaton_DMN_API_Utilities
             'knockoffsResult'
         );
 
-        foreach ($possible_containers as $container) {
-            if (isset($variables[$container]['value']) && is_array($variables[$container]['value'])) {
+        foreach ($possible_containers as $container)
+        {
+            if (isset($variables[$container]['value']) && is_array($variables[$container]['value']))
+            {
                 $container_data = $variables[$container]['value'];
 
                 // Check if it's an array of results
-                if (isset($container_data[0]) && is_array($container_data[0])) {
-                    if (isset($container_data[0][$field_name])) {
+                if (isset($container_data[0]) && is_array($container_data[0]))
+                {
+                    if (isset($container_data[0][$field_name]))
+                    {
                         return $container_data[0][$field_name];
                     }
-                } elseif (isset($container_data[$field_name])) {
+                }
+                elseif (isset($container_data[$field_name]))
+                {
                     return $container_data[$field_name];
                 }
             }
         }
 
         // Strategy 3: Comprehensive search through all variables
-        foreach ($variables as $var_name => $var_data) {
-            if (isset($var_data['value']) && is_array($var_data['value'])) {
-                if (isset($var_data['value'][0]) && is_array($var_data['value'][0])) {
-                    if (isset($var_data['value'][0][$field_name])) {
+        foreach ($variables as $var_name => $var_data)
+        {
+            if (isset($var_data['value']) && is_array($var_data['value']))
+            {
+                if (isset($var_data['value'][0]) && is_array($var_data['value'][0]))
+                {
+                    if (isset($var_data['value'][0][$field_name]))
+                    {
                         return $var_data['value'][0][$field_name];
                     }
                 }
@@ -793,16 +807,21 @@ trait Operaton_DMN_API_Utilities
     {
         $results = array();
 
-        foreach ($result_mappings as $dmn_result_field => $mapping) {
+        foreach ($result_mappings as $dmn_result_field => $mapping)
+        {
             $result_value = null;
 
-            if (isset($data[0][$dmn_result_field]['value'])) {
+            if (isset($data[0][$dmn_result_field]['value']))
+            {
                 $result_value = $data[0][$dmn_result_field]['value'];
-            } elseif (isset($data[0][$dmn_result_field])) {
+            }
+            elseif (isset($data[0][$dmn_result_field]))
+            {
                 $result_value = $data[0][$dmn_result_field];
             }
 
-            if ($result_value !== null) {
+            if ($result_value !== null)
+            {
                 $results[$dmn_result_field] = array(
                     'value' => $result_value,
                     'field_id' => $mapping['field_id']
@@ -824,7 +843,8 @@ trait Operaton_DMN_API_Utilities
     private function parse_result_mappings($config)
     {
         $result_mappings = json_decode($config->result_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
             return array();
         }
         return $result_mappings;
@@ -844,7 +864,8 @@ trait Operaton_DMN_API_Utilities
         $base_url = str_replace('/decision-definition/key', '', $base_url);
         $base_url = str_replace('/decision-definition', '', $base_url);
 
-        if (strpos($base_url, '/engine-rest') === false) {
+        if (strpos($base_url, '/engine-rest') === false)
+        {
             $base_url .= '/engine-rest';
         }
 
@@ -861,11 +882,13 @@ trait Operaton_DMN_API_Utilities
      */
     private function format_evaluation_time($iso_timestamp)
     {
-        if (empty($iso_timestamp)) {
+        if (empty($iso_timestamp))
+        {
             return 'Unknown';
         }
 
-        try {
+        try
+        {
             // Parse the ISO timestamp
             $datetime = new DateTime($iso_timestamp);
 
@@ -878,7 +901,9 @@ trait Operaton_DMN_API_Utilities
             $timezone_name = $datetime->format('T');
 
             return $formatted_date . ' (' . $timezone_name . ')';
-        } catch (Exception $e) {
+        }
+        catch (Exception $e)
+        {
             // Fallback: just clean up the original timestamp
             return str_replace(['T', '+0000'], [' ', ' UTC'], $iso_timestamp);
         }
@@ -972,12 +997,14 @@ trait Operaton_DMN_API_Utilities
         $issues = array();
 
         // Check database connection
-        if (!$this->database) {
+        if (!$this->database)
+        {
             $issues[] = __('Database manager not initialized', 'operaton-dmn');
         }
 
         // Check core plugin connection
-        if (!$this->core) {
+        if (!$this->core)
+        {
             $issues[] = __('Core plugin instance not available', 'operaton-dmn');
         }
 
@@ -985,11 +1012,13 @@ trait Operaton_DMN_API_Utilities
         $rest_url = rest_url('operaton-dmn/v1/test');
         $response = wp_remote_get($rest_url, array('timeout' => 5));
 
-        if (is_wp_error($response)) {
+        if (is_wp_error($response))
+        {
             $issues[] = sprintf(__('REST API not accessible: %s', 'operaton-dmn'), $response->get_error_message());
         }
 
-        if (!empty($issues)) {
+        if (!empty($issues))
+        {
             return new WP_Error('api_configuration_error', implode('; ', $issues), $issues);
         }
 
