@@ -11,12 +11,26 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH')) {
+if (!defined('ABSPATH'))
+{
     exit;
 }
 
+// Load the debug trait
+require_once __DIR__ . '/api-traits/trait-api-debug-enhanced.php';
+
 class Operaton_DMN_Admin
 {
+    // Add debug level constants
+    const DEBUG_LEVEL_NONE = 0;
+    const DEBUG_LEVEL_MINIMAL = 1;
+    const DEBUG_LEVEL_STANDARD = 2;
+    const DEBUG_LEVEL_VERBOSE = 3;
+    const DEBUG_LEVEL_DIAGNOSTIC = 4;
+
+    // Add the debug trait
+    use Operaton_DMN_API_Debug_Enhanced;
+
     /**
      * Core plugin instance reference
      * Provides access to main plugin functionality and data
@@ -57,9 +71,7 @@ class Operaton_DMN_Admin
         $this->core = $core;
         $this->assets = $assets;
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Interface manager initialized');
-        }
+        $this->log_standard('Interface manager initialized');
 
         $this->init_hooks();
     }
@@ -604,9 +616,7 @@ class Operaton_DMN_Admin
      */
     public function add_admin_menu()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Adding admin menu pages');
-        }
+        $this->log_standard('Adding admin menu pages');
 
         // Main menu page
         add_menu_page(
@@ -653,38 +663,40 @@ class Operaton_DMN_Admin
      */
     private function add_debug_menu()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Adding debug menu');
+        $this->log_standard('Adding debug menu');
 
-            // Check if debug class exists and use it, otherwise use temp page
-            if (class_exists('OperatonDMNUpdateDebugger')) {
-                global $operaton_debug_instance;
-                if (!$operaton_debug_instance) {
-                    $operaton_debug_instance = new OperatonDMNUpdateDebugger();
-                }
-
-                add_submenu_page(
-                    'operaton-dmn',
-                    __('Update Debug', 'operaton-dmn'),
-                    __('Update Debug', 'operaton-dmn'),
-                    $this->capability,
-                    'operaton-dmn-update-debug',
-                    array($operaton_debug_instance, 'debug_page')
-                );
-
-                error_log('Operaton DMN Admin: Debug menu added using OperatonDMNUpdateDebugger class');
-            } else {
-                add_submenu_page(
-                    'operaton-dmn',
-                    __('Update Debug', 'operaton-dmn'),
-                    __('Update Debug', 'operaton-dmn'),
-                    $this->capability,
-                    'operaton-dmn-update-debug',
-                    array($this, 'temp_debug_page')
-                );
-
-                error_log('Operaton DMN Admin: Debug menu added using temp page (class not found)');
+        // Check if debug class exists and use it, otherwise use temp page
+        if (class_exists('OperatonDMNUpdateDebugger'))
+        {
+            global $operaton_debug_instance;
+            if (!$operaton_debug_instance)
+            {
+                $operaton_debug_instance = new OperatonDMNUpdateDebugger();
             }
+
+            add_submenu_page(
+                'operaton-dmn',
+                __('Update Debug', 'operaton-dmn'),
+                __('Update Debug', 'operaton-dmn'),
+                $this->capability,
+                'operaton-dmn-update-debug',
+                array($operaton_debug_instance, 'debug_page')
+            );
+
+            $this->log_verbose('Debug menu added using OperatonDMNUpdateDebugger class');
+        }
+        else
+        {
+            add_submenu_page(
+                'operaton-dmn',
+                __('Update Debug', 'operaton-dmn'),
+                __('Update Debug', 'operaton-dmn'),
+                $this->capability,
+                'operaton-dmn-update-debug',
+                array($this, 'temp_debug_page')
+            );
+
+            $this->log_verbose('Debug menu added using temp page (class not found)');
         }
     }
 
@@ -696,9 +708,7 @@ class Operaton_DMN_Admin
      */
     public function admin_page()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Loading main admin page');
-        }
+        $this->log_standard('Loading main admin page');
 
         // Force database check when accessing admin pages
         $this->core->get_database_instance()->check_and_update_database();
@@ -750,9 +760,7 @@ class Operaton_DMN_Admin
      */
     public function add_config_page()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Loading configuration edit page');
-        }
+        $this->log_standard('Loading configuration edit page');
 
         // Force database check
         $this->core->get_database_instance()->check_and_update_database();
@@ -800,9 +808,7 @@ class Operaton_DMN_Admin
      */
     public function temp_debug_page()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Displaying temporary debug page');
-        }
+        $this->log_standard('Displaying temporary debug page');
 
         echo '<div class="wrap operaton-debug-page">';
         echo '<h1>' . __('Debug Menu Test', 'operaton-dmn') . '</h1>';
@@ -903,9 +909,7 @@ class Operaton_DMN_Admin
      */
     public function enqueue_admin_scripts($hook)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Enqueuing admin scripts for hook: ' . $hook);
-        }
+        $this->log_verbose('Enqueuing admin scripts', ['hook' => $hook]);
 
         // Only enqueue on our plugin pages
         if (strpos($hook, 'operaton-dmn') !== false) {
@@ -935,9 +939,7 @@ class Operaton_DMN_Admin
      */
     public function enqueue_frontend_scripts()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Ensuring frontend assets are loaded');
-        }
+        $this->log_standard('Ensuring frontend assets are loaded');
 
         // Only enqueue on frontend
         if (!is_admin()) {
@@ -962,9 +964,7 @@ class Operaton_DMN_Admin
             return;
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Checking for admin notices');
-        }
+        $this->log_verbose('Checking for admin notices');
 
         $issues = $this->check_plugin_health();
         if (!empty($issues)) {
@@ -989,9 +989,7 @@ class Operaton_DMN_Admin
      */
     public function add_settings_link($links)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Adding settings link to plugin page');
-        }
+        $this->log_standard('Adding settings link to plugin page');
 
         $settings_link = '<a href="' . admin_url('admin.php?page=operaton-dmn') . '">' . __('Settings', 'operaton-dmn') . '</a>';
         array_unshift($links, $settings_link);
@@ -1049,9 +1047,7 @@ class Operaton_DMN_Admin
         $gravity_forms_manager = $this->core->get_gravity_forms_instance();
 
         if (!$gravity_forms_manager || !$gravity_forms_manager->is_gravity_forms_available()) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Admin: Gravity Forms not available');
-            }
+            $this->log_minimal('Gravity Forms not available');
             return array();
         }
 
@@ -1075,9 +1071,7 @@ class Operaton_DMN_Admin
             extract($data);
             include $template_path;
         } else {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN Admin: Template not found: ' . $template_path);
-            }
+            $this->log_minimal('Template not found', ['template_path' => $template_path]);
             echo '<div class="notice notice-error"><p>' . sprintf(__('Template not found: %s', 'operaton-dmn'), $template) . '</p></div>';
         }
     }
@@ -1180,7 +1174,7 @@ class Operaton_DMN_Admin
             return false;
         }
     }
-    
+
     /**
      * Display system information for debug page
      * Shows system details for troubleshooting
@@ -1251,10 +1245,8 @@ class Operaton_DMN_Admin
             return;
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Admin: Displaying update management section');
-        }
-
+        $this->log_standard('Displaying update management section');
+        
         $current_version = OPERATON_DMN_VERSION;
         $update_plugins = get_site_transient('update_plugins');
         $has_update = false;
