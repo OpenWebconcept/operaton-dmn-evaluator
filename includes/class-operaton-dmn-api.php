@@ -27,6 +27,7 @@ $trait_files = array(
     __DIR__ . '/api-traits/trait-api-decision-flow.php',
     __DIR__ . '/api-traits/trait-api-testing.php',
     __DIR__ . '/api-traits/trait-api-utilities.php',
+    __DIR__ . '/api-traits/trait-api-debug-enhanced.php',
 );
 
 foreach ($trait_files as $trait_file)
@@ -71,14 +72,22 @@ foreach ($trait_files as $trait_file)
  */
 class Operaton_DMN_API
 {
+    // Debug level constants - moved from trait
+    const DEBUG_LEVEL_NONE = 0;                 // No debug output
+    const DEBUG_LEVEL_MINIMAL = 1;              // Only critical errors and warnings
+    const DEBUG_LEVEL_STANDARD = 2;             // Standard operations and results
+    const DEBUG_LEVEL_VERBOSE = 3;              // Detailed debug information
+    const DEBUG_LEVEL_DIAGNOSTIC = 4;           // Full diagnostic including sensitive data (sanitized)
+
     // Load all functional traits in logical order
     use Operaton_DMN_API_Core;                  // Core properties, constructor, WordPress integration
-    use Operaton_DMN_API_Rest_Endpoints;       // REST API route registration
-    use Operaton_DMN_API_Evaluation;           // Main DMN evaluation logic
-    use Operaton_DMN_API_Ajax_Handlers;        // AJAX handlers for admin interface
-    use Operaton_DMN_API_Decision_Flow;        // Decision flow monitoring & visualization
-    use Operaton_DMN_API_Testing;              // Testing & configuration validation
-    use Operaton_DMN_API_Utilities;            // Consolidated utilities (data processing, HTTP, etc.)
+    use Operaton_DMN_API_Rest_Endpoints;        // REST API route registration
+    use Operaton_DMN_API_Evaluation;            // Main DMN evaluation logic
+    use Operaton_DMN_API_Ajax_Handlers;         // AJAX handlers for admin interface
+    use Operaton_DMN_API_Decision_Flow;         // Decision flow monitoring & visualization
+    use Operaton_DMN_API_Testing;               // Testing & configuration validation
+    use Operaton_DMN_API_Utilities;             // Consolidated utilities (data processing, HTTP, etc.)
+    use Operaton_DMN_API_Debug_Enhanced;        // Enhanced debug system
 }
 
 // End of main API class file
