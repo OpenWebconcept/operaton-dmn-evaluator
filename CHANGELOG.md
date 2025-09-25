@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 
 ## Issues
 - [Issue #65](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/65) - Implement trait architecture for API class
+- [Issue #66](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/66) - Enhance debug system
+
+### Enhanced Debug Log System
+The newly added `Operaton_DMN_API_Debug_Enhanced` trait provides a comprehensive, secure debug logging system. The debug trait organizes functionality into logical groups:
+- ✅ **Security Hardening:** Sensitive data sanitization and protection mechanisms
+- ✅ **Debug Level Management:** Level determination, caching, and environment detection
+- ✅ **Enhanced Logging System:** Core logging functionality with level control
+- ✅ **Convenience Methods:** Operation-specific logging helpers
+- ✅ **Debug Utilities:** Configuration reporting and cache management
+- ✅ **Emergency Logging:** Critical error logging that bypasses restrictions
+
+See [Debudg Trait Documentation](./assets/docs/debug-trait-documentation.md).
 
 ### Architecture
 Refactored the massive API class into a clean, maintainable trait-based architecture. Benefits achieved:
@@ -27,6 +39,8 @@ Refactored the massive API class into a clean, maintainable trait-based architec
 - `trait-api-decision-flow.php` - Decision flow visualization & health monitoring
 - `trait-api-testing.php` - Comprehensive configuration testing & validation
 - `trait-api-utilities.php` - All utility methods (HTTP, data processing, URL construction, etc.)
+
+See [API Class Documentation](./assets/docs/api-class-documentation.md).
 
 ## [1.0.0-beta.17] - 2025-09-18
 
