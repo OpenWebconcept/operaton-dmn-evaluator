@@ -1,14 +1,27 @@
-# Operaton DMN API Class - Documentation
+# Operaton DMN API Class - Restructured Documentation
 
 ## Overview
 
-The `Operaton_DMN_API` class serves as the comprehensive API handler for the Operaton DMN WordPress plugin, managing all external API interactions including REST endpoints, DMN evaluation, process execution, and endpoint testing. Through a trait-based architecture, the class orchestrates communication with Operaton decision engines, provides AJAX handlers for admin functionality, manages connection pooling for performance optimization, and handles decision flow visualization.
+The `Operaton_DMN_API` class serves as the comprehensive API handler for the Operaton DMN WordPress plugin, managing all external API interactions including REST endpoints, DMN evaluation, process execution, endpoint testing, and enhanced debug logging capabilities. Through a trait-based architecture, the class orchestrates communication with Operaton decision engines, provides AJAX handlers for admin functionality, manages connection pooling for performance optimization, and handles decision flow visualization.
 
-The class is composed of seven specialized traits that organize functionality into logical groups: Core initialization, REST endpoints, evaluation processing, AJAX handlers, decision flow management, testing and validation, and utilities. This modular approach enables maintainable code organization while preserving all original functionality through exact method copying.
+The class is composed of eight specialized traits that organize functionality into logical groups: Core initialization, REST endpoints, evaluation processing, AJAX handlers, decision flow management, testing and validation, utilities, and enhanced debug logging. This modular approach enables maintainable code organization while preserving all original functionality through exact method copying.
 
 ## Trait-Based Architecture
 
-The API class utilizes the following traits for modular organization:
+The API class utilizes the following traits loaded from separate files for modular organization:
+
+```php
+$trait_files = array(
+    __DIR__ . '/api-traits/trait-api-core.php',
+    __DIR__ . '/api-traits/trait-api-rest-endpoints.php',
+    __DIR__ . '/api-traits/trait-api-evaluation.php',
+    __DIR__ . '/api-traits/trait-api-ajax-handlers.php',
+    __DIR__ . '/api-traits/trait-api-decision-flow.php',
+    __DIR__ . '/api-traits/trait-api-testing.php',
+    __DIR__ . '/api-traits/trait-api-utilities.php',
+    __DIR__ . '/api-traits/trait-api-debug-enhanced.php',
+);
+```
 
 - **`Operaton_DMN_API_Core`**: Constructor, properties, and initialization hooks
 - **`Operaton_DMN_API_REST_Endpoints`**: REST API routes and health monitoring
@@ -17,6 +30,16 @@ The API class utilizes the following traits for modular organization:
 - **`Operaton_DMN_API_Decision_Flow`**: Decision flow visualization and formatting
 - **`Operaton_DMN_API_Testing`**: Testing, validation, and debug functionality
 - **`Operaton_DMN_API_Utilities`**: Connection pooling, helpers, and utilities
+- **`Operaton_DMN_API_Debug_Enhanced`**: Secure, level-controlled debug logging system
+
+### Trait Loading System
+
+The class implements dynamic trait loading with comprehensive error handling:
+
+- **File Existence Validation**: Checks each trait file exists before loading
+- **Require Once Loading**: Prevents duplicate trait loading with `require_once`
+- **Error Logging**: WordPress error logging for missing trait files
+- **Graceful Degradation**: Continues operation even if some traits are missing
 
 ## Class Properties
 
@@ -31,6 +54,10 @@ The API class utilizes the following traits for modular organization:
 - **`$pool_stats`**: Connection pool statistics for monitoring (hits, misses, created, cleaned)
 - **`$connection_max_age`**: Maximum age for pooled connections in seconds (default: 300)
 - **`$max_connections_per_host`**: Maximum number of connections per host (default: 3)
+
+### Enhanced Debug Properties (from Debug Enhanced Trait)
+- **`$debug_level_cache`**: Static cache for current debug level preventing repeated calculations
+- **Debug level constants**: `DEBUG_LEVEL_NONE` (0) through `DEBUG_LEVEL_DIAGNOSTIC` (4)
 
 ## Method Groupings by Trait
 
@@ -209,6 +236,31 @@ API configuration methods returning consistent headers for all requests, debug m
 **`get_api_status()`, `validate_configuration()`, `get_core_instance()`, `get_database_instance()`**  
 Status and access methods providing current API configuration reporting, configuration validation with issue detection, and external access to manager instances for integration purposes.
 
+### Enhanced Debug Logging System (Operaton_DMN_API_Debug_Enhanced)
+
+These methods provide secure, level-controlled debug logging with automatic sensitive data sanitization.
+
+**`sanitize_debug_output($data, $additional_sensitive_keys = array())`**  
+Core sanitization method that removes or masks sensitive information from debug output. Handles nested arrays and objects recursively, applies default sensitive key patterns, supports additional custom sensitive keys, and maintains data structure while protecting sensitive values.
+
+**`get_debug_level()`, `is_development_environment()`**  
+Debug level determination and environment detection methods with intelligent caching. Checks WordPress constants and environment variables, implements performance optimization through caching, and provides reliable environment classification for development vs production.
+
+**`should_log($required_level = null)`, `debug_log($message, $data = null, $level = null, $additional_sensitive_keys = array())`**  
+Core logging functionality with level control and data sanitization. Validates logging level requirements, applies appropriate debug prefixes, sanitizes sensitive data automatically, formats complex data as JSON, and logs to WordPress error log.
+
+**`log_minimal($message, $data = null)`, `log_standard($message, $data = null)`, `log_verbose($message, $data = null)`, `log_diagnostic($message, $data = null)`**  
+Convenience logging methods for different debug levels. Provides easy-to-use interfaces for various debugging scenarios with automatic level assignment and consistent formatting.
+
+**`log_database($message, $data = null)`, `log_api($message, $data = null)`, `log_config($message, $data = null)`, `log_performance($message, $metrics = null)`**  
+Operation-specific logging methods with automatic sensitive data handling. Sanitizes operation-specific sensitive information, captures relevant operational context, maintains appropriate logging levels, and protects credentials and sensitive configuration.
+
+**`log_emergency($message, $data = null)`**  
+Critical error logging that bypasses all level restrictions. Always logs regardless of debug level setting, used only for critical system errors, maintains special emergency prefix, and ensures critical issues are captured.
+
+**`get_debug_config()`, `get_debug_level_name($level)`, `clear_debug_level_cache()`**  
+Debug utility methods for configuration reporting and cache management. Provides comprehensive debug configuration information, converts numeric levels to human-readable names, and supports dynamic configuration changes.
+
 ## WordPress Integration Points
 
 ### REST API Endpoints
@@ -229,6 +281,11 @@ Status and access methods providing current API configuration reporting, configu
 - **`init`**: Basic initialization and availability checking
 - **`admin_init`**: Admin interface integration and asset loading
 
+### Enhanced Debug Configuration
+- **`WP_DEBUG`**: Must be true for any debug logging functionality
+- **`WP_DEBUG_LOG`**: Enables WordPress error logging to file
+- **`OPERATON_DEBUG_LEVEL`**: Sets debug level (0-4) for granular control
+
 ## Performance Optimization Features
 
 ### Connection Pooling
@@ -242,6 +299,7 @@ Status and access methods providing current API configuration reporting, configu
 - **API response caching**: Transient-based caching for decision flow data
 - **Rate limiting**: API call throttling to prevent abuse
 - **Optimized HTTP options**: cURL optimization for performance
+- **Debug level caching**: Static cache prevents repeated level calculations
 
 ### Batching and Intelligence
 - **Intelligent batching**: Multiple API calls prepared upfront for optimal performance
@@ -257,6 +315,12 @@ Status and access methods providing current API configuration reporting, configu
 - **Input sanitization**: Comprehensive input validation and sanitization
 - **Parameter validation**: REST API parameter validation with type checking
 
+### Enhanced Debug Security
+- **Automatic data sanitization**: Prevents credential exposure in debug logs
+- **Environment-based logging**: Reduced logging in production environments
+- **Configurable sensitive keys**: Custom sensitive data pattern support
+- **Safe error messages**: No sensitive information in error responses
+
 ### SSL and Communication
 - **SSL verification**: Configurable SSL certificate verification for API calls
 - **Secure headers**: Consistent security headers for all API requests
@@ -266,13 +330,15 @@ Status and access methods providing current API configuration reporting, configu
 ## Error Handling and Logging
 
 ### Comprehensive Error Management
+- **Trait loading resilience**: Continues operation with missing trait files
 - **WP_Error integration**: WordPress standard error handling throughout
 - **HTTP status codes**: Appropriate status codes for different error conditions
 - **Fallback mechanisms**: Multiple fallback strategies for robust operation
 - **Graceful degradation**: Functional operation even when some features unavailable
 
-### Debug and Monitoring
-- **Conditional logging**: Debug output only when WP_DEBUG enabled
+### Enhanced Debug and Monitoring
+- **Multi-level debug logging**: Five levels from None to Diagnostic
+- **Automatic sensitive data protection**: Prevents credential exposure
 - **Performance metrics**: Timing and resource usage monitoring
 - **Health monitoring**: Comprehensive system health reporting
 - **Configuration validation**: Detailed configuration checking and reporting
@@ -286,6 +352,7 @@ The API class coordinates with the following external systems and dependencies:
 - **AJAX system**: WordPress AJAX handling for admin interface
 - **Transient API**: WordPress caching system for performance optimization
 - **Options API**: WordPress settings storage for configuration persistence
+- **Error logging system**: WordPress error logging integration for debug output
 
 ### External API Communication
 - **Operaton REST API**: Communication with Operaton decision engine
@@ -299,4 +366,10 @@ The API class coordinates with the following external systems and dependencies:
 - **Assets manager**: Coordinated asset loading and script management
 - **Gravity Forms**: Form integration and evaluation coordination
 
-All methods maintain exact functionality from the original implementation while providing improved organization through trait-based architecture, enhanced documentation, and clear separation of concerns for maintainable code structure.
+### Trait File Dependencies
+- **File system access**: Trait files must exist and be readable
+- **PHP include system**: Proper trait loading and inclusion
+- **Error logging**: Missing trait file error reporting
+- **Graceful degradation**: Operation continues with partial trait loading
+
+All methods maintain exact functionality from the original implementation while providing improved organization through trait-based architecture, enhanced debug logging capabilities, and clear separation of concerns for maintainable code structure.
