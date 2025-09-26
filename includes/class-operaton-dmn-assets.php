@@ -154,7 +154,8 @@ class Operaton_DMN_Assets
 
         $this->init_hooks();
 
-        $this->log_debug('Assets manager initialized with URL: ' . $this->plugin_url);
+        // UPDATED: Use global debug manager
+        operaton_debug('Assets', 'Assets manager initialized with URL: ' . $this->plugin_url);
     }
 
     /**
@@ -170,7 +171,7 @@ class Operaton_DMN_Assets
     public function set_gravity_forms_manager(Operaton_DMN_Gravity_Forms $gravity_forms_manager): void
     {
         $this->gravity_forms_manager = $gravity_forms_manager;
-        $this->log_debug('Gravity Forms manager reference established');
+        operaton_debug('Assets', 'Gravity Forms manager reference established');
     }
 
     /**
@@ -193,7 +194,8 @@ class Operaton_DMN_Assets
         // Emergency fallback for jQuery compatibility
         add_action('wp_footer', array($this, 'add_jquery_compatibility'), 1);
 
-        $this->log_debug('WordPress hooks initialized');
+        // UPDATED: Use global debug manager
+        operaton_debug('Assets', 'WordPress hooks initialized');
     }
 
     // =============================================================================
@@ -295,7 +297,7 @@ class Operaton_DMN_Assets
         // Prevent duplicate loading
         if (self::$asset_loading_state['frontend_loaded'])
         {
-            $this->log_debug('Frontend assets already loaded, skipping');
+            operaton_debug('Assets', 'Frontend assets already loaded, skipping');
             return;
         }
 
@@ -356,7 +358,7 @@ class Operaton_DMN_Assets
         }
 
         self::$asset_loading_state['frontend_loaded'] = true;
-        $this->log_debug('Frontend assets enqueued successfully');
+        operaton_debug('Assets', 'Frontend assets enqueued successfully');
     }
 
     /**
@@ -373,7 +375,7 @@ class Operaton_DMN_Assets
         // Prevent duplicate loading
         if (self::$asset_loading_state['admin_loaded'])
         {
-            $this->log_debug('Admin assets already loaded, skipping');
+            operaton_debug('Assets', 'Admin assets already loaded, skipping');
             return;
         }
 
@@ -419,7 +421,7 @@ class Operaton_DMN_Assets
         ));
 
         self::$asset_loading_state['admin_loaded'] = true;
-        $this->log_debug('Admin assets enqueued successfully');
+        operaton_debug('Assets', 'Admin assets enqueued successfully');
     }
 
     /**
@@ -449,7 +451,7 @@ class Operaton_DMN_Assets
             $this->version
         );
 
-        $this->log_debug('Radio sync assets enqueued for form: ' . $form_id);
+        operaton_debug('Assets', 'Radio sync assets enqueued for form: ' . $form_id);
     }
 
     /**
@@ -492,7 +494,7 @@ class Operaton_DMN_Assets
                 break;
         }
 
-        $this->log_debug('Force enqueued asset group: ' . $asset_group);
+        operaton_debug('Assets', 'Force enqueued asset group: ' . $asset_group);
     }
 
     /**
@@ -559,7 +561,7 @@ class Operaton_DMN_Assets
                 unset(self::$detection_cache[$key]);
             }
 
-            $this->log_debug('Cleared cache for form: ' . $form_id);
+            operaton_debug('Assets', 'Cleared cache for form: ' . $form_id);
         }
         else
         {
@@ -568,7 +570,7 @@ class Operaton_DMN_Assets
             self::$detection_complete = false;
             self::$cache_timestamp = time();
 
-            $this->log_debug('Cleared all asset detection cache');
+            operaton_debug('Assets', 'Cleared all asset detection cache');
         }
     }
 
@@ -805,7 +807,7 @@ class Operaton_DMN_Assets
             )
         ));
 
-        $this->log_debug('Frontend script localized with configuration');
+        operaton_debug('Assets', 'Frontend script localized with configuration');
     }
 
     /**
@@ -827,7 +829,7 @@ class Operaton_DMN_Assets
         // Prevent duplicate localization
         if (isset(self::$localized_configs[$config_key]))
         {
-            $this->log_debug('Configuration already localized for: ' . $config_key);
+            operaton_debug('Assets', 'Configuration already localized for: ' . $config_key);
             return;
         }
 
@@ -853,7 +855,7 @@ class Operaton_DMN_Assets
             'config_id' => $config->id ?? 0
         );
 
-        $this->log_debug('Configuration localized - Form: ' . $form_id .
+        operaton_debug('Assets', 'Configuration localized - Form: ' . $form_id .
             ' | Handle: ' . $handle . ' | Endpoint: ' . ($config->dmn_endpoint ?? 'NONE'));
     }
 
@@ -899,7 +901,7 @@ class Operaton_DMN_Assets
             $handle = is_admin() ? 'operaton-dmn-admin' : 'operaton-dmn-frontend';
             wp_add_inline_style($handle, $css);
 
-            $this->log_debug('Inline styles added for form: ' . ($form_id ?? 'global'));
+            operaton_debug('Assets', 'Inline styles added for form: ' . ($form_id ?? 'global'));
         }
     }
 
@@ -943,24 +945,6 @@ class Operaton_DMN_Assets
 
         $decoded = json_decode($json_string, true);
         return (json_last_error() === JSON_ERROR_NONE) ? $decoded : $default;
-    }
-
-    /**
-     * Log debug messages conditionally
-     *
-     * Outputs debug messages only when WP_DEBUG is enabled,
-     * helping with development and troubleshooting.
-     *
-     * @since 1.0.0
-     * @param string $message Debug message to log
-     * @return void
-     */
-    private function log_debug(string $message): void
-    {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Assets: ' . $message);
-        }
     }
 
     // =============================================================================
@@ -1007,7 +991,7 @@ class Operaton_DMN_Assets
             'decision_flow_loaded' => false
         );
 
-        $this->log_debug('All loading states reset');
+        operaton_debug('Assets', 'All loading states reset');
     }
 
     /**
@@ -1021,22 +1005,22 @@ class Operaton_DMN_Assets
      */
     public function log_performance(): void
     {
-        if (!defined('WP_DEBUG') || !WP_DEBUG)
+        if (!operaton_debug_manager()->get_debug_level())
         {
             return;
         }
 
         $status = $this->get_status();
 
-        error_log('=== OPERATON DMN ASSETS PERFORMANCE REPORT ===');
-        error_log('Detection Complete: ' . ($status['detection_complete'] ? 'YES' : 'NO'));
-        error_log('Cache Age: ' . $status['cache_age'] . 's');
-        error_log('Cache Entries: ' . $status['cache_entries']);
-        error_log('Should Load: ' . ($status['should_load'] ? 'YES' : 'NO'));
-        error_log('Loading State: ' . json_encode($status['loading_state']));
-        error_log('WordPress States: ' . json_encode($status['wordpress_states']));
-        error_log('Context: ' . json_encode($status['context']));
-        error_log('===============================================');
+        operaton_debug_verbose('Assets', '=== OPERATON DMN ASSETS PERFORMANCE REPORT ===');
+        operaton_debug_verbose('Assets', 'Detection Complete: ' . ($status['detection_complete'] ? 'YES' : 'NO'));
+        operaton_debug_verbose('Assets', 'Cache Age: ' . $status['cache_age'] . 's');
+        operaton_debug_verbose('Assets', 'Cache Entries: ' . $status['cache_entries']);
+        operaton_debug_verbose('Assets', 'Should Load: ' . ($status['should_load'] ? 'YES' : 'NO'));
+        operaton_debug_verbose('Assets', 'Loading State', $status['loading_state']);
+        operaton_debug_verbose('Assets', 'WordPress States', $status['wordpress_states']);
+        operaton_debug_verbose('Assets', 'Context', $status['context']);
+        operaton_debug_verbose('Assets', '===============================================');
     }
 
     // =============================================================================
@@ -1115,7 +1099,7 @@ class Operaton_DMN_Assets
             unset(self::$localized_configs[$key]);
         }
 
-        $this->log_debug('Cleared localization cache for form: ' . $form_id);
+        operaton_debug('Assets', 'Cleared localization cache for form: ' . $form_id);
     }
 
     /**
@@ -1142,7 +1126,7 @@ class Operaton_DMN_Assets
             'decision_flow_loaded' => false
         );
 
-        $this->log_debug('Cleared all localization cache and reset loading states');
+        operaton_debug('Assets', 'Cleared all localization cache and reset loading states');
     }
 
     /**
