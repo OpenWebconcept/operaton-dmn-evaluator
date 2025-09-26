@@ -359,7 +359,8 @@ trait Operaton_DMN_API_Debug_Enhanced
             'Operaton_DMN_Admin' => 'Operaton DMN Admin',
             'Operaton_DMN_Database' => 'Operaton DMN Database',
             'Operaton_DMN_Assets' => 'Operaton DMN Assets',
-            'Operaton_DMN_Gravity_Forms' => 'Operaton DMN Gravity Forms'
+            'Operaton_DMN_Gravity_Forms' => 'Operaton DMN Gravity Forms',
+            'OperatonDMNEvaluator' => 'Operaton DMN Main'
         );
 
         // Get the appropriate prefix for this class
