@@ -21,7 +21,8 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH')) {
+if (!defined('ABSPATH'))
+{
     exit;
 }
 
@@ -156,11 +157,14 @@ class Operaton_DMN_Gravity_Forms
         $this->database = $database;
 
         // Initialize performance monitor if available
-        if (method_exists($core, 'get_performance_instance')) {
+        if (method_exists($core, 'get_performance_instance'))
+        {
             $this->performance = $core->get_performance_instance();
         }
 
-        $this->log_debug('Gravity Forms integration manager initialized');
+        // UPDATED: Use global debug manager
+        operaton_debug('GravityForms', 'Gravity Forms integration manager initialized');
+
         $this->init_hooks();
     }
 
@@ -190,7 +194,7 @@ class Operaton_DMN_Gravity_Forms
         // Admin integration hooks
         add_action('admin_init', array($this, 'init_admin_integration'));
 
-        $this->log_debug('WordPress hooks initialized');
+        operaton_debug('GravityForms', 'WordPress hooks initialized');
     }
 
     // =============================================================================
@@ -208,11 +212,12 @@ class Operaton_DMN_Gravity_Forms
      */
     public function check_gravity_forms_availability(): bool
     {
-        if ($this->gravity_forms_available === null) {
+        if ($this->gravity_forms_available === null)
+        {
             $this->gravity_forms_available = $this->perform_gravity_forms_check();
 
             $status = $this->gravity_forms_available ? 'available' : 'not available';
-            $this->log_debug('Gravity Forms is ' . $status);
+            operaton_debug('GravityForms', 'Gravity Forms is ' . $status);
         }
 
         return $this->gravity_forms_available;
@@ -227,12 +232,14 @@ class Operaton_DMN_Gravity_Forms
     private function perform_gravity_forms_check(): bool
     {
         // Check if classes exist
-        if (!class_exists('GFForms') || !class_exists('GFAPI')) {
+        if (!class_exists('GFForms') || !class_exists('GFAPI'))
+        {
             return false;
         }
 
         // Check version compatibility
-        if (class_exists('GFCommon') && isset(GFCommon::$version)) {
+        if (class_exists('GFCommon') && isset(GFCommon::$version))
+        {
             return version_compare(GFCommon::$version, self::MIN_GF_VERSION, '>=');
         }
 
@@ -250,8 +257,10 @@ class Operaton_DMN_Gravity_Forms
      */
     public function conditional_init_gravity_forms(): void
     {
-        if (!$this->check_gravity_forms_availability()) {
-            $this->log_debug('Gravity Forms not available - skipping integration');
+        if (!$this->check_gravity_forms_availability())
+        {
+            // UPDATED: Use global debug manager
+            operaton_debug('GravityForms', 'Gravity Forms not available - skipping integration');
             return;
         }
 
@@ -265,7 +274,8 @@ class Operaton_DMN_Gravity_Forms
         add_action('gform_after_submission', array($this, 'handle_post_submission'), 10, 2);
 
         // Admin interface hooks
-        if (is_admin()) {
+        if (is_admin())
+        {
             add_action('gform_editor_js', array($this, 'add_editor_script'));
             add_action('gform_field_advanced_settings', array($this, 'add_field_advanced_settings'), 10, 2);
         }
@@ -273,7 +283,8 @@ class Operaton_DMN_Gravity_Forms
         // Radio synchronization hooks
         $this->add_radio_sync_hooks();
 
-        $this->log_debug('Gravity Forms integration hooks initialized');
+        // UPDATED: Use global debug manager
+        operaton_debug('GravityForms', 'Gravity Forms integration hooks initialized');
     }
 
     // =============================================================================
@@ -295,7 +306,8 @@ class Operaton_DMN_Gravity_Forms
     public function add_evaluate_button($button, $form): string
     {
         // Skip button addition in admin or AJAX contexts
-        if (is_admin() || (defined('DOING_AJAX') && DOING_AJAX)) {
+        if (is_admin() || (defined('DOING_AJAX') && DOING_AJAX))
+        {
             return $button;
         }
 
@@ -303,11 +315,12 @@ class Operaton_DMN_Gravity_Forms
         $config = $this->get_form_config($form_id);
 
         // No DMN configuration found for this form
-        if (!$config) {
+        if (!$config)
+        {
             return $button;
         }
 
-        $this->log_debug('Adding evaluate button for form ' . $form_id);
+        operaton_debug('GravityForms', 'Adding evaluate button for form ' . $form_id);
 
         // Build the evaluation button HTML
         $evaluate_button = sprintf(
@@ -319,7 +332,8 @@ class Operaton_DMN_Gravity_Forms
 
         // Add decision flow container if enabled
         $decision_flow_container = '';
-        if (!empty($config->show_decision_flow)) {
+        if (!empty($config->show_decision_flow))
+        {
             $decision_flow_container = sprintf(
                 '<div id="decision-flow-summary-%d" class="decision-flow-summary" style="display: none;"></div>',
                 $form_id
@@ -345,15 +359,17 @@ class Operaton_DMN_Gravity_Forms
      */
     public function ensure_assets_loaded($form)
     {
-        if (is_admin()) {
+        if (is_admin())
+        {
             return $form;
         }
 
         $form_id = $form['id'];
         $config = $this->get_form_config($form_id);
 
-        if ($config) {
-            $this->log_debug('Form ' . $form_id . ' has DMN config - ensuring assets loaded');
+        if ($config)
+        {
+            operaton_debug('GravityForms', 'Form ' . $form_id . ' has DMN config - ensuring assets loaded');
             $this->enqueue_gravity_scripts($form, false);
         }
 
@@ -371,17 +387,19 @@ class Operaton_DMN_Gravity_Forms
      */
     public function maybe_enqueue_assets(): void
     {
-        if (is_admin() || !$this->check_gravity_forms_availability()) {
+        if (is_admin() || !$this->check_gravity_forms_availability())
+        {
             return;
         }
 
-        $this->log_debug('Checking for DMN forms on page');
+        operaton_debug('GravityForms', 'Checking for DMN forms on page');
 
         // Use centralized detection from assets manager
-        if (Operaton_DMN_Assets::should_load_frontend_assets() && $this->has_dmn_enabled_forms_on_page()) {
+        if (Operaton_DMN_Assets::should_load_frontend_assets() && $this->has_dmn_enabled_forms_on_page())
+        {
             $this->assets->enqueue_frontend_assets();
             $this->enqueue_gravity_forms_scripts();
-            $this->log_debug('Assets loaded for DMN-enabled forms');
+            operaton_debug('GravityForms', 'Assets loaded for DMN-enabled forms');
         }
     }
 
@@ -401,18 +419,20 @@ class Operaton_DMN_Gravity_Forms
         $form_id = $form['id'];
         $config = $this->get_form_config($form_id);
 
-        if (!$config) {
-            $this->log_debug('No config found for form ' . $form_id);
+        if (!$config)
+        {
+            operaton_debug('GravityForms', 'No config found for form ' . $form_id);
             return;
         }
 
-        $this->log_debug('Enqueuing scripts for form ' . $form_id);
+        operaton_debug('GravityForms', 'Enqueuing scripts for form ' . $form_id);
 
         // Load form-specific assets
         $this->enqueue_gravity_form_assets($form, $config);
 
         // Ensure form configuration is localized
-        add_action('wp_footer', function () use ($form, $config) {
+        add_action('wp_footer', function () use ($form, $config)
+        {
             $this->ensure_form_config_localized($form, $config);
         }, 5);
     }
@@ -429,15 +449,17 @@ class Operaton_DMN_Gravity_Forms
     {
         $form_id = $form['id'];
 
-        $this->log_debug('Loading assets for form ' . $form_id);
+        operaton_debug('GravityForms', 'Loading assets for form ' . $form_id);
 
         // Load main Gravity Forms integration script
-        if (!wp_script_is('operaton-dmn-gravity-integration', 'enqueued')) {
+        if (!wp_script_is('operaton-dmn-gravity-integration', 'enqueued'))
+        {
             $this->enqueue_gravity_forms_scripts();
         }
 
         // Load radio sync assets if needed
-        if ($this->form_needs_radio_sync($form_id)) {
+        if ($this->form_needs_radio_sync($form_id))
+        {
             $this->assets->enqueue_radio_sync_assets($form_id);
         }
     }
@@ -452,11 +474,13 @@ class Operaton_DMN_Gravity_Forms
     {
         static $scripts_loaded = false;
 
-        if ($scripts_loaded) {
+        if ($scripts_loaded)
+        {
             return;
         }
 
-        if (!wp_script_is('operaton-dmn-gravity-integration', 'enqueued')) {
+        if (!wp_script_is('operaton-dmn-gravity-integration', 'enqueued'))
+        {
             wp_enqueue_script(
                 'operaton-dmn-gravity-integration',
                 $this->assets->get_plugin_url() . 'assets/js/gravity-forms.js',
@@ -503,22 +527,25 @@ class Operaton_DMN_Gravity_Forms
         $localization_key = $form_id . '_' . ($config->id ?? 0);
 
         // Prevent duplicate localization
-        if (isset(self::$localized_form_configs[$localization_key])) {
-            $this->log_debug('Config already localized for form ' . $form_id);
+        if (isset(self::$localized_form_configs[$localization_key]))
+        {
+            operaton_debug('GravityForms', 'Config already localized for form ' . $form_id);
             return;
         }
 
         // Prevent rapid-fire attempts
-        if (isset(self::$localization_timestamps[$form_id])) {
+        if (isset(self::$localization_timestamps[$form_id]))
+        {
             $last_attempt = self::$localization_timestamps[$form_id];
-            if ((time() - $last_attempt) < 3) {
-                $this->log_debug('Preventing rapid localization for form ' . $form_id);
+            if ((time() - $last_attempt) < 3)
+            {
+                operaton_debug('GravityForms', 'Preventing rapid localization for form ' . $form_id);
                 return;
             }
         }
 
         self::$localization_timestamps[$form_id] = time();
-        $this->log_debug('Localizing config for form ' . $form_id);
+        operaton_debug('GravityForms', 'Localizing config for form ' . $form_id);
 
         // Build configuration arrays
         $field_mappings = $this->get_field_mappings($config);
@@ -560,7 +587,7 @@ class Operaton_DMN_Gravity_Forms
             'config_var_name' => $config_var_name
         );
 
-        $this->log_debug('Config successfully localized for form ' . $form_id);
+        operaton_debug('GravityForms', 'Config successfully localized for form ' . $form_id);
     }
 
     // =============================================================================
@@ -592,11 +619,13 @@ class Operaton_DMN_Gravity_Forms
     {
         $form_id = $form['id'];
 
-        if ($this->form_needs_radio_sync($form_id)) {
-            $this->log_debug('Adding radio sync for form ' . $form_id);
+        if ($this->form_needs_radio_sync($form_id))
+        {
+            operaton_debug('GravityForms', 'Adding radio sync for form ' . $form_id);
             $this->assets->enqueue_radio_sync_assets($form_id);
 
-            add_action('wp_footer', function () use ($form_id) {
+            add_action('wp_footer', function () use ($form_id)
+            {
                 $this->add_radio_sync_initialization($form_id);
             }, 15);
         }
@@ -615,7 +644,8 @@ class Operaton_DMN_Gravity_Forms
     {
         $config = $this->get_form_config($form_id);
 
-        if (!$config) {
+        if (!$config)
+        {
             return false;
         }
 
@@ -656,7 +686,8 @@ class Operaton_DMN_Gravity_Forms
     public function ajax_evaluate_form(): void
     {
         // Verify nonce for security
-        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'operaton_gravity_nonce')) {
+        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'operaton_gravity_nonce'))
+        {
             wp_die(json_encode(array(
                 'success' => false,
                 'message' => __('Security verification failed.', 'operaton-dmn')
@@ -666,7 +697,8 @@ class Operaton_DMN_Gravity_Forms
         $form_id = intval($_POST['form_id'] ?? 0);
         $config_id = intval($_POST['config_id'] ?? 0);
 
-        if (!$form_id || !$config_id) {
+        if (!$form_id || !$config_id)
+        {
             wp_die(json_encode(array(
                 'success' => false,
                 'message' => __('Missing form or configuration ID.', 'operaton-dmn')
@@ -675,7 +707,8 @@ class Operaton_DMN_Gravity_Forms
 
         // Get configuration and validate
         $config = $this->database->get_config($config_id);
-        if (!$config || $config->form_id != $form_id) {
+        if (!$config || $config->form_id != $form_id)
+        {
             wp_die(json_encode(array(
                 'success' => false,
                 'message' => __('Invalid configuration.', 'operaton-dmn')
@@ -684,7 +717,8 @@ class Operaton_DMN_Gravity_Forms
 
         // Process evaluation through API manager
         $api_manager = $this->core->get_api_instance();
-        if (!$api_manager) {
+        if (!$api_manager)
+        {
             wp_die(json_encode(array(
                 'success' => false,
                 'message' => __('API manager not available.', 'operaton-dmn')
@@ -717,7 +751,8 @@ class Operaton_DMN_Gravity_Forms
         $form_id = $form['id'];
         $config = $this->get_form_config($form_id);
 
-        if (!$config) {
+        if (!$config)
+        {
             return $validation_result;
         }
 
@@ -743,11 +778,12 @@ class Operaton_DMN_Gravity_Forms
         $form_id = $form['id'];
         $config = $this->get_form_config($form_id);
 
-        if (!$config) {
+        if (!$config)
+        {
             return;
         }
 
-        $this->log_debug('Form ' . $form_id . ' submitted with DMN configuration');
+        operaton_debug('GravityForms', 'Form ' . $form_id . ' submitted with DMN configuration');
 
         // Add post-submission processing logic here if needed
         // For example, logging or additional data processing
@@ -767,12 +803,14 @@ class Operaton_DMN_Gravity_Forms
      */
     public function init_admin_integration(): void
     {
-        if (!is_admin() || !$this->check_gravity_forms_availability()) {
+        if (!is_admin() || !$this->check_gravity_forms_availability())
+        {
             return;
         }
 
         // Admin-specific initialization logic here
-        $this->log_debug('Admin integration initialized');
+        // UPDATED: Use global debug manager
+        operaton_debug('GravityForms', 'Admin integration initialized');
     }
 
     /**
@@ -844,22 +882,28 @@ class Operaton_DMN_Gravity_Forms
      */
     public function get_available_forms(): array
     {
-        if (!$this->check_gravity_forms_availability()) {
+        if (!$this->check_gravity_forms_availability())
+        {
             return array();
         }
 
-        try {
+        try
+        {
             $forms = GFAPI::get_forms();
 
-            foreach ($forms as &$form) {
-                if (isset($form['fields'])) {
+            foreach ($forms as &$form)
+            {
+                if (isset($form['fields']))
+                {
                     $form['field_list'] = $this->get_form_fields($form['id']);
                 }
             }
 
             return $forms;
-        } catch (Exception $e) {
-            error_log('Operaton DMN Gravity Forms: Error getting forms: ' . $e->getMessage());
+        }
+        catch (Exception $e)
+        {
+            operaton_debug_minimal('GravityForms', 'Operaton DMN Gravity Forms: Error getting forms: ' . $e->getMessage());
             return array();
         }
     }
@@ -873,14 +917,18 @@ class Operaton_DMN_Gravity_Forms
      */
     public function form_exists($form_id): bool
     {
-        if (!$this->check_gravity_forms_availability()) {
+        if (!$this->check_gravity_forms_availability())
+        {
             return false;
         }
 
-        try {
+        try
+        {
             $form = GFAPI::get_form($form_id);
             return !empty($form);
-        } catch (Exception $e) {
+        }
+        catch (Exception $e)
+        {
             return false;
         }
     }
@@ -894,14 +942,18 @@ class Operaton_DMN_Gravity_Forms
      */
     public function get_form_title($form_id): string
     {
-        if (!$this->check_gravity_forms_availability()) {
+        if (!$this->check_gravity_forms_availability())
+        {
             return '';
         }
 
-        try {
+        try
+        {
             $form = GFAPI::get_form($form_id);
             return !empty($form['title']) ? $form['title'] : '';
-        } catch (Exception $e) {
+        }
+        catch (Exception $e)
+        {
             return '';
         }
     }
@@ -915,27 +967,32 @@ class Operaton_DMN_Gravity_Forms
      */
     public function get_form_fields($form_id): array
     {
-        if (!$this->check_gravity_forms_availability()) {
+        if (!$this->check_gravity_forms_availability())
+        {
             return array();
         }
 
         $cache_key = 'fields_' . $form_id;
 
-        if (isset(self::$form_fields_cache[$cache_key])) {
+        if (isset(self::$form_fields_cache[$cache_key]))
+        {
             return self::$form_fields_cache[$cache_key];
         }
 
-        try {
+        try
+        {
             $form = GFAPI::get_form($form_id);
 
-            if (!$form) {
+            if (!$form)
+            {
                 self::$form_fields_cache[$cache_key] = array();
                 return array();
             }
 
             $fields = array();
 
-            foreach ($form['fields'] as $field) {
+            foreach ($form['fields'] as $field)
+            {
                 $field_data = array(
                     'id' => $field->id,
                     'label' => $field->label,
@@ -947,9 +1004,11 @@ class Operaton_DMN_Gravity_Forms
                 );
 
                 // Add choices for select/radio/checkbox fields
-                if (in_array($field->type, array('select', 'radio', 'checkbox')) && !empty($field->choices)) {
+                if (in_array($field->type, array('select', 'radio', 'checkbox')) && !empty($field->choices))
+                {
                     $field_data['choices'] = array();
-                    foreach ($field->choices as $choice) {
+                    foreach ($field->choices as $choice)
+                    {
                         $field_data['choices'][] = array(
                             'text' => $choice['text'],
                             'value' => $choice['value']
@@ -962,9 +1021,10 @@ class Operaton_DMN_Gravity_Forms
 
             self::$form_fields_cache[$cache_key] = $fields;
             return $fields;
-
-        } catch (Exception $e) {
-            error_log('Operaton DMN Gravity Forms: Error getting form fields: ' . $e->getMessage());
+        }
+        catch (Exception $e)
+        {
+            operaton_debug_minimal('GravityForms', 'Operaton DMN Gravity Forms: Error getting form fields: ' . $e->getMessage());
             self::$form_fields_cache[$cache_key] = array();
             return array();
         }
@@ -991,25 +1051,31 @@ class Operaton_DMN_Gravity_Forms
             )
         );
 
-        if ($status['gravity_forms_available']) {
-            try {
+        if ($status['gravity_forms_available'])
+        {
+            try
+            {
                 $forms = GFAPI::get_forms();
                 $status['total_forms'] = count($forms);
 
                 $forms_with_config = 0;
-                foreach ($forms as $form) {
-                    if ($this->form_has_dmn_config($form['id'])) {
+                foreach ($forms as $form)
+                {
+                    if ($this->form_has_dmn_config($form['id']))
+                    {
                         $forms_with_config++;
                     }
                 }
                 $status['forms_with_dmn_config'] = $forms_with_config;
-
-            } catch (Exception $e) {
+            }
+            catch (Exception $e)
+            {
                 $status['error'] = $e->getMessage();
             }
 
             // Add version information
-            if (class_exists('GFCommon')) {
+            if (class_exists('GFCommon'))
+            {
                 $status['version_info'] = array(
                     'gravity_forms_version' => GFCommon::$version ?? 'unknown',
                     'minimum_required' => self::MIN_GF_VERSION,
@@ -1034,23 +1100,29 @@ class Operaton_DMN_Gravity_Forms
      */
     public function clear_form_cache($form_id = null): void
     {
-        if ($form_id) {
+        if ($form_id)
+        {
             $keys_to_remove = array();
-            foreach (self::$form_config_cache as $key => $value) {
-                if (strpos($key, '_' . $form_id) !== false) {
+            foreach (self::$form_config_cache as $key => $value)
+            {
+                if (strpos($key, '_' . $form_id) !== false)
+                {
                     $keys_to_remove[] = $key;
                 }
             }
 
-            foreach ($keys_to_remove as $key) {
+            foreach ($keys_to_remove as $key)
+            {
                 unset(self::$form_config_cache[$key]);
             }
 
             // Clear fields cache for specific form
             unset(self::$form_fields_cache['fields_' . $form_id]);
 
-            $this->log_debug('Cleared cache for form ' . $form_id);
-        } else {
+            operaton_debug('GravityForms', 'Cleared cache for form ' . $form_id);
+        }
+        else
+        {
             $this->clear_all_caches();
         }
     }
@@ -1068,7 +1140,7 @@ class Operaton_DMN_Gravity_Forms
         self::$localized_form_configs = array();
         self::$localization_timestamps = array();
 
-        $this->log_debug('All caches cleared');
+        operaton_debug('GravityForms', 'All caches cleared');
     }
 
     /**
@@ -1080,24 +1152,30 @@ class Operaton_DMN_Gravity_Forms
      */
     public function clear_gravity_forms_localization_cache($form_id = null): void
     {
-        if ($form_id) {
+        if ($form_id)
+        {
             $keys_to_remove = array();
-            foreach (self::$localized_form_configs as $key => $data) {
-                if ($data['form_id'] == $form_id) {
+            foreach (self::$localized_form_configs as $key => $data)
+            {
+                if ($data['form_id'] == $form_id)
+                {
                     $keys_to_remove[] = $key;
                 }
             }
 
-            foreach ($keys_to_remove as $key) {
+            foreach ($keys_to_remove as $key)
+            {
                 unset(self::$localized_form_configs[$key]);
             }
 
             unset(self::$localization_timestamps[$form_id]);
-            $this->log_debug('Cleared localization cache for form ' . $form_id);
-        } else {
+            operaton_debug('GravityForms', 'Cleared localization cache for form ' . $form_id);
+        }
+        else
+        {
             self::$localized_form_configs = array();
             self::$localization_timestamps = array();
-            $this->log_debug('All localization cache cleared');
+            operaton_debug('GravityForms', 'All localization cache cleared');
         }
     }
 
@@ -1115,7 +1193,7 @@ class Operaton_DMN_Gravity_Forms
     {
         // This method is kept for backward compatibility
         // Most functionality is now handled in conditional_init_gravity_forms()
-        $this->log_debug('Gravity Forms hooks method called (compatibility)');
+        operaton_debug('GravityForms', 'Gravity Forms hooks method called (compatibility)');
     }
 
     /**
@@ -1146,7 +1224,8 @@ class Operaton_DMN_Gravity_Forms
     {
         $cache_key = 'config_' . $form_id;
 
-        if (isset(self::$form_config_cache[$cache_key])) {
+        if (isset(self::$form_config_cache[$cache_key]))
+        {
             return self::$form_config_cache[$cache_key];
         }
 
@@ -1178,26 +1257,31 @@ class Operaton_DMN_Gravity_Forms
     {
         global $post;
 
-        if (!$post) {
+        if (!$post)
+        {
             return false;
         }
 
         // Check shortcodes
         $shortcode_form_ids = $this->extract_form_ids_from_shortcodes($post->post_content);
-        if ($this->any_forms_have_dmn_config($shortcode_form_ids)) {
+        if ($this->any_forms_have_dmn_config($shortcode_form_ids))
+        {
             return true;
         }
 
         // Check Gutenberg blocks
         $block_form_ids = $this->extract_form_ids_from_blocks($post);
-        if ($this->any_forms_have_dmn_config($block_form_ids)) {
+        if ($this->any_forms_have_dmn_config($block_form_ids))
+        {
             return true;
         }
 
         // Check URL parameters for specific form
-        if (isset($_GET['gf_page']) && isset($_GET['id'])) {
+        if (isset($_GET['gf_page']) && isset($_GET['id']))
+        {
             $form_id = intval($_GET['id']);
-            if ($form_id > 0) {
+            if ($form_id > 0)
+            {
                 return $this->form_has_dmn_config($form_id);
             }
         }
@@ -1214,8 +1298,10 @@ class Operaton_DMN_Gravity_Forms
      */
     private function any_forms_have_dmn_config($form_ids): bool
     {
-        foreach ($form_ids as $form_id) {
-            if ($this->form_has_dmn_config($form_id)) {
+        foreach ($form_ids as $form_id)
+        {
+            if ($this->form_has_dmn_config($form_id))
+            {
                 return true;
             }
         }
@@ -1234,7 +1320,8 @@ class Operaton_DMN_Gravity_Forms
         $form_ids = array();
         $pattern = '/\[gravityform[^\]]*id=["\'](\d+)["\'][^\]]*\]/';
 
-        if (preg_match_all($pattern, $content, $matches)) {
+        if (preg_match_all($pattern, $content, $matches))
+        {
             $form_ids = array_map('intval', $matches[1]);
         }
 
@@ -1252,7 +1339,8 @@ class Operaton_DMN_Gravity_Forms
     {
         $form_ids = array();
 
-        if (function_exists('parse_blocks')) {
+        if (function_exists('parse_blocks'))
+        {
             $blocks = parse_blocks($post->post_content);
             $form_ids = $this->find_gravity_form_ids_in_blocks($blocks);
         }
@@ -1271,14 +1359,18 @@ class Operaton_DMN_Gravity_Forms
     {
         $form_ids = array();
 
-        foreach ($blocks as $block) {
-            if ($block['blockName'] === 'gravityforms/form') {
-                if (isset($block['attrs']['formId'])) {
+        foreach ($blocks as $block)
+        {
+            if ($block['blockName'] === 'gravityforms/form')
+            {
+                if (isset($block['attrs']['formId']))
+                {
                     $form_ids[] = intval($block['attrs']['formId']);
                 }
             }
 
-            if (!empty($block['innerBlocks'])) {
+            if (!empty($block['innerBlocks']))
+            {
                 $inner_ids = $this->find_gravity_form_ids_in_blocks($block['innerBlocks']);
                 $form_ids = array_merge($form_ids, $inner_ids);
             }
@@ -1296,7 +1388,8 @@ class Operaton_DMN_Gravity_Forms
      */
     private function get_field_mappings($config): array
     {
-        if (empty($config->field_mappings)) {
+        if (empty($config->field_mappings))
+        {
             return array();
         }
 
@@ -1313,7 +1406,8 @@ class Operaton_DMN_Gravity_Forms
      */
     private function get_result_mappings($config): array
     {
-        if (empty($config->result_mappings)) {
+        if (empty($config->result_mappings))
+        {
             return array();
         }
 
@@ -1336,11 +1430,15 @@ class Operaton_DMN_Gravity_Forms
         $result_field_ids = array();
 
         // Primary: Extract from result_mappings (most reliable)
-        if (is_array($result_mappings)) {
-            foreach ($result_mappings as $dmn_variable => $mapping) {
-                if (isset($mapping['field_id']) && is_numeric($mapping['field_id'])) {
+        if (is_array($result_mappings))
+        {
+            foreach ($result_mappings as $dmn_variable => $mapping)
+            {
+                if (isset($mapping['field_id']) && is_numeric($mapping['field_id']))
+                {
                     $field_id = intval($mapping['field_id']);
-                    if (!in_array($field_id, $result_field_ids)) {
+                    if (!in_array($field_id, $result_field_ids))
+                    {
                         $result_field_ids[] = $field_id;
                     }
                 }
@@ -1348,13 +1446,18 @@ class Operaton_DMN_Gravity_Forms
         }
 
         // Secondary: Look for clear result variables in field_mappings
-        if (is_array($field_mappings)) {
-            foreach ($field_mappings as $dmn_variable => $mapping) {
-                if (isset($mapping['field_id']) && is_numeric($mapping['field_id'])) {
+        if (is_array($field_mappings))
+        {
+            foreach ($field_mappings as $dmn_variable => $mapping)
+            {
+                if (isset($mapping['field_id']) && is_numeric($mapping['field_id']))
+                {
                     $field_id = intval($mapping['field_id']);
                     // Only include variables that clearly indicate results
-                    if (strpos($dmn_variable, 'aanmerking') === 0 || strpos($dmn_variable, 'result') === 0) {
-                        if (!in_array($field_id, $result_field_ids)) {
+                    if (strpos($dmn_variable, 'aanmerking') === 0 || strpos($dmn_variable, 'result') === 0)
+                    {
+                        if (!in_array($field_id, $result_field_ids))
+                        {
                             $result_field_ids[] = $field_id;
                         }
                     }
@@ -1363,11 +1466,14 @@ class Operaton_DMN_Gravity_Forms
         }
 
         // Form-specific corrections (if needed)
-        if ($form_id == 8) {
+        if ($form_id == 8)
+        {
             $correct_result_fields = array(35, 36); // aanmerkingHeusdenPas, aanmerkingKindPakket
             $result_field_ids = array_intersect($result_field_ids, $correct_result_fields);
-            foreach ($correct_result_fields as $field_id) {
-                if (!in_array($field_id, $result_field_ids)) {
+            foreach ($correct_result_fields as $field_id)
+            {
+                if (!in_array($field_id, $result_field_ids))
+                {
                     $result_field_ids[] = $field_id;
                 }
             }
@@ -1386,13 +1492,16 @@ class Operaton_DMN_Gravity_Forms
      */
     private function count_form_pages($form): int
     {
-        if (empty($form['fields'])) {
+        if (empty($form['fields']))
+        {
             return 1;
         }
 
         $max_page = 1;
-        foreach ($form['fields'] as $field) {
-            if ($field->type === 'page') {
+        foreach ($form['fields'] as $field)
+        {
+            if ($field->type === 'page')
+            {
                 $max_page++;
             }
         }
@@ -1442,20 +1551,6 @@ class Operaton_DMN_Gravity_Forms
     // =============================================================================
 
     /**
-     * Log debug message if debug mode is enabled
-     *
-     * @since 1.0.0
-     * @param string $message Debug message
-     * @return void
-     */
-    private function log_debug($message): void
-    {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN Gravity Forms: ' . $message);
-        }
-    }
-
-    /**
      * Get performance metrics if performance monitor is available
      *
      * @since 1.0.0
@@ -1463,7 +1558,8 @@ class Operaton_DMN_Gravity_Forms
      */
     public function get_performance_metrics(): array
     {
-        if ($this->performance) {
+        if ($this->performance)
+        {
             return $this->performance->get_metrics('gravity_forms');
         }
 
