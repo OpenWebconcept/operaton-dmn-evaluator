@@ -27,7 +27,7 @@ $trait_files = array(
     __DIR__ . '/api-traits/trait-api-decision-flow.php',
     __DIR__ . '/api-traits/trait-api-testing.php',
     __DIR__ . '/api-traits/trait-api-utilities.php',
-    __DIR__ . '/api-traits/trait-api-debug-enhanced.php',
+    // Debug trait removed - now using global debug manager
 );
 
 foreach ($trait_files as $trait_file)
@@ -35,18 +35,11 @@ foreach ($trait_files as $trait_file)
     if (file_exists($trait_file))
     {
         require_once $trait_file;
-
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Loaded trait: ' . basename($trait_file));
-        }
+        operaton_debug_verbose('API', 'Loaded trait: ' . basename($trait_file));
     }
     else
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Missing trait file: ' . $trait_file);
-        }
+        operaton_debug_minimal('API', 'Missing trait file: ' . $trait_file);
     }
 }
 
@@ -87,7 +80,7 @@ class Operaton_DMN_API
     use Operaton_DMN_API_Decision_Flow;         // Decision flow monitoring & visualization
     use Operaton_DMN_API_Testing;               // Testing & configuration validation
     use Operaton_DMN_API_Utilities;             // Consolidated utilities (data processing, HTTP, etc.)
-    use Operaton_DMN_API_Debug_Enhanced;        // Enhanced debug system
+                                                // Debug trait removed - now using global debug manager
 }
 
 // End of main API class file

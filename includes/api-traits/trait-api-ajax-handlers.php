@@ -11,7 +11,8 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH')) {
+if (!defined('ABSPATH'))
+{
     exit;
 }
 
@@ -25,16 +26,18 @@ trait Operaton_DMN_API_AJAX_Handlers
      */
     public function ajax_test_endpoint()
     {
-        $this->log_standard('Testing endpoint connectivity');
+        operaton_debug('API', 'Testing endpoint connectivity');
 
         // Verify nonce and permissions
-        if (!wp_verify_nonce($_POST['nonce'], 'operaton_test_endpoint') || !current_user_can('manage_options')) {
+        if (!wp_verify_nonce($_POST['nonce'], 'operaton_test_endpoint') || !current_user_can('manage_options'))
+        {
             wp_die(__('Security check failed', 'operaton-dmn'));
         }
 
         $endpoint = sanitize_url($_POST['endpoint']);
 
-        if (empty($endpoint)) {
+        if (empty($endpoint))
+        {
             wp_send_json_error(array(
                 'message' => __('Endpoint URL is required.', 'operaton-dmn')
             ));
@@ -43,9 +46,12 @@ trait Operaton_DMN_API_AJAX_Handlers
         // Test the endpoint
         $test_result = $this->test_endpoint_connectivity($endpoint);
 
-        if ($test_result['success']) {
+        if ($test_result['success'])
+        {
             wp_send_json_success($test_result);
-        } else {
+        }
+        else
+        {
             wp_send_json_error($test_result);
         }
     }
@@ -58,17 +64,19 @@ trait Operaton_DMN_API_AJAX_Handlers
      */
     public function ajax_test_full_config()
     {
-        $this->log_standard('Testing full configuration');
+        operaton_debug('API', 'Testing full configuration');
 
         // Verify nonce and permissions
-        if (!wp_verify_nonce($_POST['nonce'], 'operaton_test_endpoint') || !current_user_can('manage_options')) {
+        if (!wp_verify_nonce($_POST['nonce'], 'operaton_test_endpoint') || !current_user_can('manage_options'))
+        {
             wp_die(__('Security check failed', 'operaton-dmn'));
         }
 
         $base_endpoint = sanitize_url($_POST['base_endpoint']);
         $decision_key = sanitize_text_field($_POST['decision_key']);
 
-        if (empty($base_endpoint) || empty($decision_key)) {
+        if (empty($base_endpoint) || empty($decision_key))
+        {
             wp_send_json_error(array(
                 'message' => __('Both base endpoint and decision key are required.', 'operaton-dmn')
             ));
@@ -76,9 +84,12 @@ trait Operaton_DMN_API_AJAX_Handlers
 
         $test_result = $this->test_full_endpoint_configuration($base_endpoint, $decision_key);
 
-        if ($test_result['success']) {
+        if ($test_result['success'])
+        {
             wp_send_json_success($test_result);
-        } else {
+        }
+        else
+        {
             wp_send_json_error($test_result);
         }
     }
@@ -91,9 +102,10 @@ trait Operaton_DMN_API_AJAX_Handlers
      */
     public function ajax_clear_update_cache()
     {
-        $this->log_standard('Clearing update cache');
+        operaton_debug('API', 'Clearing update cache');
 
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
+        {
             wp_send_json_error(array(
                 'message' => __('Insufficient permissions', 'operaton-dmn')
             ));
@@ -128,7 +140,7 @@ trait Operaton_DMN_API_AJAX_Handlers
 
         try
         {
-            error_log("Starting Operaton DMN REST API Debug Session");
+            operaton_debug('API', 'Starting Operaton DMN REST API Debug Session');
 
             $results = array();
             $results['server_config'] = $this->test_server_config();
@@ -136,7 +148,7 @@ trait Operaton_DMN_API_AJAX_Handlers
             $results['rest_api'] = $this->test_rest_api_availability();
             $results['api_call'] = $this->test_rest_api_call();
 
-            error_log("=== END OPERATON DMN DEBUG ===");
+            operaton_debug('API', '=== END OPERATON DMN DEBUG ===');
 
             wp_send_json_success(array(
                 'message' => 'Debug completed successfully',
@@ -146,7 +158,7 @@ trait Operaton_DMN_API_AJAX_Handlers
         }
         catch (Exception $e)
         {
-            error_log("Debug error: " . $e->getMessage());
+            operaton_debug_minimal('API', 'Debug error: ' . $e->getMessage());
             wp_send_json_error('Debug failed: ' . $e->getMessage());
         }
     }
@@ -203,7 +215,7 @@ trait Operaton_DMN_API_AJAX_Handlers
         }
         catch (Exception $e)
         {
-            error_log('Operaton DMN Debug AJAX Error: ' . $e->getMessage());
+            operaton_debug_minimal('API', 'Debug AJAX Error: ' . $e->getMessage());
             wp_send_json_error('Debug test execution failed: ' . $e->getMessage());
         }
     }
@@ -219,7 +231,7 @@ trait Operaton_DMN_API_AJAX_Handlers
         // Prevent any output before JSON response
         ob_clean();
 
-        $this->log_standard('Testing complete configuration via AJAX');
+        operaton_debug('API', 'Testing complete configuration via AJAX');
 
         // Verify nonce and permissions
         if (!wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce') || !current_user_can('manage_options'))
@@ -255,12 +267,12 @@ trait Operaton_DMN_API_AJAX_Handlers
         }
         catch (Exception $e)
         {
-            $this->log_minimal('Test configuration error occurred', [
+            operaton_debug_minimal('API', 'Test configuration error occurred', [
                 'error_message' => $e->getMessage(),
                 'error_line' => $e->getLine(),
                 'error_file' => basename($e->getFile())
             ]);
-            
+
             wp_send_json_error(array(
                 'message' => 'Test execution failed: ' . $e->getMessage()
             ));

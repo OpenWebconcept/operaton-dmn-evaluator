@@ -98,7 +98,7 @@ trait Operaton_DMN_API_Core
         // Initialize connection timeout from saved setting
         $this->init_connection_timeout();
 
-        $this->log_standard('Handler initialized');
+        operaton_debug('API', 'Handler initialized');
 
         $this->init_hooks();
     }
