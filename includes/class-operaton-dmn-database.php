@@ -92,10 +92,7 @@ class Operaton_DMN_Database
         $this->plugin_version = $plugin_version;
         $this->table_name = $this->wpdb->prefix . 'operaton_dmn_configs';
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Manager initialized with version ' . $plugin_version);
-        }
+        $this->log_standard('Manager initialized', ['version' => $plugin_version]);
 
         $this->init_hooks();
     }
@@ -131,10 +128,7 @@ class Operaton_DMN_Database
      */
     public function create_database_tables()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Creating/updating database tables');
-        }
+        $this->log_standard('Creating/updating database tables');
 
         // Check if table already exists and handle column additions
         if ($this->wpdb->get_var("SHOW TABLES LIKE '{$this->table_name}'") === $this->table_name)
@@ -177,10 +171,7 @@ class Operaton_DMN_Database
             // Update database version
             update_option($this->db_version_option, $this->current_db_version);
 
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN Database: Table created successfully');
-            }
+            $this->log_standard('Table created successfully');
         }
 
         return !empty($result);
@@ -219,14 +210,14 @@ class Operaton_DMN_Database
                 if ($result !== false)
                 {
                     $added_columns++;
-                    if (defined('WP_DEBUG') && WP_DEBUG)
-                    {
-                        error_log("Operaton DMN Database: Added column '{$column_name}'");
-                    }
+                    $this->log_verbose('Added column', ['column_name' => $column_name]);
                 }
                 else
                 {
-                    error_log("Operaton DMN Database: Failed to add column '{$column_name}': " . $this->wpdb->last_error);
+                    $this->log_minimal('Failed to add column', [
+                        'column_name' => $column_name,
+                        'error' => $this->wpdb->last_error
+                    ]);
                 }
             }
         }
@@ -287,10 +278,10 @@ class Operaton_DMN_Database
     {
         $installed_db_version = get_option($this->db_version_option, 0);
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log("Operaton DMN Database: Checking database version - installed: {$installed_db_version}, current: {$this->current_db_version}");
-        }
+        $this->log_standard('Checking database version', [
+            'installed_version' => $installed_db_version,
+            'current_version' => $this->current_db_version
+        ]);
 
         // Check if table exists at all
         if ($this->wpdb->get_var("SHOW TABLES LIKE '{$this->table_name}'") !== $this->table_name)
@@ -301,10 +292,10 @@ class Operaton_DMN_Database
         // Check if migration is needed
         if (version_compare($installed_db_version, $this->current_db_version, '<'))
         {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log("Operaton DMN Database: Migration needed from version {$installed_db_version} to {$this->current_db_version}");
-            }
+            $this->log_standard('Migration needed', [
+                'from_version' => $installed_db_version,
+                'to_version' => $this->current_db_version
+            ]);
 
             return $this->run_database_migration($installed_db_version);
         }
@@ -348,10 +339,9 @@ class Operaton_DMN_Database
             {
                 update_option($this->db_version_option, $this->current_db_version);
 
-                if (defined('WP_DEBUG') && WP_DEBUG)
-                {
-                    error_log("Operaton DMN Database: Migration completed successfully to version {$this->current_db_version}");
-                }
+                $this->log_standard('Migration completed successfully', [
+                    'to_version' => $this->current_db_version
+                ]);
             }
         }
         catch (Exception $e)
@@ -446,10 +436,7 @@ class Operaton_DMN_Database
                 return false;
             }
 
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log("Operaton DMN Database: Added 'active' column successfully");
-            }
+            $this->log_verbose("Added 'active' column successfully");
         }
 
         // Add index for active column
@@ -485,10 +472,7 @@ class Operaton_DMN_Database
      */
     public function get_all_configurations($args = array())
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Retrieving all configurations');
-        }
+        $this->log_verbose('Retrieving all configurations');
 
         // Default arguments
         $defaults = array(
@@ -536,10 +520,7 @@ class Operaton_DMN_Database
      */
     public function get_configuration($id, $use_cache = true)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Retrieving configuration with ID: ' . $id);
-        }
+        $this->log_verbose('Retrieving configuration', ['id' => $id]);
 
         $cache_key = "operaton_dmn_config_{$id}";
 
@@ -603,25 +584,16 @@ class Operaton_DMN_Database
         if (!$use_cache && isset($cache[$form_id]))
         {
             unset($cache[$form_id]);
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN Database: Cleared cached config for form: ' . $form_id);
-            }
+            $this->log_verbose('Cleared cached config for form', ['form_id' => $form_id]);
         }
 
         if ($use_cache && isset($cache[$form_id]))
         {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN Database: Using cached config for form: ' . $form_id);
-            }
+            $this->log_verbose('Using cached config for form', ['form_id' => $form_id]);
             return $cache[$form_id];
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Loading config from database for form: ' . $form_id);
-        }
+        $this->log_verbose('Loading config from database for form', ['form_id' => $form_id]);
 
         $config = $this->wpdb->get_row(
             $this->wpdb->prepare("SELECT * FROM {$this->table_name} WHERE form_id = %d", $form_id)
@@ -645,10 +617,7 @@ class Operaton_DMN_Database
      */
     public function save_configuration($data)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Saving configuration');
-        }
+        $this->log_standard('Saving configuration');
 
         // Validate data first
         $validation_result = $this->validate_configuration_data($data);
@@ -799,10 +768,7 @@ class Operaton_DMN_Database
      */
     public function delete_config($id)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Deleting configuration with ID: ' . $id);
-        }
+        $this->log_standard('Deleting configuration', ['id' => $id]);
 
         // Validate ID
         $id = intval($id);
@@ -863,10 +829,10 @@ class Operaton_DMN_Database
      */
     public function store_process_instance_id($form_id, $process_instance_id)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log("Operaton DMN Database: Storing process instance ID: {$process_instance_id} for form: {$form_id}");
-        }
+        $this->log_standard('Storing process instance ID', [
+            'process_instance_id' => $process_instance_id,
+            'form_id' => $form_id
+        ]);
 
         // Validate inputs
         if (empty($form_id) || empty($process_instance_id))
@@ -893,10 +859,7 @@ class Operaton_DMN_Database
                 $process_instance_id
             );
 
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log("Operaton DMN Database: User meta storage result: " . ($result ? 'success' : 'failed'));
-            }
+            $this->log_verbose('User meta storage result', ['result' => $result ? 'success' : 'failed']);
         }
 
         // Store in WordPress transients as backup (expire in 24 hours)
@@ -916,10 +879,7 @@ class Operaton_DMN_Database
      */
     public function get_process_instance_id($form_id)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Retrieving process instance ID for form: ' . $form_id);
-        }
+        $this->log_verbose('Retrieving process instance ID for form', ['form_id' => $form_id]);
 
         $form_id = intval($form_id);
         if ($form_id <= 0)
@@ -935,10 +895,7 @@ class Operaton_DMN_Database
 
         if (isset($_SESSION["operaton_process_{$form_id}"]))
         {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN Database: Found process ID in session');
-            }
+            $this->log_verbose('Found process ID in session');
             return sanitize_text_field($_SESSION["operaton_process_{$form_id}"]);
         }
 
@@ -948,10 +905,7 @@ class Operaton_DMN_Database
             $process_id = get_user_meta(get_current_user_id(), "operaton_process_{$form_id}", true);
             if ($process_id)
             {
-                if (defined('WP_DEBUG') && WP_DEBUG)
-                {
-                    error_log('Operaton DMN Database: Found process ID in user meta');
-                }
+                $this->log_verbose('Found process ID in user meta');
                 return sanitize_text_field($process_id);
             }
         }
@@ -962,10 +916,7 @@ class Operaton_DMN_Database
 
         if ($process_id)
         {
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN Database: Found process ID in transients');
-            }
+            $this->log_verbose('Found process ID in transients');
             return sanitize_text_field($process_id);
         }
 
@@ -984,10 +935,7 @@ class Operaton_DMN_Database
      */
     public function ajax_manual_database_update()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Manual database update requested');
-        }
+        $this->log_standard('Manual database update requested');
 
         // Verify nonce and permissions
         if (!wp_verify_nonce($_GET['_wpnonce'], 'operaton_manual_db_update') || !current_user_can('manage_options'))
@@ -1035,10 +983,7 @@ class Operaton_DMN_Database
     {
         $errors = array();
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Validating configuration data');
-        }
+        $this->log_verbose('Validating configuration data');
 
         // Required field validation
         $required_fields = array(
@@ -1337,10 +1282,10 @@ class Operaton_DMN_Database
      */
     public function clear_configuration_cache($form_id = null)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Clearing configuration cache' . ($form_id ? ' for form ' . $form_id : ' (all)'));
-        }
+        $this->log_verbose('Clearing configuration cache', [
+            'scope' => $form_id ? 'specific_form' : 'all',
+            'form_id' => $form_id ?: null
+        ]);
 
         // STEP 1 PART 2: Clear Gravity Forms localization cache
         $plugin_instance = OperatonDMNEvaluator::get_instance();
@@ -1356,10 +1301,9 @@ class Operaton_DMN_Database
                 $gravity_forms_manager->clear_gravity_forms_localization_cache();
             }
 
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN Database: Gravity Forms localization cache cleared for form: ' . ($form_id ?: 'ALL'));
-            }
+            $this->log_verbose('Gravity Forms localization cache cleared', [
+                'form_id' => $form_id ?: 'ALL'
+            ]);
         }
 
         // FIXED: Clear static cache in get_config_by_form_id
@@ -1414,10 +1358,9 @@ class Operaton_DMN_Database
                 $assets_manager->clear_all_localization_cache();
             }
 
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN Database: Assets localization cache cleared for form: ' . ($form_id ?: 'ALL'));
-            }
+            $this->log_verbose('Assets localization cache cleared', [
+                'form_id' => $form_id ?: 'ALL'
+            ]);
         }
     }
 
@@ -1429,10 +1372,7 @@ class Operaton_DMN_Database
      */
     public function cleanup_old_data()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN Database: Running cleanup task');
-        }
+        $this->log_standard('Running cleanup task');
 
         // Clean up old process instance data (older than 7 days)
         if (is_user_logged_in())
