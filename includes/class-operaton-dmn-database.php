@@ -17,21 +17,8 @@ if (!defined('ABSPATH'))
     exit;
 }
 
-// Load the debug trait
-require_once __DIR__ . '/api-traits/trait-api-debug-enhanced.php';
-
 class Operaton_DMN_Database
 {
-    // Add debug level constants
-    const DEBUG_LEVEL_NONE = 0;
-    const DEBUG_LEVEL_MINIMAL = 1;
-    const DEBUG_LEVEL_STANDARD = 2;
-    const DEBUG_LEVEL_VERBOSE = 3;
-    const DEBUG_LEVEL_DIAGNOSTIC = 4;
-
-    // Add the debug trait
-    use Operaton_DMN_API_Debug_Enhanced;
-
     /**
      * Database table name for configurations
      * WordPress prefixed table name for plugin configurations
@@ -92,7 +79,8 @@ class Operaton_DMN_Database
         $this->plugin_version = $plugin_version;
         $this->table_name = $this->wpdb->prefix . 'operaton_dmn_configs';
 
-        $this->log_standard('Manager initialized', ['version' => $plugin_version]);
+        // UPDATED: Use global debug manager
+        operaton_debug('Database', 'Manager initialized', ['version' => $plugin_version]);
 
         $this->init_hooks();
     }
@@ -128,7 +116,7 @@ class Operaton_DMN_Database
      */
     public function create_database_tables()
     {
-        $this->log_standard('Creating/updating database tables');
+        operaton_debug('Database', 'Creating/updating database tables');
 
         // Check if table already exists and handle column additions
         if ($this->wpdb->get_var("SHOW TABLES LIKE '{$this->table_name}'") === $this->table_name)
@@ -171,7 +159,7 @@ class Operaton_DMN_Database
             // Update database version
             update_option($this->db_version_option, $this->current_db_version);
 
-            $this->log_standard('Table created successfully');
+            operaton_debug('Database', 'Table created successfully');
         }
 
         return !empty($result);
@@ -210,7 +198,7 @@ class Operaton_DMN_Database
                 if ($result !== false)
                 {
                     $added_columns++;
-                    $this->log_verbose('Added column', ['column_name' => $column_name]);
+                    operaton_debug_verbose('Database', 'Added column', ['column_name' => $column_name]);
                 }
                 else
                 {
@@ -278,7 +266,8 @@ class Operaton_DMN_Database
     {
         $installed_db_version = get_option($this->db_version_option, 0);
 
-        $this->log_standard('Checking database version', [
+        // UPDATED: Use global debug manager
+        operaton_debug('Database', 'Checking database version', [
             'installed_version' => $installed_db_version,
             'current_version' => $this->current_db_version
         ]);
@@ -292,7 +281,8 @@ class Operaton_DMN_Database
         // Check if migration is needed
         if (version_compare($installed_db_version, $this->current_db_version, '<'))
         {
-            $this->log_standard('Migration needed', [
+            // UPDATED: Use global debug manager
+            operaton_debug('Database', 'Migration needed', [
                 'from_version' => $installed_db_version,
                 'to_version' => $this->current_db_version
             ]);
@@ -339,14 +329,14 @@ class Operaton_DMN_Database
             {
                 update_option($this->db_version_option, $this->current_db_version);
 
-                $this->log_standard('Migration completed successfully', [
+                operaton_debug('Database', 'Migration completed successfully', [
                     'to_version' => $this->current_db_version
                 ]);
             }
         }
         catch (Exception $e)
         {
-            error_log('Operaton DMN Database: Migration failed: ' . $e->getMessage());
+            operaton_debug_minimal('Database', 'Migration failed: ' . $e->getMessage());
             $success = false;
         }
 
@@ -432,11 +422,11 @@ class Operaton_DMN_Database
             $result = $this->wpdb->query("ALTER TABLE {$this->table_name} ADD COLUMN active tinyint(1) NOT NULL DEFAULT 1");
             if ($result === false)
             {
-                error_log("Operaton DMN Database: Failed to add 'active' column: " . $this->wpdb->last_error);
+                operaton_debug_minimal('Database', "Failed to add 'active' column: " . $this->wpdb->last_error);
                 return false;
             }
 
-            $this->log_verbose("Added 'active' column successfully");
+            operaton_debug_verbose('Database', "Added 'active' column successfully");
         }
 
         // Add index for active column
@@ -472,7 +462,7 @@ class Operaton_DMN_Database
      */
     public function get_all_configurations($args = array())
     {
-        $this->log_verbose('Retrieving all configurations');
+        operaton_debug_verbose('Database', 'Retrieving all configurations');
 
         // Default arguments
         $defaults = array(
@@ -520,7 +510,7 @@ class Operaton_DMN_Database
      */
     public function get_configuration($id, $use_cache = true)
     {
-        $this->log_verbose('Retrieving configuration', ['id' => $id]);
+        operaton_debug_verbose('Database', 'Retrieving configuration', ['id' => $id]);
 
         $cache_key = "operaton_dmn_config_{$id}";
 
@@ -564,7 +554,7 @@ class Operaton_DMN_Database
         if ($form_id === 'CLEAR_CACHE')
         {
             $cache = array();
-            error_log('Operaton DMN Database: Static cache cleared');
+            operaton_debug('Database', 'Static cache cleared');
             return null;
         }
 
@@ -575,7 +565,7 @@ class Operaton_DMN_Database
             if (isset($cache[$specific_form_id]))
             {
                 unset($cache[$specific_form_id]);
-                error_log('Operaton DMN Database: Cleared static cache for form: ' . $specific_form_id);
+                operaton_debug('Database', 'Cleared static cache for form: ' . $specific_form_id);
             }
             return null;
         }
@@ -584,16 +574,16 @@ class Operaton_DMN_Database
         if (!$use_cache && isset($cache[$form_id]))
         {
             unset($cache[$form_id]);
-            $this->log_verbose('Cleared cached config for form', ['form_id' => $form_id]);
+            operaton_debug_verbose('Database', 'Cleared cached config for form', ['form_id' => $form_id]);
         }
 
         if ($use_cache && isset($cache[$form_id]))
         {
-            $this->log_verbose('Using cached config for form', ['form_id' => $form_id]);
+            operaton_debug_verbose('Database', 'Using cached config for form', ['form_id' => $form_id]);
             return $cache[$form_id];
         }
 
-        $this->log_verbose('Loading config from database for form', ['form_id' => $form_id]);
+        operaton_debug_verbose('Database', 'Loading config from database for form', ['form_id' => $form_id]);
 
         $config = $this->wpdb->get_row(
             $this->wpdb->prepare("SELECT * FROM {$this->table_name} WHERE form_id = %d", $form_id)
@@ -617,7 +607,7 @@ class Operaton_DMN_Database
      */
     public function save_configuration($data)
     {
-        $this->log_standard('Saving configuration');
+        operaton_debug('Database', 'Saving configuration');
 
         // Validate data first
         $validation_result = $this->validate_configuration_data($data);
@@ -768,7 +758,7 @@ class Operaton_DMN_Database
      */
     public function delete_config($id)
     {
-        $this->log_standard('Deleting configuration', ['id' => $id]);
+        operaton_debug('Database', 'Deleting configuration', ['id' => $id]);
 
         // Validate ID
         $id = intval($id);
@@ -829,7 +819,7 @@ class Operaton_DMN_Database
      */
     public function store_process_instance_id($form_id, $process_instance_id)
     {
-        $this->log_standard('Storing process instance ID', [
+        operaton_debug('Database', 'Storing process instance ID', [
             'process_instance_id' => $process_instance_id,
             'form_id' => $form_id
         ]);
@@ -859,7 +849,7 @@ class Operaton_DMN_Database
                 $process_instance_id
             );
 
-            $this->log_verbose('User meta storage result', ['result' => $result ? 'success' : 'failed']);
+            operaton_debug_verbose('Database', 'User meta storage result', ['result' => $result ? 'success' : 'failed']);
         }
 
         // Store in WordPress transients as backup (expire in 24 hours)
@@ -879,7 +869,7 @@ class Operaton_DMN_Database
      */
     public function get_process_instance_id($form_id)
     {
-        $this->log_verbose('Retrieving process instance ID for form', ['form_id' => $form_id]);
+        operaton_debug_verbose('Database', 'Retrieving process instance ID for form', ['form_id' => $form_id]);
 
         $form_id = intval($form_id);
         if ($form_id <= 0)
@@ -895,7 +885,7 @@ class Operaton_DMN_Database
 
         if (isset($_SESSION["operaton_process_{$form_id}"]))
         {
-            $this->log_verbose('Found process ID in session');
+            operaton_debug_verbose('Database', 'Found process ID in session');
             return sanitize_text_field($_SESSION["operaton_process_{$form_id}"]);
         }
 
@@ -905,7 +895,7 @@ class Operaton_DMN_Database
             $process_id = get_user_meta(get_current_user_id(), "operaton_process_{$form_id}", true);
             if ($process_id)
             {
-                $this->log_verbose('Found process ID in user meta');
+                operaton_debug_verbose('Database', 'Found process ID in user meta');
                 return sanitize_text_field($process_id);
             }
         }
@@ -916,7 +906,7 @@ class Operaton_DMN_Database
 
         if ($process_id)
         {
-            $this->log_verbose('Found process ID in transients');
+            operaton_debug_verbose('Database', 'Found process ID in transients');
             return sanitize_text_field($process_id);
         }
 
@@ -935,7 +925,7 @@ class Operaton_DMN_Database
      */
     public function ajax_manual_database_update()
     {
-        $this->log_standard('Manual database update requested');
+        operaton_debug('Database', 'Manual database update requested');
 
         // Verify nonce and permissions
         if (!wp_verify_nonce($_GET['_wpnonce'], 'operaton_manual_db_update') || !current_user_can('manage_options'))
@@ -983,7 +973,7 @@ class Operaton_DMN_Database
     {
         $errors = array();
 
-        $this->log_verbose('Validating configuration data');
+        operaton_debug_verbose('Database', 'Validating configuration data');
 
         // Required field validation
         $required_fields = array(
@@ -1282,7 +1272,7 @@ class Operaton_DMN_Database
      */
     public function clear_configuration_cache($form_id = null)
     {
-        $this->log_verbose('Clearing configuration cache', [
+        operaton_debug_verbose('Database', 'Clearing configuration cache', [
             'scope' => $form_id ? 'specific_form' : 'all',
             'form_id' => $form_id ?: null
         ]);
@@ -1301,7 +1291,7 @@ class Operaton_DMN_Database
                 $gravity_forms_manager->clear_gravity_forms_localization_cache();
             }
 
-            $this->log_verbose('Gravity Forms localization cache cleared', [
+            operaton_debug_verbose('Database', 'Gravity Forms localization cache cleared', [
                 'form_id' => $form_id ?: 'ALL'
             ]);
         }
@@ -1358,7 +1348,7 @@ class Operaton_DMN_Database
                 $assets_manager->clear_all_localization_cache();
             }
 
-            $this->log_verbose('Assets localization cache cleared', [
+            operaton_debug_verbose('Database', 'Assets localization cache cleared', [
                 'form_id' => $form_id ?: 'ALL'
             ]);
         }
@@ -1372,7 +1362,7 @@ class Operaton_DMN_Database
      */
     public function cleanup_old_data()
     {
-        $this->log_standard('Running cleanup task');
+        operaton_debug('Database', 'Running cleanup task');
 
         // Clean up old process instance data (older than 7 days)
         if (is_user_logged_in())
@@ -1429,7 +1419,7 @@ class Operaton_DMN_Database
 
         if (defined('WP_DEBUG') && WP_DEBUG && !empty($expired_transients))
         {
-            error_log('Operaton DMN Database: Cleaned up ' . count($expired_transients) . ' expired transients');
+            operaton_debug('Database', 'Cleaned up ' . count($expired_transients) . ' expired transients');
         }
     }
 
