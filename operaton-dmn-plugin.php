@@ -1000,17 +1000,27 @@ function operaton_dmn_debug_asset_loading()
  */
 function operaton_dmn_reset_asset_loading()
 {
-    if (is_admin() && current_user_can('manage_options')) {
-        // FIXED: Check if method exists
-        if (method_exists('Operaton_DMN_Assets', 'reset_loading_coordinator')) {
-            Operaton_DMN_Assets::reset_loading_coordinator();
-        } elseif (method_exists('Operaton_DMN_Assets', 'reset_all_loading_states')) {
-            Operaton_DMN_Assets::reset_all_loading_states();
+    if (is_admin() && current_user_can('manage_options'))
+    {
+        // Get the assets manager instance instead of calling static methods
+        $plugin_instance = OperatonDMNEvaluator::get_instance();
+        $assets_manager = $plugin_instance->get_assets_instance();
+
+        if ($assets_manager)
+        {
+            // Call instance methods, not static methods
+            if (method_exists($assets_manager, 'reset_loading_coordinator'))
+            {
+                $assets_manager->reset_loading_coordinator();
+            }
+            elseif (method_exists($assets_manager, 'reset_all_loading_states'))
+            {
+                $assets_manager->reset_all_loading_states();
+            }
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Asset loading state manually reset');
-        }
+        // Convert this debug call too while we're here:
+        $plugin_instance->log_verbose('Asset loading state manually reset');
     }
 }
 
