@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 ## Issues
 - [Issue #65](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/65) - Implement trait architecture for API class
 - [Issue #66](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/66) - Enhance debug system
+- [Issue #68](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/68) - Eliminate debug data dump of a WordPress Hook object
 
 ### Enhanced Debug Log System
 The newly added `Operaton_DMN_API_Debug_Enhanced` trait provides a comprehensive, secure debug logging system. The debug trait organizes functionality into logical groups:
