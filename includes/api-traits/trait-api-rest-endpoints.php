@@ -264,10 +264,10 @@ trait Operaton_DMN_API_REST_Endpoints
      */
     public function register_rest_routes()
     {
-        error_log('Operaton DMN API: register_rest_routes() called');
+        operaton_debug('API', 'register_rest_routes() called');
 
-        $this->log_standard('Registering REST API routes');
-        
+        operaton_debug('API', 'Registering REST API routes');
+
         // Main evaluation endpoint
         register_rest_route('operaton-dmn/v1', '/evaluate', array(
             'methods' => 'POST',
@@ -278,25 +278,28 @@ trait Operaton_DMN_API_REST_Endpoints
                     'required' => true,
                     'type' => 'integer',
                     'sanitize_callback' => 'absint',
-                    'validate_callback' => function ($value) {
+                    'validate_callback' => function ($value)
+                    {
                         return $value > 0;
                     }
                 ),
                 'form_data' => array(
                     'required' => true,
                     'type' => 'object',
-                    'validate_callback' => function ($value) {
+                    'validate_callback' => function ($value)
+                    {
                         return is_array($value) && !empty($value);
                     }
                 )
             )
         ));
-        error_log('Operaton DMN API: Evaluate route registered');
+        operaton_debug('API', 'Evaluate route registered');
 
         // Test endpoint for debugging
         register_rest_route('operaton-dmn/v1', '/test', array(
             'methods' => 'GET',
-            'callback' => function () {
+            'callback' => function ()
+            {
                 return array(
                     'status' => 'Plugin REST API is working!',
                     'version' => OPERATON_DMN_VERSION,
@@ -305,7 +308,7 @@ trait Operaton_DMN_API_REST_Endpoints
             },
             'permission_callback' => '__return_true'
         ));
-        error_log('Operaton DMN API: Test route registered');
+        operaton_debug('API', 'Test route registered');
 
         // Health endpoint for monitoring and load testing
         $health_registered = register_rest_route('operaton-dmn/v1', '/health', array(
@@ -322,17 +325,23 @@ trait Operaton_DMN_API_REST_Endpoints
             ),
         ));
 
-        if ($health_registered) {
-            error_log('Operaton DMN API: Health route registered successfully');
-        } else {
-            error_log('Operaton DMN API: Health route registration FAILED');
+        if ($health_registered)
+        {
+            operaton_debug('API', 'Health route registered successfully');
+        }
+        else
+        {
+            operaton_debug_minimal('API', 'Health route registration FAILED');
         }
 
         // Check if the health_check method exists
-        if (method_exists($this, 'health_check')) {
-            error_log('Operaton DMN API: health_check method exists');
-        } else {
-            error_log('Operaton DMN API: health_check method DOES NOT EXIST');
+        if (method_exists($this, 'health_check'))
+        {
+            operaton_debug_verbose('API', 'health_check method exists');
+        }
+        else
+        {
+            operaton_debug_minimal('API', 'health_check method DOES NOT EXIST');
         }
     }
 
