@@ -304,11 +304,20 @@ class Operaton_DMN_Assets
         $timer_id = $this->performance ?
             $this->performance->start_timer('frontend_assets') : null;
 
+        // Debug bridge - Load FIRST as dependency for other scripts
+        wp_enqueue_script(
+            'operaton-dmn-debug',
+            $this->plugin_url . 'assets/js/debug.js',
+            array('jquery'),
+            $this->version,
+            true
+        );
+
         // Main frontend script
         wp_enqueue_script(
             'operaton-dmn-frontend',
             $this->plugin_url . 'assets/js/frontend.js',
-            array('jquery'),
+            array('jquery', 'operaton-dmn-debug'),
             $this->version,
             true
         );
@@ -317,7 +326,7 @@ class Operaton_DMN_Assets
         wp_enqueue_script(
             'operaton-dmn-gravity-integration',
             $this->plugin_url . 'assets/js/gravity-forms.js',
-            array('jquery', 'operaton-dmn-frontend'),
+            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend'),
             $this->version,
             true
         );
@@ -328,7 +337,7 @@ class Operaton_DMN_Assets
             wp_enqueue_script(
                 'operaton-dmn-decision-flow',
                 $this->plugin_url . 'assets/js/decision-flow.js',
-                array('jquery', 'operaton-dmn-frontend'),
+                array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend'),
                 $this->version,
                 true
             );
@@ -387,11 +396,20 @@ class Operaton_DMN_Assets
             $this->version
         );
 
+        // Debug bridge - Load FIRST for admin too
+        wp_enqueue_script(
+            'operaton-dmn-debug',
+            $this->plugin_url . 'assets/js/debug.js',
+            array('jquery'),
+            $this->version,
+            true
+        );
+
         // Main admin script
         wp_enqueue_script(
             'operaton-dmn-admin',
             $this->plugin_url . 'assets/js/admin.js',
-            array('jquery'),
+            array('jquery', 'operaton-dmn-debug'),
             $this->version,
             true
         );
@@ -400,7 +418,7 @@ class Operaton_DMN_Assets
         wp_enqueue_script(
             'operaton-dmn-api-test',
             $this->plugin_url . 'assets/js/api-test.js',
-            array('jquery', 'operaton-dmn-admin'),
+            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-admin'),
             $this->version,
             true
         );
@@ -439,7 +457,7 @@ class Operaton_DMN_Assets
         wp_enqueue_script(
             'operaton-dmn-radio-sync',
             $this->plugin_url . 'assets/js/radio-sync.js',
-            array('jquery', 'operaton-dmn-frontend'),
+            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend'),
             $this->version,
             true
         );
@@ -477,10 +495,19 @@ class Operaton_DMN_Assets
                 break;
 
             case 'decision_flow':
+                // Ensure debug is loaded first
+                wp_enqueue_script(
+                    'operaton-dmn-debug',
+                    $this->plugin_url . 'assets/js/debug.js',
+                    array('jquery'),
+                    $this->version,
+                    true
+                );
+
                 wp_enqueue_script(
                     'operaton-dmn-decision-flow',
                     $this->plugin_url . 'assets/js/decision-flow.js',
-                    array('jquery', 'operaton-dmn-frontend'),
+                    array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend'),
                     $this->version,
                     true
                 );
