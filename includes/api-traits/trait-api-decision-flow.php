@@ -11,7 +11,8 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH')) {
+if (!defined('ABSPATH'))
+{
     exit;
 }
 
@@ -47,12 +48,13 @@ trait Operaton_DMN_API_Decision_Flow
      */
     public function get_decision_flow_summary_html($form_id)
     {
-        $this->log_standard('Getting decision flow summary', ['form_id' => $form_id]);
+        operaton_debug('API', 'Getting decision flow summary', ['form_id' => $form_id]);
 
         // Check configuration and requirements
         $config = $this->database->get_config_by_form_id($form_id);
-        if (!$config || !$config->show_decision_flow || !$config->use_process) {
-            $this->log_verbose('Decision flow not available - not using process execution or disabled');
+        if (!$config || !$config->show_decision_flow || !$config->use_process)
+        {
+            operaton_debug_verbose('API', 'Decision flow not available - not using process execution or disabled');
 
             return $this->get_decision_flow_placeholder();
         }
@@ -61,22 +63,28 @@ trait Operaton_DMN_API_Decision_Flow
         $cache_bust = isset($_GET['cache_bust']) ? sanitize_text_field($_GET['cache_bust']) : '';
         $cache_key = 'operaton_decision_flow_' . $form_id;
 
-        if (empty($cache_bust)) {
+        if (empty($cache_bust))
+        {
             $cached_result = get_transient($cache_key);
-            if ($cached_result !== false) {
-                $this->log_verbose('Returning cached decision flow', ['form_id' => $form_id]);
+            if ($cached_result !== false)
+            {
+                operaton_debug_verbose('API', 'Returning cached decision flow', ['form_id' => $form_id]);
                 return $cached_result;
             }
-        } else {
+        }
+        else
+        {
             delete_transient($cache_key);
         }
 
         // Get process instance ID
         $process_instance_id = $this->database->get_process_instance_id($form_id);
-        if (!$process_instance_id) {
+        if (!$process_instance_id)
+        {
             $result = $this->get_decision_flow_loading_message();
 
-            if (empty($cache_bust)) {
+            if (empty($cache_bust))
+            {
                 set_transient($cache_key, $result, 60); // Cache for 1 minute
             }
             return $result;
@@ -84,21 +92,25 @@ trait Operaton_DMN_API_Decision_Flow
 
         // Rate limiting for API calls
         $api_cache_key = 'operaton_api_call_' . $process_instance_id;
-        if (empty($cache_bust) && get_transient($api_cache_key)) {
+        if (empty($cache_bust) && get_transient($api_cache_key))
+        {
             return $this->get_decision_flow_loading_message();
         }
 
-        if (empty($cache_bust)) {
+        if (empty($cache_bust))
+        {
             set_transient($api_cache_key, true, 5); // 5 second rate limit
         }
 
         // Fetch decision flow data
         $decision_instances = $this->fetch_decision_flow_data($config, $process_instance_id);
 
-        if (is_wp_error($decision_instances)) {
+        if (is_wp_error($decision_instances))
+        {
             $result = $this->format_decision_flow_error($decision_instances->get_error_message());
 
-            if (empty($cache_bust)) {
+            if (empty($cache_bust))
+            {
                 set_transient($cache_key, $result, 120); // Cache error for 2 minutes
             }
             return $result;
@@ -107,7 +119,8 @@ trait Operaton_DMN_API_Decision_Flow
         // Format and cache successful result
         $result = $this->format_decision_flow_summary($decision_instances, $process_instance_id);
 
-        if (empty($cache_bust)) {
+        if (empty($cache_bust))
+        {
             set_transient($cache_key, $result, 600); // Cache for 10 minutes
         }
 
@@ -129,7 +142,7 @@ trait Operaton_DMN_API_Decision_Flow
         $history_endpoint = $base_url . '/history/decision-instance';
         $history_url = $history_endpoint . '?processInstanceId=' . $process_instance_id . '&includeInputs=true&includeOutputs=true';
 
-        $this->log_verbose('Getting decision flow from URL', ['url' => $history_url]);
+        operaton_debug_verbose('API', 'Getting decision flow from URL', ['url' => $history_url]);
 
         $response = wp_remote_get($history_url, array(
             'headers' => array('Accept' => 'application/json'),
@@ -137,7 +150,8 @@ trait Operaton_DMN_API_Decision_Flow
             'sslverify' => $this->ssl_verify,
         ));
 
-        if (is_wp_error($response)) {
+        if (is_wp_error($response))
+        {
             return new WP_Error(
                 'api_error',
                 sprintf(__('Error retrieving decision flow: %s', 'operaton-dmn'), $response->get_error_message())
@@ -147,7 +161,8 @@ trait Operaton_DMN_API_Decision_Flow
         $http_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
 
-        if ($http_code !== 200) {
+        if ($http_code !== 200)
+        {
             return new WP_Error(
                 'api_error',
                 sprintf(__('Error loading decision flow (HTTP %d). Please try again.', 'operaton-dmn'), $http_code)
@@ -156,7 +171,8 @@ trait Operaton_DMN_API_Decision_Flow
 
         $decision_instances = json_decode($body, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
             return new WP_Error(
                 'json_error',
                 __('Error parsing decision flow data.', 'operaton-dmn')
@@ -177,19 +193,21 @@ trait Operaton_DMN_API_Decision_Flow
      */
     private function format_decision_flow_summary($decision_instances, $process_instance_id)
     {
-        $this->log_verbose('Formatting decision flow summary', ['instances_count' => count($decision_instances)]);
-        
+        operaton_debug_verbose('API', 'Formatting decision flow summary', ['instances_count' => count($decision_instances)]);
+
         $html = '<h3>📋 Decision Flow Results Summary</h3>';
         $html .= '<p><strong>Process Instance:</strong> <code>' . esc_html($process_instance_id) . '</code></p>';
 
-        if (empty($decision_instances) || !is_array($decision_instances)) {
+        if (empty($decision_instances) || !is_array($decision_instances))
+        {
             return $html . '<div class="decision-flow-empty"><p><em>No decision instances found for this process.</em></p></div>';
         }
 
         // Filter and process decision instances
         $filtered_instances = $this->filter_decision_instances($decision_instances);
 
-        if (empty($filtered_instances)) {
+        if (empty($filtered_instances))
+        {
             return $html . '<p><em>No relevant decision instances found.</em></p>';
         }
 
@@ -215,26 +233,32 @@ trait Operaton_DMN_API_Decision_Flow
         $filtered_instances = array();
         $has_final_compilation = false;
 
-        foreach ($decision_instances as $instance) {
-            if (isset($instance['activityId']) && $instance['activityId'] === 'Activity_FinalResultCompilation') {
+        foreach ($decision_instances as $instance)
+        {
+            if (isset($instance['activityId']) && $instance['activityId'] === 'Activity_FinalResultCompilation')
+            {
                 $filtered_instances[] = $instance;
                 $has_final_compilation = true;
             }
         }
 
         // If no FinalResultCompilation activity, get the latest evaluation for each decision
-        if (!$has_final_compilation) {
+        if (!$has_final_compilation)
+        {
             $latest_by_decision = array();
 
-            foreach ($decision_instances as $instance) {
-                if (isset($instance['decisionDefinitionKey']) && isset($instance['evaluationTime'])) {
+            foreach ($decision_instances as $instance)
+            {
+                if (isset($instance['decisionDefinitionKey']) && isset($instance['evaluationTime']))
+                {
                     $key = $instance['decisionDefinitionKey'];
                     $eval_time = $instance['evaluationTime'];
 
                     if (
                         !isset($latest_by_decision[$key]) ||
                         strtotime($eval_time) > strtotime($latest_by_decision[$key]['evaluationTime'])
-                    ) {
+                    )
+                    {
                         $latest_by_decision[$key] = $instance;
                     }
                 }
@@ -244,7 +268,8 @@ trait Operaton_DMN_API_Decision_Flow
         }
 
         // Sort by evaluation time
-        usort($filtered_instances, function ($a, $b) {
+        usort($filtered_instances, function ($a, $b)
+        {
             $timeA = isset($a['evaluationTime']) ? strtotime($a['evaluationTime']) : 0;
             $timeB = isset($b['evaluationTime']) ? strtotime($b['evaluationTime']) : 0;
             return $timeA - $timeB;
@@ -265,10 +290,13 @@ trait Operaton_DMN_API_Decision_Flow
     private function generate_decision_flow_header($filtered_instances, $all_instances)
     {
         $decisions_by_key = array();
-        foreach ($filtered_instances as $instance) {
-            if (isset($instance['decisionDefinitionKey'])) {
+        foreach ($filtered_instances as $instance)
+        {
+            if (isset($instance['decisionDefinitionKey']))
+            {
                 $key = $instance['decisionDefinitionKey'];
-                if (!isset($decisions_by_key[$key])) {
+                if (!isset($decisions_by_key[$key]))
+                {
                     $decisions_by_key[$key] = array();
                 }
                 $decisions_by_key[$key][] = $instance;
@@ -276,8 +304,10 @@ trait Operaton_DMN_API_Decision_Flow
         }
 
         $has_final_compilation = false;
-        foreach ($all_instances as $instance) {
-            if (isset($instance['activityId']) && $instance['activityId'] === 'Activity_FinalResultCompilation') {
+        foreach ($all_instances as $instance)
+        {
+            if (isset($instance['activityId']) && $instance['activityId'] === 'Activity_FinalResultCompilation')
+            {
                 $has_final_compilation = true;
                 break;
             }
@@ -317,10 +347,13 @@ trait Operaton_DMN_API_Decision_Flow
     private function generate_decision_flow_tables($filtered_instances)
     {
         $decisions_by_key = array();
-        foreach ($filtered_instances as $instance) {
-            if (isset($instance['decisionDefinitionKey'])) {
+        foreach ($filtered_instances as $instance)
+        {
+            if (isset($instance['decisionDefinitionKey']))
+            {
                 $key = $instance['decisionDefinitionKey'];
-                if (!isset($decisions_by_key[$key])) {
+                if (!isset($decisions_by_key[$key]))
+                {
                     $decisions_by_key[$key] = array();
                 }
                 $decisions_by_key[$key][] = $instance;
@@ -330,7 +363,8 @@ trait Operaton_DMN_API_Decision_Flow
         $html = '<div class="decision-flow-tables">';
         $step = 1;
 
-        foreach ($decisions_by_key as $decision_key => $instances) {
+        foreach ($decisions_by_key as $decision_key => $instances)
+        {
             $instance = $instances[0]; // Only show the first instance for each decision
 
             $html .= '<div class="decision-table-container">';
@@ -371,12 +405,14 @@ trait Operaton_DMN_API_Decision_Flow
         $html .= '<tbody>';
 
         // INPUTS Section
-        if (isset($instance['inputs']) && is_array($instance['inputs']) && count($instance['inputs']) > 0) {
+        if (isset($instance['inputs']) && is_array($instance['inputs']) && count($instance['inputs']) > 0)
+        {
             $html .= $this->generate_table_section($instance['inputs'], 'inputs', '📥 Inputs');
         }
 
         // OUTPUTS Section
-        if (isset($instance['outputs']) && is_array($instance['outputs']) && count($instance['outputs']) > 0) {
+        if (isset($instance['outputs']) && is_array($instance['outputs']) && count($instance['outputs']) > 0)
+        {
             $html .= $this->generate_table_section($instance['outputs'], 'outputs', '📤 Outputs');
         }
 
@@ -404,21 +440,28 @@ trait Operaton_DMN_API_Decision_Flow
         $row_class = $type === 'inputs' ? 'input-row' : 'output-row';
         $header_class = $type === 'inputs' ? 'inputs-header' : 'outputs-header';
 
-        foreach ($items as $item) {
+        foreach ($items as $item)
+        {
             $html .= '<tr class="' . $row_class . '">';
 
-            if ($first_item) {
+            if ($first_item)
+            {
                 $html .= '<td class="row-header ' . $header_class . '" rowspan="' . $item_count . '">' . $header . '</td>';
                 $first_item = false;
             }
 
             // Variable name
             $name = 'Unknown ' . ucfirst(rtrim($type, 's'));
-            if (isset($item['clauseName']) && !empty($item['clauseName'])) {
+            if (isset($item['clauseName']) && !empty($item['clauseName']))
+            {
                 $name = $item['clauseName'];
-            } elseif (isset($item['variableName']) && !empty($item['variableName'])) {
+            }
+            elseif (isset($item['variableName']) && !empty($item['variableName']))
+            {
                 $name = $item['variableName'];
-            } elseif (isset($item['name']) && !empty($item['name'])) {
+            }
+            elseif (isset($item['name']) && !empty($item['name']))
+            {
                 $name = $item['name'];
             }
             $html .= '<td class="variable-cell">' . esc_html($name) . '</td>';
@@ -441,24 +484,34 @@ trait Operaton_DMN_API_Decision_Flow
      */
     private function format_decision_value($item)
     {
-        if (!array_key_exists('value', $item)) {
+        if (!array_key_exists('value', $item))
+        {
             return '<em class="no-value">no value</em>';
         }
 
         $value = $item['value'];
 
-        if (is_null($value) || $value === '') {
+        if (is_null($value) || $value === '')
+        {
             return '<em class="null-value">null</em>';
-        } elseif (is_bool($value)) {
+        }
+        elseif (is_bool($value))
+        {
             $icon = $value ? '✅' : '❌';
             $text = $value ? 'true' : 'false';
             $class = $value ? 'true' : 'false';
             return '<span class="boolean-value ' . $class . '">' . $icon . ' ' . $text . '</span>';
-        } elseif (is_numeric($value)) {
+        }
+        elseif (is_numeric($value))
+        {
             return '<span class="numeric-value">' . esc_html((string) $value) . '</span>';
-        } elseif (is_array($value)) {
+        }
+        elseif (is_array($value))
+        {
             return '<span class="array-value">' . esc_html(json_encode($value)) . '</span>';
-        } else {
+        }
+        else
+        {
             return '<span class="string-value">' . esc_html((string) $value) . '</span>';
         }
     }
@@ -475,12 +528,14 @@ trait Operaton_DMN_API_Decision_Flow
     {
         $html = '<div class="decision-metadata">';
 
-        if (isset($instance['evaluationTime'])) {
+        if (isset($instance['evaluationTime']))
+        {
             $formatted_time = $this->format_evaluation_time($instance['evaluationTime']);
             $html .= '<small><strong>⏱️ Evaluation Time:</strong> ' . esc_html($formatted_time) . '</small>';
         }
 
-        if (isset($instance['activityId'])) {
+        if (isset($instance['activityId']))
+        {
             $html .= '<small style="margin-left: 15px;"><strong>🔧 Activity:</strong> ' . esc_html($instance['activityId']) . '</small>';
         }
 
