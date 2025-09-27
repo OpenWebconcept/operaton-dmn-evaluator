@@ -42,7 +42,7 @@ const formConfigCache = new Map();
 window.showEvaluateButton = function (formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for showEvaluateButton');
+    operatonDebugMinimal('Frontend', 'jQuery not available for showEvaluateButton');
     return;
   }
 
@@ -53,7 +53,7 @@ window.showEvaluateButton = function (formId) {
     $button.addClass('operaton-show-button').show();
     $summary.removeClass('operaton-show-summary');
   } catch (error) {
-    console.error('Error in showEvaluateButton:', error);
+    operatonDebugMinimal('Frontend', 'Error in showEvaluateButton:', error);
     $(`#operaton-evaluate-${formId}`).addClass('operaton-show-button').show();
     $(`#decision-flow-summary-${formId}`).removeClass('operaton-show-summary');
   }
@@ -62,7 +62,7 @@ window.showEvaluateButton = function (formId) {
 window.showDecisionFlowSummary = function (formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for showDecisionFlowSummary');
+    operatonDebugMinimal('Frontend', 'jQuery not available for showDecisionFlowSummary');
     return;
   }
 
@@ -80,14 +80,14 @@ window.showDecisionFlowSummary = function (formId) {
        operatonDebugVerbose('Frontend', '📊 Decision flow manager not available for form', formId);
     }
   } catch (error) {
-    console.error('Error in showDecisionFlowSummary:', error);
+    operatonDebugMinimal('Frontend', 'Error in showDecisionFlowSummary:', error);
   }
 };
 
 window.hideAllElements = function (formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for hideAllElements');
+    operatonDebugMinimal('Frontend', 'jQuery not available for hideAllElements');
     return;
   }
 
@@ -121,7 +121,7 @@ window.hideAllElements = function (formId) {
     $button.removeClass('operaton-show-button').hide();
     $summary.removeClass('operaton-show-summary');
   } catch (error) {
-    console.error('Error in hideAllElements:', error);
+    operatonDebugMinimal('Frontend', 'Error in hideAllElements:', error);
     $(`#operaton-evaluate-${formId}`).removeClass('operaton-show-button').hide();
     $(`#decision-flow-summary-${formId}`).removeClass('operaton-show-summary');
   }
@@ -134,7 +134,7 @@ window.hideAllElements = function (formId) {
 function getCachedElement(selector, maxAge = 5000) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for getCachedElement');
+    operatonDebugMinimal('Frontend', 'jQuery not available for getCachedElement');
     return $();
   }
 
@@ -312,7 +312,7 @@ function getResultFieldIds(formId) {
   const resultFieldIds = [];
 
   if (!config) {
-    console.warn(`No configuration found for form ${formId}`);
+    operatonDebugMinimal('Frontend', `No configuration found for form ${formId}`);
     return resultFieldIds;
   }
 
@@ -408,7 +408,7 @@ function clearAllResultFields(formId, reason) {
     }
 
     if (!fieldCleared) {
-       operatonDebugVerbose('Frontend', `Result field ${fieldId} not found or already empty`);
+       operatonDebugMinimal('Frontend', `Result field ${fieldId} not found or already empty`);
     }
   });
 
@@ -421,7 +421,7 @@ function clearAllResultFields(formId, reason) {
       resultFieldIds.forEach(fieldId => {
         const $field = $form.find(`#input_${formId}_${fieldId}`);
         if ($field.length > 0 && $field.val() && $field.val().trim() !== '') {
-          console.warn(`Field ${fieldId} still has value after clearing: "${$field.val()}"`);
+          operatonDebugMinimal('Frontend', `Field ${fieldId} still has value after clearing: "${$field.val()}"`);
         } else {
           verifyCount++;
         }
@@ -552,7 +552,7 @@ function setupInputChangeMonitoring(formId) {
   const $form = $(`#gform_${formId}`);
 
   if ($form.length === 0) {
-     operatonDebugVerbose('Frontend', `Form ${formId} not found for input monitoring`);
+     operatonDebugMinimal('Frontend', `Form ${formId} not found for input monitoring`);
     return;
   }
 
@@ -813,7 +813,7 @@ window.testInputFunctionality = function(formId = 8) {
 function bindNavigationEventsOptimized(formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for bindNavigationEventsOptimized');
+    operatonDebugMinimal('Frontend', 'jQuery not available for bindNavigationEventsOptimized');
     return;
   }
 
@@ -927,7 +927,7 @@ function bindNavigationEventsOptimized(formId) {
     `click.operaton-nav-${formId}`,
     '.gform_previous_button input, .gform_previous_button button, input[value*="Previous"], button:contains("Previous")',
     function (e) {
-       operatonDebugVerbose('Frontend', 'Previous button clicked for form:', formId);
+       operatonDebugFrontend('Frontend', 'Previous button clicked for form:', formId);
       navigationInProgress = true;
 
       const currentState = captureFormState();
@@ -1146,7 +1146,7 @@ function simpleFormInitialization(formId) {
 
      operatonDebugVerbose('Frontend', `=== FORM ${formId} INITIALIZATION COMPLETE ===`);
   } catch (error) {
-    console.error(`Error initializing form ${formId}:`, error);
+    operatonDebugMinimal('Frontend', `Error initializing form ${formId}:`, error);
     window.operatonInitialized.forms.delete(formId);
   } finally {
     delete window.operatonInitialized[initKey];
@@ -1193,7 +1193,7 @@ function initOperatonDMN() {
     return;
   }
 
-   operatonDebugVerbose('Frontend', '🚀 Starting Operaton DMN initialization...');
+   operatonDebugFrontend('Frontend', '🚀 Starting Operaton DMN initialization...');
 
   // Hook into Gravity Forms events if available
   if (typeof gform !== 'undefined' && gform.addAction) {
@@ -1307,7 +1307,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
     const $form = $(`#gform_${formId}`);
 
     if ($form.length === 0) {
-       operatonDebugVerbose('Frontend', `Form ${formId} not found for field logic`);
+       operatonDebugMinimal('Frontend', `Form ${formId} not found for field logic`);
       return;
     }
 
@@ -1329,7 +1329,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
     const $partnerField = $form.find(`#input_${formId}_${mapping.partnerField}`);
 
     if ($partnerField.length === 0) {
-       operatonDebugVerbose('Frontend', `Partner field not found: #input_${formId}_${mapping.partnerField}`);
+       operatonDebugMinimal('Frontend', `Partner field not found: #input_${formId}_${mapping.partnerField}`);
       return;
     }
 
@@ -1369,7 +1369,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
     const $childField = $form.find(`#input_${formId}_${mapping.childField}`);
 
     if ($childField.length === 0) {
-       operatonDebugVerbose('Frontend', `Child field not found: #input_${formId}_${mapping.childField}`);
+       operatonDebugMinimal('Frontend', `Child field not found: #input_${formId}_${mapping.childField}`);
       return;
     }
 
@@ -1553,7 +1553,7 @@ function findResultFieldOnCurrentPageOptimized(formId) {
 function handleEvaluateClick($button) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.error('jQuery not available for handleEvaluateClick');
+    operatonDebugMinimal('Frontend', 'jQuery not available for handleEvaluateClick');
     showError('System error: jQuery not available. Please refresh the page.');
     return;
   }
@@ -1571,11 +1571,11 @@ function handleEvaluateClick($button) {
   // Set processing lock
   window.operatonProcessingLock[lockKey] = true;
 
-   operatonDebugVerbose('Frontend', 'Button clicked for form:', formId, 'config:', configId);
+   operatonDebugFrontend('Frontend', 'Button clicked for form:', formId, 'config:', configId);
 
   const config = getFormConfigCached(formId);
   if (!config) {
-    console.error('Configuration not found for form:', formId);
+    operatonDebugMinimal('Frontend', 'Configuration not found for form:', formId);
     showError('Configuration error. Please contact the administrator.');
     return;
   }
@@ -1663,13 +1663,13 @@ function handleEvaluateClick($button) {
 
     // Check if operaton_ajax is available
     if (typeof window.operaton_ajax === 'undefined') {
-      console.error('operaton_ajax not available');
+      operatonDebugMinimal('Frontend', 'operaton_ajax not available');
       showError('System error: AJAX configuration not loaded. Please refresh the page.');
       window.operatonButtonManager.restoreOriginalState($button, formId);
       return;
     }
 
-     operatonDebugVerbose('Frontend', 'Making AJAX call to:', window.operaton_ajax.url);
+     operatonDebugFrontend('Frontend', 'Making AJAX call to:', window.operaton_ajax.url);
 
     // Make AJAX call
     $.ajax({
@@ -1684,7 +1684,7 @@ function handleEvaluateClick($button) {
         xhr.setRequestHeader('X-WP-Nonce', window.operaton_ajax.nonce);
       },
       success: function (response) {
-         operatonDebugVerbose('Frontend', 'AJAX success:', response);
+         operatonDebugFrontend('Frontend', 'AJAX success:', response);
 
         if (response.success && response.results) {
            operatonDebugVerbose('Frontend', 'Results received:', response.results);
@@ -1718,7 +1718,7 @@ function handleEvaluateClick($button) {
 
               highlightField($resultField);
             } else {
-              console.warn('No field found for result:', dmnResultField, 'Field ID:', fieldId);
+              operatonDebugMinimal('Frontend', 'No field found for result:', dmnResultField, 'Field ID:', fieldId);
             }
           });
 
@@ -1765,14 +1765,14 @@ function handleEvaluateClick($button) {
             sessionStorage.setItem(`operaton_dmn_eval_data_${formId}`, JSON.stringify(evalData));
           }
         } else {
-          console.error('Invalid response structure:', response);
+          operatonDebugMinimal('Frontend', 'Invalid response structure:', response);
           showError('No results received from evaluation.');
         }
       },
       error: function (xhr, status, error) {
-        console.error('AJAX Error:', error);
-        console.error('XHR Status:', xhr.status);
-        console.error('XHR Response:', xhr.responseText);
+        operatonDebugMinimal('Frontend', 'AJAX Error:', error);
+        operatonDebugMinimal('Frontend', 'XHR Status:', xhr.status);
+        operatonDebugMinimal('Frontend', 'XHR Response:', xhr.responseText);
 
         let errorMessage = 'Error during evaluation. Please try again.';
 
@@ -1815,7 +1815,7 @@ function handleEvaluateClick($button) {
 function validateForm(formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for validateForm');
+    operatonDebugMinimal('Frontend', 'jQuery not available for validateForm');
     return true;
   }
 
@@ -1882,7 +1882,7 @@ function validateFieldType(value, expectedType) {
 function forceSyncRadioButtons(formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for forceSyncRadioButtons');
+    operatonDebugMinimal('Frontend', 'jQuery not available for forceSyncRadioButtons');
     return;
   }
 
@@ -1947,7 +1947,7 @@ function convertDateFormat(dateStr, fieldName) {
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
     // Note: This creates ambiguity with DD/MM/YYYY
     // You may need to specify which format your forms use
-    console.warn('Ambiguous date format detected:', dateStr, 'Assuming DD/MM/YYYY');
+    operatonDebugMinimal('Frontend', 'Ambiguous date format detected:', dateStr, 'Assuming DD/MM/YYYY');
   }
 
   // Handle YYYY/MM/DD format
@@ -1970,11 +1970,11 @@ function convertDateFormat(dateStr, fieldName) {
       return result;
     }
   } catch (e) {
-    console.error('Error parsing date:', dateStr, e);
+    operatonDebugMinimal('Frontend', 'Error parsing date:', dateStr, e);
   }
 
   // If all else fails, return original string
-  console.warn('Could not convert date format:', dateStr);
+  operatonDebugMinimal('Frontend', 'Could not convert date format:', dateStr);
   return dateStr;
 }
 
@@ -2060,7 +2060,7 @@ function getGravityFieldValueOptimized(formId, fieldId) {
 function findCustomRadioValueOptimized(formId, fieldId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for findCustomRadioValueOptimized');
+    operatonDebugMinimal('Frontend', 'jQuery not available for findCustomRadioValueOptimized');
     return null;
   }
 
@@ -2155,7 +2155,7 @@ function storeProcessInstanceId(formId, processInstanceId) {
 function showSuccessNotification(message) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for showSuccessNotification');
+    operatonDebugMinimal('Frontend', 'jQuery not available for showSuccessNotification');
     alert(message);
     return;
   }
@@ -2192,7 +2192,7 @@ function showSuccessNotification(message) {
 function showError(message) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for showError');
+    operatonDebugMinimal('Frontend', 'jQuery not available for showError');
     alert('Error: ' + message);
     return;
   }
@@ -2228,7 +2228,7 @@ function showError(message) {
 function highlightField($field) {
   const $ = window.jQuery || window.$;
   if (!$ || !$field || $field.length === 0) {
-    console.warn('jQuery or field not available for highlightField');
+    operatonDebugMinimal('Frontend', 'jQuery or field not available for highlightField');
     return;
   }
 
@@ -2263,7 +2263,7 @@ function highlightField($field) {
 function bindEvaluationEventsOptimized(formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for bindEvaluationEventsOptimized');
+    operatonDebugMinimal('Frontend', 'jQuery not available for bindEvaluationEventsOptimized');
     return;
   }
 
@@ -2272,7 +2272,7 @@ function bindEvaluationEventsOptimized(formId) {
   $(document).off(`click.operaton-${formId}`, selector);
   $(document).on(`click.operaton-${formId}`, selector, function (e) {
     e.preventDefault();
-     operatonDebugVerbose('Frontend', '🎯 Button clicked for form:', formId);
+     operatonDebugFrontend('Frontend', '🎯 Button clicked for form:', formId);
     handleEvaluateClick($(this));
   });
 
@@ -2298,7 +2298,7 @@ function waitForOperatonAjax(callback, maxAttempts = 50) {
       }
       setTimeout(check, 100);
     } else {
-      console.error('❌ operaton_ajax not found after', maxAttempts, 'attempts');
+      operatonDebugMinimal('Frontend', '❌ operaton_ajax not found after', maxAttempts, 'attempts');
       createEmergencyOperatonAjax();
       callback();
     }
@@ -2350,7 +2350,7 @@ function waitForJQuery(callback, maxAttempts = 50) {
       const delay = Math.min(100 * Math.pow(1.1, attempts), 1000);
       setTimeout(check, delay);
     } else {
-      console.error(`❌ jQuery not found after ${maxAttempts} attempts`);
+      operatonDebugMinimal('Frontend', `❌ jQuery not found after ${maxAttempts} attempts`);
     }
   }
   check();
@@ -2371,7 +2371,7 @@ function waitForJQuery(callback, maxAttempts = 50) {
     // Wait for operaton_ajax and initialize
     waitForOperatonAjax(() => {
       const initStartTime = performance.now();
-       operatonDebugVerbose('Frontend', '🚀 Initializing Operaton DMN...');
+       operatonDebugFrontend('Frontend', '🚀 Initializing Operaton DMN...');
 
       window.operatonInitialized.jQueryReady = true;
       initOperatonDMN();
@@ -2386,7 +2386,7 @@ function waitForJQuery(callback, maxAttempts = 50) {
       const initEndTime = performance.now();
       window.operatonInitialized.performanceStats.totalProcessingTime += initEndTime - initStartTime;
 
-       operatonDebugVerbose('Frontend', `🎉 Operaton DMN initialization complete in ${(initEndTime - initStartTime).toFixed(2)}ms`);
+       operatonDebugFrontend('Frontend', `🎉 Operaton DMN initialization complete in ${(initEndTime - initStartTime).toFixed(2)}ms`);
     });
 
     $(window).on('beforeunload', e => {
@@ -2463,7 +2463,7 @@ window.addEventListener('load', () => {
       if (typeof jQuery !== 'undefined') {
         simplifiedFormDetection();
       } else {
-        console.warn('Window load: jQuery still not available');
+        operatonDebugMinimal('Frontend', 'Window load: jQuery still not available');
       }
     }
   }, 1000);
@@ -2478,17 +2478,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============================================================================
 // GLOBAL DEBUGGING FUNCTIONS
 // =============================================================================
-
-// Debug function for testing delegation
-// window.testDelegation = function() {
-//     operatonDebugVerbose('Frontend', 'Testing delegation availability:');
-//     operatonDebugVerbose('Frontend', 'operatonButtonManager:', typeof window.operatonButtonManager !== 'undefined');
-//     operatonDebugVerbose('Frontend', 'handleEvaluateClick:', typeof window.handleEvaluateClick !== 'undefined');
-//     operatonDebugVerbose('Frontend', 'Should delegate:',
-//        typeof window.operatonButtonManager !== 'undefined' &&
-//        typeof window.handleEvaluateClick !== 'undefined'
-//    );
-//};
 
 if (typeof window !== 'undefined') {
   window.operatonDebugFixed = function () {
@@ -2520,4 +2509,4 @@ if (typeof window !== 'undefined') {
   };
 }
 
- operatonDebugVerbose('Frontend', 'Operaton DMN frontend script loaded - FIXED VERSION');
+ operatonDebugFrontend('Frontend', 'Operaton DMN frontend script loaded');
