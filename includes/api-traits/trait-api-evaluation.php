@@ -11,7 +11,8 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH')) {
+if (!defined('ABSPATH'))
+{
     exit;
 }
 
@@ -27,13 +28,15 @@ trait Operaton_DMN_API_Evaluation
      */
     public function handle_evaluation($request)
     {
-        try {
-            $this->log_standard('Handling evaluation request');
+        try
+        {
+            operaton_debug('API', 'Handling evaluation request');
 
             $params = $request->get_json_params();
 
             // Validate required parameters
-            if (!isset($params['config_id']) || !isset($params['form_data'])) {
+            if (!isset($params['config_id']) || !isset($params['form_data']))
+            {
                 return new WP_Error(
                     'missing_params',
                     __('Configuration ID and form data are required', 'operaton-dmn'),
@@ -43,7 +46,8 @@ trait Operaton_DMN_API_Evaluation
 
             // Get configuration
             $config = $this->database->get_configuration($params['config_id']);
-            if (!$config) {
+            if (!$config)
+            {
                 return new WP_Error(
                     'invalid_config',
                     __('Configuration not found', 'operaton-dmn'),
@@ -54,16 +58,21 @@ trait Operaton_DMN_API_Evaluation
             // Determine evaluation method
             $use_process = isset($config->use_process) ? $config->use_process : false;
 
-            if ($use_process && !empty($config->process_key)) {
-            // OLD:
-            //    return $this->handle_process_execution($config, $params['form_data']);
-            // NEW:
+            if ($use_process && !empty($config->process_key))
+            {
+                // OLD:
+                //    return $this->handle_process_execution($config, $params['form_data']);
+                // NEW:
                 return $this->handle_process_execution_optimized($config, $params['form_data']);
-            } else {
+            }
+            else
+            {
                 return $this->handle_decision_evaluation($config, $params['form_data']);
             }
-        } catch (Exception $e) {
-            $this->log_minimal('Evaluation error occurred', [
+        }
+        catch (Exception $e)
+        {
+            operaton_debug_minimal('API', 'Evaluation error occurred', [
                 'error_message' => $e->getMessage(),
                 'error_line' => $e->getLine(),
                 'error_file' => basename($e->getFile())
@@ -88,11 +97,12 @@ trait Operaton_DMN_API_Evaluation
      */
     private function handle_process_execution($config, $form_data)
     {
-        $this->log_standard('Starting process execution', ['process_key' => $config->process_key]);
+        operaton_debug('API', 'Starting process execution', ['process_key' => $config->process_key]);
 
         // Parse and validate field mappings
         $field_mappings = json_decode($config->field_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
             return new WP_Error(
                 'invalid_mappings',
                 __('Invalid field mappings configuration', 'operaton-dmn'),
@@ -102,14 +112,15 @@ trait Operaton_DMN_API_Evaluation
 
         // Process input variables
         $variables = $this->process_input_variables($field_mappings, $form_data);
-        if (is_wp_error($variables)) {
+        if (is_wp_error($variables))
+        {
             return $variables;
         }
 
         // Build process start endpoint
         $process_endpoint = $this->build_process_endpoint($config->dmn_endpoint, $config->process_key);
 
-        $this->log_standard('Starting process at endpoint', ['endpoint' => $process_endpoint]);
+        operaton_debug('API', 'Starting process at endpoint', ['endpoint' => $process_endpoint]);
 
         // Start the process
         $process_data = array('variables' => $variables);
@@ -121,7 +132,8 @@ trait Operaton_DMN_API_Evaluation
             'sslverify' => $this->ssl_verify,
         ));
 
-        if (is_wp_error($response)) {
+        if (is_wp_error($response))
+        {
             return new WP_Error(
                 'api_error',
                 sprintf(__('Failed to start process: %s', 'operaton-dmn'), $response->get_error_message()),
@@ -132,7 +144,8 @@ trait Operaton_DMN_API_Evaluation
         $http_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
 
-        if ($http_code !== 200 && $http_code !== 201) {
+        if ($http_code !== 200 && $http_code !== 201)
+        {
             return new WP_Error(
                 'api_error',
                 sprintf(__('Process start failed with status %d: %s', 'operaton-dmn'), $http_code, $body),
@@ -142,7 +155,8 @@ trait Operaton_DMN_API_Evaluation
 
         $process_result = json_decode($body, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
             return new WP_Error(
                 'invalid_response',
                 __('Invalid JSON response from process start', 'operaton-dmn'),
@@ -155,7 +169,8 @@ trait Operaton_DMN_API_Evaluation
 
         // Get final variables from process
         $final_variables = $this->get_process_variables($config, $process_instance_id, $process_ended);
-        if (is_wp_error($final_variables)) {
+        if (is_wp_error($final_variables))
+        {
             return $final_variables;
         }
 
@@ -195,7 +210,7 @@ trait Operaton_DMN_API_Evaluation
      */
     private function handle_process_execution_optimized($config, $form_data)
     {
-        $this->log_standard('Starting enhanced batched process execution', ['process_key' => $config->process_key]);
+        operaton_debug('API', 'Starting enhanced batched process execution', ['process_key' => $config->process_key]);
 
         // Parse and validate field mappings
         $field_mappings = json_decode($config->field_mappings, true);
@@ -244,7 +259,7 @@ trait Operaton_DMN_API_Evaluation
         // Execute Step 1: Start Process (required)
         $start_time = microtime(true);
 
-        $this->log_verbose('Batch Step 1 - Starting process', ['endpoint' => $api_batch['start_process']['endpoint']]);
+        operaton_debug_verbose('API', 'Batch Step 1 - Starting process', ['endpoint' => $api_batch['start_process']['endpoint']]);
 
         $process_response = $this->make_optimized_api_call(
             $api_batch['start_process']['endpoint'],
@@ -293,7 +308,7 @@ trait Operaton_DMN_API_Evaluation
             $api_batch['get_variables_history']['endpoint'] = $base_url . '/history/variable-instance?processInstanceId=' . $process_instance_id;
             $primary_endpoint = 'get_variables_history';
 
-            $this->log_verbose('Process ended immediately, using history endpoint');
+            operaton_debug_verbose('API', 'Process ended immediately, using history endpoint');
         }
         else
         {
@@ -302,7 +317,7 @@ trait Operaton_DMN_API_Evaluation
             $api_batch['get_variables_history']['endpoint'] = $base_url . '/history/variable-instance?processInstanceId=' . $process_instance_id;
             $primary_endpoint = 'get_variables_active';
 
-            $this->log_verbose('Process may be running, preparing intelligent fallback strategy');
+            operaton_debug_verbose('API', 'Process may be running, preparing intelligent fallback strategy');
         }
 
         // Execute Step 2: Intelligent Variable Retrieval with Batched Fallback
@@ -321,7 +336,7 @@ trait Operaton_DMN_API_Evaluation
 
         $total_time = round((microtime(true) - $start_time) * 1000, 2);
 
-        $this->log_standard('Batched execution completed', ['total_time_ms' => $total_time]);
+        operaton_debug('API', 'Batched execution completed', ['total_time_ms' => $total_time]);
 
         return array(
             'success' => true,
@@ -355,11 +370,12 @@ trait Operaton_DMN_API_Evaluation
      */
     private function handle_decision_evaluation($config, $form_data)
     {
-        $this->log_standard('Starting direct decision evaluation', ['decision_key' => $config->decision_key]);
+        operaton_debug('API', 'Starting direct decision evaluation', ['decision_key' => $config->decision_key]);
 
         // Parse and validate mappings
         $field_mappings = json_decode($config->field_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
             return new WP_Error(
                 'invalid_mappings',
                 __('Invalid field mappings configuration', 'operaton-dmn'),
@@ -368,7 +384,8 @@ trait Operaton_DMN_API_Evaluation
         }
 
         $result_mappings = json_decode($config->result_mappings, true);
-        if (json_last_error() !== JSON_ERROR_NONE || empty($result_mappings)) {
+        if (json_last_error() !== JSON_ERROR_NONE || empty($result_mappings))
+        {
             return new WP_Error(
                 'invalid_result_mappings',
                 __('Invalid or missing result mappings configuration', 'operaton-dmn'),
@@ -378,11 +395,13 @@ trait Operaton_DMN_API_Evaluation
 
         // Process input variables
         $variables = $this->process_input_variables($field_mappings, $form_data);
-        if (is_wp_error($variables)) {
+        if (is_wp_error($variables))
+        {
             return $variables;
         }
 
-        if (empty($variables)) {
+        if (empty($variables))
+        {
             return new WP_Error(
                 'no_data',
                 __('No valid form data provided', 'operaton-dmn'),
@@ -393,12 +412,12 @@ trait Operaton_DMN_API_Evaluation
         // Build the full evaluation endpoint
         $evaluation_endpoint = $this->build_evaluation_endpoint($config->dmn_endpoint, $config->decision_key);
 
-        $this->log_standard('Using evaluation endpoint', ['endpoint' => $evaluation_endpoint]);
+        operaton_debug('API', 'Using evaluation endpoint', ['endpoint' => $evaluation_endpoint]);
 
         // Make API call
         $operaton_data = array('variables' => $variables);
 
-        $this->log_api('Making HTTP request', [
+        operaton_debug_api('API', 'Making HTTP request', [
             'endpoint' => $evaluation_endpoint,
             'data_keys' => array_keys($operaton_data)
         ]);
@@ -416,21 +435,22 @@ trait Operaton_DMN_API_Evaluation
 
         if (is_wp_error($response))
         {
-            $this->log_minimal('HTTP request failed', [
+            operaton_debug_minimal('API', 'HTTP request failed', [
                 'error_message' => $response->get_error_message(),
                 'error_codes' => $response->get_error_codes()
             ]);
         }
         else
         {
-            $this->log_api('HTTP response received', [
+            operaton_debug_api('API', 'HTTP response received', [
                 'status_code' => wp_remote_retrieve_response_code($response),
                 'body_length' => strlen(wp_remote_retrieve_body($response)),
                 'body_preview' => substr(wp_remote_retrieve_body($response), 0, 100) . '...'
             ]);
         }
-        
-        if (is_wp_error($response)) {
+
+        if (is_wp_error($response))
+        {
             return new WP_Error(
                 'api_error',
                 sprintf(__('Failed to connect to Operaton API: %s', 'operaton-dmn'), $response->get_error_message()),
@@ -441,7 +461,8 @@ trait Operaton_DMN_API_Evaluation
         $http_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
 
-        if ($http_code !== 200) {
+        if ($http_code !== 200)
+        {
             return new WP_Error(
                 'api_error',
                 sprintf(__('API returned status code %d: %s', 'operaton-dmn'), $http_code, $body),
@@ -451,7 +472,8 @@ trait Operaton_DMN_API_Evaluation
 
         $data = json_decode($body, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        if (json_last_error() !== JSON_ERROR_NONE)
+        {
             return new WP_Error(
                 'invalid_response',
                 __('Invalid JSON response from Operaton API', 'operaton-dmn'),
@@ -462,7 +484,8 @@ trait Operaton_DMN_API_Evaluation
         // Process results based on configured mappings
         $results = $this->extract_decision_results($result_mappings, $data);
 
-        if (empty($results)) {
+        if (empty($results))
+        {
             return new WP_Error(
                 'no_results',
                 __('No valid results found in API response', 'operaton-dmn'),
@@ -496,7 +519,7 @@ trait Operaton_DMN_API_Evaluation
         $retrieval_start = microtime(true);
 
         // Try primary strategy first
-        $this->log_verbose('Batch Step 2a - Trying primary strategy', ['endpoint' => $primary_endpoint]);
+        operaton_debug_verbose('API', 'Batch Step 2a - Trying primary strategy', ['endpoint' => $primary_endpoint]);
 
         $primary_response = $this->make_optimized_api_call(
             $api_batch[$primary_endpoint]['endpoint'],
@@ -511,7 +534,7 @@ trait Operaton_DMN_API_Evaluation
         {
             $retrieval_time = round((microtime(true) - $retrieval_start) * 1000, 2);
 
-            $this->log_verbose('Primary strategy succeeded', [
+            operaton_debug_verbose('API', 'Primary strategy succeeded', [
                 'retrieval_time_ms' => $retrieval_time,
                 'variables_found' => count($primary_variables)
             ]);
@@ -531,7 +554,7 @@ trait Operaton_DMN_API_Evaluation
             );
         }
 
-        $this->log_verbose('Batch Step 2b - Primary failed, trying fallback', ['fallback_endpoint' => $fallback_endpoint]);
+        operaton_debug_verbose('API', 'Batch Step 2b - Primary failed, trying fallback', ['fallback_endpoint' => $fallback_endpoint]);
 
         // Small delay before fallback to allow process completion if needed
         if ($primary_endpoint === 'get_variables_active')
@@ -558,7 +581,7 @@ trait Operaton_DMN_API_Evaluation
 
         $total_retrieval_time = round((microtime(true) - $retrieval_start) * 1000, 2);
 
-        $this->log_verbose('Fallback strategy succeeded', [
+        operaton_debug_verbose('API', 'Fallback strategy succeeded', [
             'total_retrieval_time_ms' => $total_retrieval_time,
             'variables_found' => count($fallback_variables)
         ]);
