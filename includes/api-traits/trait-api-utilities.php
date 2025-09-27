@@ -36,7 +36,7 @@ trait Operaton_DMN_API_Utilities
             self::$pool_stats['hits']++;
             $this->update_connection_stats('hits');  // Wordpress persistence for admin dashboard
 
-            $this->log_verbose('Reusing connection for host', ['host' => $host]);
+            operaton_debug_verbose('API', 'Reusing connection for host', ['host' => $host]);
 
             return $this->get_cached_connection_options($connection_key);
         }
@@ -47,7 +47,7 @@ trait Operaton_DMN_API_Utilities
         $this->update_connection_stats('misses'); // Wordpress persistence for admin dashboard
         $this->update_connection_stats('created');
 
-        $this->log_verbose('Creating new connection for host', ['host' => $host]);
+        operaton_debug_verbose('API', 'Creating new connection for host', ['host' => $host]);
 
         $options = $this->create_optimized_connection_options($host);
         $this->cache_connection($connection_key, $options);
@@ -229,7 +229,7 @@ trait Operaton_DMN_API_Utilities
         if ($cleaned > 0)
         {
             self::$pool_stats['cleaned'] += $cleaned;
-            $this->log_verbose('Cleaned old connections', ['count' => $cleaned]);
+            operaton_debug_verbose('API', 'Cleaned old connections', ['count' => $cleaned]);
         }
     }
 
@@ -280,12 +280,12 @@ trait Operaton_DMN_API_Utilities
     {
         $this->connection_max_age = max(60, min(1800, intval($timeout)));
 
-        $this->log_verbose('Connection pool timeout updated', ['timeout_seconds' => $this->connection_max_age]);
+        operaton_debug_verbose('API', 'Connection pool timeout updated', ['timeout_seconds' => $this->connection_max_age]);
 
         // Clear existing connections to apply new timeout immediately
         $cleared = $this->clear_connection_pool();
 
-        $this->log_verbose('Cleared connections to apply new timeout', ['count' => $cleared]);
+        operaton_debug_verbose('API', 'Cleared connections to apply new timeout', ['count' => $cleared]);
     }
 
     /**
@@ -299,7 +299,7 @@ trait Operaton_DMN_API_Utilities
     {
         $cleared = $this->clear_connection_pool();
 
-        $this->log_verbose('Cleared connection pool for batching optimization', ['count' => $cleared]);
+        operaton_debug_verbose('API', 'Cleared connection pool for batching optimization', ['count' => $cleared]);
 
         return $cleared;
     }
@@ -365,7 +365,7 @@ trait Operaton_DMN_API_Utilities
         self::$connection_pool = array();
         self::$pool_stats['cleaned'] += $cleared;
 
-        $this->log_verbose('Manually cleared connections', ['count' => $cleared]);
+        operaton_debug_verbose('API', 'Manually cleared connections', ['count' => $cleared]);
 
         return $cleared;
     }
@@ -492,7 +492,7 @@ trait Operaton_DMN_API_Utilities
      */
     private function build_evaluation_endpoint($base_endpoint, $decision_key)
     {
-        $this->log_verbose('Building evaluation endpoint', [
+        operaton_debug_verbose('API', 'Building evaluation endpoint', [
             'decision_key' => $decision_key,
             'base_endpoint' => $base_endpoint
         ]);
@@ -520,7 +520,7 @@ trait Operaton_DMN_API_Utilities
         // Build the complete evaluation URL
         $evaluation_url = $clean_base_url . '/decision-definition/key/' . $decision_key . '/evaluate';
 
-        $this->log_verbose('Final evaluation endpoint built', ['endpoint' => $evaluation_url]);
+        operaton_debug_verbose('API', 'Final evaluation endpoint built', ['endpoint' => $evaluation_url]);
 
         return $evaluation_url;
     }
@@ -566,14 +566,14 @@ trait Operaton_DMN_API_Utilities
         if ($process_ended)
         {
             // Process completed immediately - get variables from history
-            $this->log_verbose('Process completed immediately, getting variables from history');
+            operaton_debug_verbose('API', 'Process completed immediately, getting variables from history');
 
             return $this->get_historical_variables($base_url, $process_instance_id);
         }
         else
         {
             // Process is still running - wait and try to get active variables
-            $this->log_verbose('Process still running, waiting for completion');
+            operaton_debug_verbose('API', 'Process still running, waiting for completion');
 
             sleep(3); // Wait for process completion
 
@@ -603,7 +603,7 @@ trait Operaton_DMN_API_Utilities
         $history_endpoint = $base_url . '/history/variable-instance';
         $history_url = $history_endpoint . '?processInstanceId=' . $process_instance_id;
 
-        $this->log_verbose('Getting historical variables', ['url' => $history_url]);
+        operaton_debug_verbose('API', 'Getting historical variables', ['url' => $history_url]);
 
         $response = wp_remote_get($history_url, array(
             'headers' => array('Accept' => 'application/json'),
@@ -710,7 +710,7 @@ trait Operaton_DMN_API_Utilities
                     'field_id' => $mapping['field_id']
                 );
 
-                $this->log_diagnostic('Extracted result field', [
+                operaton_debug_diagnostic('API', 'Extracted result field', [
                     'field' => $dmn_result_field,
                     'value' => $result_value,
                     'type' => gettype($result_value)
@@ -718,7 +718,7 @@ trait Operaton_DMN_API_Utilities
             }
             else
             {
-                $this->log_diagnostic('No result found for field', ['field' => $dmn_result_field]);
+                operaton_debug_diagnostic('API', 'No result found for field', ['field' => $dmn_result_field]);
             }
         }
 
