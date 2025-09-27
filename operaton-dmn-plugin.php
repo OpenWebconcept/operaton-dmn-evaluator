@@ -19,7 +19,8 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH')) {
+if (!defined('ABSPATH'))
+{
     exit;
 }
 
@@ -28,53 +29,63 @@ define('OPERATON_DMN_VERSION', '1.0.0-beta.17');
 define('OPERATON_DMN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('OPERATON_DMN_PLUGIN_PATH', plugin_dir_path(__FILE__));
 
+require_once __DIR__ . '/includes/class-operaton-dmn-debug-manager.php';
+Operaton_DMN_Debug_Manager::get_instance();
+
 // CRITICAL FIX: Load Performance Monitor FIRST, before everything else
 $performance_file = OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-performance.php';
-if (file_exists($performance_file)) {
+if (file_exists($performance_file))
+{
     require_once $performance_file;
-
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN: Performance monitor loaded successfully');
-    }
-} else {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN: Performance monitor file not found at: ' . $performance_file);
-    }
+    operaton_debug('Main', 'Performance monitor loaded successfully');
+}
+else
+{
+    operaton_debug_minimal('Main', 'Performance monitor file not found', ['path' => $performance_file]);
 }
 
 // Initialize the update checker - CLEAN VERSION
-if (is_admin()) {
+if (is_admin())
+{
     // Only load auto-updater in admin context
     $updater_file = OPERATON_DMN_PLUGIN_PATH . 'includes/plugin-updater.php';
 
-    if (file_exists($updater_file)) {
+    if (file_exists($updater_file))
+    {
         require_once $updater_file;
 
         // IMPORTANT: Initialize with the MAIN plugin file, not the updater file
         new OperatonDMNAutoUpdater(__FILE__, OPERATON_DMN_VERSION);
 
         // Log successful loading if debug is enabled
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Auto-updater loaded successfully');
-            error_log('Operaton DMN: Plugin file for updater: ' . __FILE__);
-            error_log('Operaton DMN: Plugin basename: ' . plugin_basename(__FILE__));
-        }
+        operaton_debug(
+            'Main',
+            'Auto-updater loaded successfully',
+            [
+                'plugin_file' => __FILE__,
+                'plugin_basename' => plugin_basename(__FILE__)
+            ]
+        );
 
         // Add debug information to admin
-        add_action('admin_footer', function () {
-            if (current_user_can('manage_options') && isset($_GET['page']) && strpos($_GET['page'], 'operaton-dmn') !== false) {
+        add_action('admin_footer', function ()
+        {
+            if (current_user_can('manage_options') && isset($_GET['page']) && strpos($_GET['page'], 'operaton-dmn') !== false)
+            {
                 echo '<script>console.log("Operaton DMN Auto-Updater: Loaded");</script>';
             }
         });
-    } else {
+    }
+    else
+    {
         // Log missing file if debug is enabled
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Auto-updater file not found at: ' . $updater_file);
-        }
+        operaton_debug_minimal('Main', 'Auto-updater file not found', ['path' => $updater_file]);
 
         // Show admin notice about missing auto-updater
-        add_action('admin_notices', function () {
-            if (current_user_can('manage_options')) {
+        add_action('admin_notices', function ()
+        {
+            if (current_user_can('manage_options'))
+            {
                 echo '<div class="notice notice-warning is-dismissible">';
                 echo '<p><strong>Operaton DMN Evaluator:</strong> Auto-update system files are missing. Please reinstall the plugin to enable automatic updates.</p>';
                 echo '</div>';
@@ -83,18 +94,19 @@ if (is_admin()) {
     }
 
     // Load debug tools if in debug mode (remove in production)
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Operaton DMN: WP_DEBUG is enabled, attempting to load debug tools');
-        $debug_file = OPERATON_DMN_PLUGIN_PATH . 'includes/update-debug.php';
-        error_log('Operaton DMN: Debug file path: ' . $debug_file);
+    operaton_debug_verbose('Main', 'WP_DEBUG is enabled, attempting to load debug tools');
+    $debug_file = OPERATON_DMN_PLUGIN_PATH . 'includes/update-debug.php';
+    operaton_debug_verbose('Main', 'Debug file path', ['path' => $debug_file]);
 
-        if (file_exists($debug_file)) {
-            error_log('Operaton DMN: Debug file exists, loading...');
-            require_once $debug_file;
-            error_log('Operaton DMN: Debug file loaded successfully');
-        } else {
-            error_log('Operaton DMN: Debug file NOT found at: ' . $debug_file);
-        }
+    if (file_exists($debug_file))
+    {
+        operaton_debug_verbose('Main', 'Debug file exists, loading...');
+        require_once $debug_file;
+        operaton_debug('Main', 'Debug file loaded successfully');
+    }
+    else
+    {
+        operaton_debug_minimal('Main', 'Debug file NOT found', ['path' => $debug_file]);
     }
 }
 
@@ -183,7 +195,8 @@ class OperatonDMNEvaluator
      */
     public static function get_instance()
     {
-        if (null === self::$instance) {
+        if (null === self::$instance)
+        {
             self::$instance = new self();
         }
         return self::$instance;
@@ -202,60 +215,64 @@ class OperatonDMNEvaluator
     private function __construct()
     {
         // FIXED: Initialize performance monitoring FIRST
-        if (class_exists('Operaton_DMN_Performance_Monitor')) {
+        if (class_exists('Operaton_DMN_Performance_Monitor'))
+        {
             $this->performance = Operaton_DMN_Performance_Monitor::get_instance();
             $this->performance->mark('plugin_construct_start', 'Main plugin constructor started');
-        } else {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Performance monitor class not available');
-            }
+        }
+        else
+        {
+            operaton_debug_minimal('Evaluator', 'Performance monitor class not available');
         }
 
         // Prevent multiple initializations
-        if (self::$initialized) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Preventing duplicate initialization');
-            }
+        if (self::$initialized)
+        {
+            operaton_debug_verbose('Evaluator', 'Preventing duplicate initialization');
             return;
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Starting fresh initialization - v' . OPERATON_DMN_VERSION);
-        }
+        operaton_debug('Evaluator', 'Starting fresh initialization', ['version' => OPERATON_DMN_VERSION]);
 
         // NEW: Load quirks fix manager FIRST (before assets)
         $this->load_quirks_fix_manager();
-        if ($this->performance) {
+        if ($this->performance)
+        {
             $this->performance->mark('quirks_fix_loaded');
         }
 
         // 1. Load assets manager first
         $this->load_assets_manager();
-        if ($this->performance) {
+        if ($this->performance)
+        {
             $this->performance->mark('assets_manager_loaded');
         }
 
         // 2. Load admin manager second (depends on assets)
         $this->load_admin_manager();
-        if ($this->performance) {
+        if ($this->performance)
+        {
             $this->performance->mark('admin_manager_loaded');
         }
 
         // 3. Load database manager third
         $this->load_database_manager();
-        if ($this->performance) {
+        if ($this->performance)
+        {
             $this->performance->mark('database_manager_loaded');
         }
 
         // 4. Load API manager fourth (depends on core and database)
         $this->load_api_manager();
-        if ($this->performance) {
+        if ($this->performance)
+        {
             $this->performance->mark('api_manager_loaded');
         }
 
         // 5. Load Gravity Forms manager fifth (depends on all others)
         $this->load_gravity_forms_manager();
-        if ($this->performance) {
+        if ($this->performance)
+        {
             $this->performance->mark('gravity_forms_manager_loaded');
         }
 
@@ -264,7 +281,8 @@ class OperatonDMNEvaluator
         add_action('rest_api_init', array($this, 'register_rest_routes'));
 
         // Database and version checks (admin only)
-        if (is_admin()) {
+        if (is_admin())
+        {
             add_action('admin_init', array($this->database, 'check_and_update_database'), 1);
             add_action('admin_init', array($this, 'check_version'), 5);
         }
@@ -286,7 +304,8 @@ class OperatonDMNEvaluator
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
 
         // FIXED: Add performance hooks if available
-        if ($this->performance) {
+        if ($this->performance)
+        {
             add_action('wp_loaded', array($this, 'mark_wp_loaded'));
             add_action('shutdown', array($this, 'store_performance_data'));
         }
@@ -294,13 +313,12 @@ class OperatonDMNEvaluator
         // Mark as initialized
         self::$initialized = true;
 
-        if ($this->performance) {
+        if ($this->performance)
+        {
             $this->performance->mark('plugin_construct_complete', 'Main plugin constructor completed');
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: ✅ Initialization complete');
-        }
+        operaton_debug('Evaluator', '✅ Initialization complete');
     }
 
     /**
@@ -308,7 +326,8 @@ class OperatonDMNEvaluator
      */
     public function mark_wp_loaded()
     {
-        if ($this->performance) {
+        if ($this->performance)
+        {
             $this->performance->mark('wp_loaded', 'WordPress fully loaded');
         }
     }
@@ -318,7 +337,8 @@ class OperatonDMNEvaluator
      */
     public function store_performance_data()
     {
-        if ($this->performance) {
+        if ($this->performance)
+        {
             $this->performance->store_performance_stats();
         }
     }
@@ -359,9 +379,7 @@ class OperatonDMNEvaluator
         require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-quirks-fix.php';
         $this->quirks_fix = new Operaton_DMN_Quirks_Fix();
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Quirks fix manager loaded successfully');
-        }
+        operaton_debug('Evaluator', 'Quirks fix manager loaded successfully');
     }
 
     /**
@@ -383,9 +401,7 @@ class OperatonDMNEvaluator
         require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-assets.php';
         $this->assets = new Operaton_DMN_Assets(OPERATON_DMN_PLUGIN_URL, OPERATON_DMN_VERSION);
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Assets manager loaded successfully');
-        }
+        operaton_debug('Evaluator', 'Assets manager loaded successfully');
     }
 
     /**
@@ -398,9 +414,7 @@ class OperatonDMNEvaluator
         require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-admin.php';
         $this->admin = new Operaton_DMN_Admin($this, $this->assets);
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Admin manager loaded successfully');
-        }
+        operaton_debug('Evaluator', 'Admin manager loaded successfully');
     }
 
     /**
@@ -413,9 +427,7 @@ class OperatonDMNEvaluator
         require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-database.php';
         $this->database = new Operaton_DMN_Database(OPERATON_DMN_VERSION);
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Database manager loaded successfully');
-        }
+        operaton_debug('Evaluator', 'Database manager loaded successfully');
     }
 
     /**
@@ -429,9 +441,7 @@ class OperatonDMNEvaluator
         require_once OPERATON_DMN_PLUGIN_PATH . 'includes/class-operaton-dmn-api.php';
         $this->api = new Operaton_DMN_API($this, $this->database);
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: API manager loaded successfully');
-        }
+        operaton_debug('Evaluator', 'API manager loaded successfully');
     }
 
     /**
@@ -447,9 +457,7 @@ class OperatonDMNEvaluator
         // Set the Gravity Forms manager in the assets manager for form detection
         $this->assets->set_gravity_forms_manager($this->gravity_forms);
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Gravity Forms manager loaded successfully');
-        }
+        operaton_debug('Evaluator', 'Gravity Forms manager loaded successfully');
     }
 
     // =============================================================================
@@ -527,17 +535,17 @@ class OperatonDMNEvaluator
      */
     public function init()
     {
-        if ($this->performance) {
+        if ($this->performance)
+        {
             $timer_id = $this->performance->start_timer('plugin_init');
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Initializing plugin textdomain');
-        }
+        operaton_debug_verbose('Evaluator', 'Initializing plugin textdomain');
 
         load_plugin_textdomain('operaton-dmn', false, dirname(plugin_basename(__FILE__)) . '/languages/');
 
-        if ($this->performance && isset($timer_id)) {
+        if ($this->performance && isset($timer_id))
+        {
             $this->performance->stop_timer($timer_id, 'Textdomain loaded');
         }
     }
@@ -550,19 +558,16 @@ class OperatonDMNEvaluator
      */
     public function register_rest_routes()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Delegating REST API registration to API manager');
-        }
+        operaton_debug_verbose('Evaluator', 'Delegating REST API registration to API manager');
 
         // API manager handles all REST route registration
-        if (isset($this->api)) {
+        if (isset($this->api))
+        {
             // Routes are registered automatically via API manager hooks
             return;
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: API manager not available for REST route registration');
-        }
+        operaton_debug_minimal('Evaluator', 'API manager not available for REST route registration');
     }
 
     /**
@@ -575,10 +580,12 @@ class OperatonDMNEvaluator
     {
         $installed_version = get_option('operaton_dmn_version', '1.0.0-beta.1');
 
-        if (version_compare($installed_version, OPERATON_DMN_VERSION, '<')) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Version upgrade detected from ' . $installed_version . ' to ' . OPERATON_DMN_VERSION);
-            }
+        if (version_compare($installed_version, OPERATON_DMN_VERSION, '<'))
+        {
+            operaton_debug('Evaluator', 'Version upgrade detected', [
+                'from_version' => $installed_version,
+                'to_version' => OPERATON_DMN_VERSION
+            ]);
 
             // Run database migration for any version upgrade
             $this->database->check_and_update_database();
@@ -603,26 +610,27 @@ class OperatonDMNEvaluator
      */
     public function activate()
     {
-        if ($this->performance) {
+        if ($this->performance)
+        {
             $timer_id = $this->performance->start_timer('plugin_activation');
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Plugin activation started');
-        }
+        operaton_debug('Evaluator', 'Plugin activation started');
 
         // EXISTING ACTIVATION CODE
         $this->database->create_database_tables();
         add_option('operaton_dmn_version', OPERATON_DMN_VERSION);
         add_option('operaton_dmn_activated', current_time('mysql'));
 
-        if (!wp_next_scheduled('operaton_dmn_cleanup')) {
+        if (!wp_next_scheduled('operaton_dmn_cleanup'))
+        {
             wp_schedule_event(time(), 'daily', 'operaton_dmn_cleanup');
         }
 
         flush_rewrite_rules();
 
-        if ($this->performance && isset($timer_id)) {
+        if ($this->performance && isset($timer_id))
+        {
             $this->performance->stop_timer($timer_id, 'Plugin activation completed');
         }
     }
@@ -635,9 +643,7 @@ class OperatonDMNEvaluator
      */
     public function deactivate()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Plugin deactivation started');
-        }
+        operaton_debug('Evaluator', 'Plugin deactivation started');
 
         // Clear scheduled events
         wp_clear_scheduled_hook('operaton_dmn_cleanup');
@@ -668,22 +674,28 @@ class OperatonDMNEvaluator
     public function force_frontend_assets_on_gravity_forms()
     {
         // Skip in admin
-        if (is_admin()) {
+        if (is_admin())
+        {
             return;
         }
 
         // Use centralized detection
-        if (Operaton_DMN_Assets::should_load_frontend_assets()) {
-            if (isset($this->assets)) {
+        if (Operaton_DMN_Assets::should_load_frontend_assets())
+        {
+            if (isset($this->assets))
+            {
                 // Ensure jQuery is loaded first with high priority
-                add_action('wp_enqueue_scripts', function () {
-                    if (!wp_script_is('jquery', 'enqueued')) {
+                add_action('wp_enqueue_scripts', function ()
+                {
+                    if (!wp_script_is('jquery', 'enqueued'))
+                    {
                         wp_enqueue_script('jquery');
                     }
                 }, 1);
 
                 // Load our assets after jQuery is guaranteed
-                add_action('wp_enqueue_scripts', function () {
+                add_action('wp_enqueue_scripts', function ()
+                {
                     $this->assets->enqueue_frontend_assets();
                 }, 15);
             }
@@ -720,10 +732,9 @@ class OperatonDMNEvaluator
      */
     public function get_config_by_form_id($form_id, $use_cache = true)
     {
-        if (!$this->database) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Operaton DMN: Database manager not available for config retrieval');
-            }
+        if (!$this->database)
+        {
+            operaton_debug_minimal('Evaluator', 'Database manager not available for config retrieval');
             return null;
         }
 
@@ -739,9 +750,7 @@ class OperatonDMNEvaluator
      */
     public function get_endpoint_examples()
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Getting endpoint examples');
-        }
+        operaton_debug_verbose('Evaluator', 'Getting endpoint examples');
 
         return array(
             'operaton_cloud' => array(
@@ -776,21 +785,24 @@ class OperatonDMNEvaluator
     {
         $issues = array();
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Performing health check');
-        }
+        operaton_debug_verbose('Evaluator', 'Performing health check');
 
         // Check if Gravity Forms is active using the new manager
-        if (!$this->gravity_forms || !$this->gravity_forms->is_gravity_forms_available()) {
+        if (!$this->gravity_forms || !$this->gravity_forms->is_gravity_forms_available())
+        {
             $issues[] = __('Gravity Forms is not active.', 'operaton-dmn');
         }
 
         // Check database table
-        if (!$this->database) {
+        if (!$this->database)
+        {
             $issues[] = __('Database manager not initialized.', 'operaton-dmn');
-        } else {
+        }
+        else
+        {
             $health = $this->database->check_database_health();
-            if (!empty($health['issues'])) {
+            if (!empty($health['issues']))
+            {
                 $issues = array_merge($issues, $health['issues']);
             }
         }
@@ -798,22 +810,28 @@ class OperatonDMNEvaluator
         // Check if REST API is working
         $test_url = rest_url('operaton-dmn/v1/test');
         $response = wp_remote_get($test_url, array('timeout' => 5));
-        if (is_wp_error($response)) {
+        if (is_wp_error($response))
+        {
             $issues[] = __('REST API is not accessible.', 'operaton-dmn');
         }
 
         // NEW: Check quirks fix status
-        if (!$this->quirks_fix) {
+        if (!$this->quirks_fix)
+        {
             $issues[] = __('Quirks fix manager not initialized.', 'operaton-dmn');
-        } else {
+        }
+        else
+        {
             $quirks_status = $this->quirks_fix->get_compatibility_status();
-            if (!$quirks_status['quirks_fix_active']) {
+            if (!$quirks_status['quirks_fix_active'])
+            {
                 $issues[] = __('Quirks mode compatibility fixes not active.', 'operaton-dmn');
             }
         }
 
         // Check if assets are properly loaded
-        if (!$this->assets) {
+        if (!$this->assets)
+        {
             $issues[] = __('Assets manager not initialized.', 'operaton-dmn');
         }
 
@@ -856,7 +874,8 @@ class OperatonDMNEvaluator
      */
     public function test_full_endpoint_configuration($base_endpoint, $decision_key)
     {
-        if (!$this->api) {
+        if (!$this->api)
+        {
             return array(
                 'success' => false,
                 'message' => __('API manager not available', 'operaton-dmn'),
@@ -877,7 +896,8 @@ class OperatonDMNEvaluator
      */
     public function get_decision_flow_summary_html($form_id)
     {
-        if (!$this->api) {
+        if (!$this->api)
+        {
             return '<div class="operaton-error"><p><em>API manager not available for decision flow.</em></p></div>';
         }
 
@@ -894,26 +914,30 @@ class OperatonDMNEvaluator
  */
 function operaton_dmn_handle_cache_clear_url()
 {
-    if (!current_user_can('manage_options')) {
+    if (!current_user_can('manage_options'))
+    {
         return;
     }
 
     // Comprehensive cache clear (new functionality)
-    if (isset($_GET['operaton_clear_all_cache'])) {
+    if (isset($_GET['operaton_clear_all_cache']))
+    {
         global $wpdb;
 
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_operaton_%'");
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_operaton_%'");
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%operaton_config_%'");
 
-        if (function_exists('wp_cache_flush')) {
+        if (function_exists('wp_cache_flush'))
+        {
             wp_cache_flush();
         }
 
         // Force database manager to reload
         $plugin_instance = OperatonDMNEvaluator::get_instance();
         $database = $plugin_instance->get_database_instance();
-        if ($database && method_exists($database, 'force_reload_all_configurations')) {
+        if ($database && method_exists($database, 'force_reload_all_configurations'))
+        {
             $database->force_reload_all_configurations();
         }
 
@@ -931,35 +955,39 @@ function operaton_dmn_handle_cache_clear_url()
  */
 function debug_operaton_assets_loading()
 {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('=== OPERATON ASSETS DEBUG (EARLY) ===');
-        error_log('Is admin: ' . (is_admin() ? 'YES' : 'NO'));
-        error_log('Current page: ' . $_SERVER['REQUEST_URI']);
-        error_log('Has Gravity Forms: ' . (class_exists('GFForms') ? 'YES' : 'NO'));
+    global $post, $wp_scripts;
 
-        // Check if we have Gravity Forms on page
-        global $post;
-        if ($post) {
-            $has_gf_shortcode = has_shortcode($post->post_content, 'gravityform');
-            $has_gf_block = has_block('gravityforms/form', $post);
-            error_log('Has GF shortcode: ' . ($has_gf_shortcode ? 'YES' : 'NO'));
-            error_log('Has GF block: ' . ($has_gf_block ? 'YES' : 'NO'));
-            error_log('Post content preview: ' . substr($post->post_content, 0, 200));
-        }
+    // Collect Gravity Forms data
+    $gf_data = [];
+    if ($post)
+    {
+        $gf_data = [
+            'has_shortcode' => has_shortcode($post->post_content, 'gravityform'),
+            'has_block' => has_block('gravityforms/form', $post),
+            'content_preview' => substr($post->post_content, 0, 200)
+        ];
+    }
 
-        // Check what scripts are registered
-        global $wp_scripts;
-        $operaton_scripts = array();
-        if (isset($wp_scripts->registered)) {
-            foreach ($wp_scripts->registered as $handle => $script) {
-                if (strpos($handle, 'operaton') !== false) {
-                    $operaton_scripts[] = $handle . ' (registered)';
-                }
+    // Collect script data
+    $operaton_scripts = [];
+    if (isset($wp_scripts->registered))
+    {
+        foreach ($wp_scripts->registered as $handle => $script)
+        {
+            if (strpos($handle, 'operaton') !== false)
+            {
+                $operaton_scripts[] = $handle;
             }
         }
-        error_log('Operaton scripts found: ' . implode(', ', $operaton_scripts));
-        error_log('=====================================');
     }
+
+    operaton_debug_diagnostic('Main', '=== OPERATON ASSETS DEBUG (EARLY) ===', [
+        'is_admin' => is_admin(),
+        'current_page' => $_SERVER['REQUEST_URI'] ?? 'unknown',
+        'has_gravity_forms' => class_exists('GFForms'),
+        'gravity_forms_data' => $gf_data,
+        'operaton_scripts' => $operaton_scripts
+    ]);
 }
 
 /**
@@ -967,24 +995,32 @@ function debug_operaton_assets_loading()
  */
 function operaton_dmn_debug_asset_loading()
 {
-    if (!defined('WP_DEBUG') || !WP_DEBUG) {
+    if (!defined('WP_DEBUG') || !WP_DEBUG)
+    {
         return;
     }
 
     // FIXED: Add safety check for class existence
-    if (!class_exists('Operaton_DMN_Assets')) {
+    if (!class_exists('Operaton_DMN_Assets'))
+    {
         error_log('Operaton DMN: Assets class not available for debug');
         return;
     }
 
     // FIXED: Check if method exists before calling
-    if (method_exists('Operaton_DMN_Assets', 'get_coordinator_status')) {
+    if (method_exists('Operaton_DMN_Assets', 'get_coordinator_status'))
+    {
         $status = Operaton_DMN_Assets::get_coordinator_status();
-    } else {
+    }
+    else
+    {
         // Fallback for enhanced assets manager
-        if (method_exists('Operaton_DMN_Assets', 'get_enhanced_status')) {
+        if (method_exists('Operaton_DMN_Assets', 'get_enhanced_status'))
+        {
             $status = Operaton_DMN_Assets::get_enhanced_status();
-        } else {
+        }
+        else
+        {
             error_log('Operaton DMN: No debug status method available');
             return;
         }
@@ -1000,45 +1036,60 @@ function operaton_dmn_debug_asset_loading()
  */
 function operaton_dmn_reset_asset_loading()
 {
-    if (is_admin() && current_user_can('manage_options')) {
-        // FIXED: Check if method exists
-        if (method_exists('Operaton_DMN_Assets', 'reset_loading_coordinator')) {
-            Operaton_DMN_Assets::reset_loading_coordinator();
-        } elseif (method_exists('Operaton_DMN_Assets', 'reset_all_loading_states')) {
-            Operaton_DMN_Assets::reset_all_loading_states();
+    if (is_admin() && current_user_can('manage_options'))
+    {
+        // Get the assets manager instance instead of calling static methods
+        $plugin_instance = OperatonDMNEvaluator::get_instance();
+        $assets_manager = $plugin_instance->get_assets_instance();
+
+        if ($assets_manager)
+        {
+            // Call instance methods, not static methods
+            if (method_exists($assets_manager, 'reset_loading_coordinator'))
+            {
+                $assets_manager->reset_loading_coordinator();
+            }
+            elseif (method_exists($assets_manager, 'reset_all_loading_states'))
+            {
+                $assets_manager->reset_all_loading_states();
+            }
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Operaton DMN: Asset loading state manually reset');
-        }
+        // Convert this debug call too while we're here:
+        operaton_debug_verbose('Evaluator', 'Asset loading state manually reset');
     }
 }
 
 function debug_operaton_assets_loading_late()
 {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('=== OPERATON ASSETS DEBUG (LATE) ===');
+    global $wp_scripts;
 
-        global $wp_scripts;
-        $operaton_scripts = array();
-        if (isset($wp_scripts->registered)) {
-            foreach ($wp_scripts->registered as $handle => $script) {
-                if (strpos($handle, 'operaton') !== false) {
-                    $status = wp_script_is($handle, 'enqueued') ? 'ENQUEUED' : 'registered only';
-                    $operaton_scripts[] = $handle . ' (' . $status . ')';
-                }
+    $operaton_scripts = [];
+    $frontend_script_data = null;
+
+    if (isset($wp_scripts->registered))
+    {
+        foreach ($wp_scripts->registered as $handle => $script)
+        {
+            if (strpos($handle, 'operaton') !== false)
+            {
+                $status = wp_script_is($handle, 'enqueued') ? 'ENQUEUED' : 'registered only';
+                $operaton_scripts[$handle] = $status;
             }
         }
-        error_log('Final Operaton scripts: ' . implode(', ', $operaton_scripts));
-
-        // Check if frontend script was localized
-        if (isset($wp_scripts->registered['operaton-dmn-frontend'])) {
-            $frontend_script = $wp_scripts->registered['operaton-dmn-frontend'];
-            error_log('Frontend script localized data: ' . print_r($frontend_script->extra, true));
-        }
-
-        error_log('====================================');
     }
+
+    // Get frontend script localization data
+    if (isset($wp_scripts->registered['operaton-dmn-frontend']))
+    {
+        $frontend_script = $wp_scripts->registered['operaton-dmn-frontend'];
+        $frontend_script_data = $frontend_script->extra;
+    }
+
+    operaton_debug_diagnostic('Main', '=== OPERATON ASSETS DEBUG (LATE) ===', [
+        'operaton_scripts' => $operaton_scripts,
+        'frontend_script_data' => $frontend_script_data
+    ]);
 }
 
 /**
@@ -1047,8 +1098,10 @@ function debug_operaton_assets_loading_late()
 add_action('shutdown', 'operaton_dmn_debug_asset_loading', 999);
 
 // Add admin action to reset coordinator state
-add_action('wp_ajax_operaton_reset_coordinator', function () {
-    if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'operaton_admin_nonce')) {
+add_action('wp_ajax_operaton_reset_coordinator', function ()
+{
+    if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'operaton_admin_nonce'))
+    {
         wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
 
@@ -1065,8 +1118,10 @@ add_action('wp_enqueue_scripts', 'debug_operaton_assets_loading', 1);
 add_action('wp_enqueue_scripts', 'debug_operaton_assets_loading_late', 999);
 
 // Add AJAX handler for clearing update cache
-add_action('wp_ajax_operaton_clear_update_cache', function () {
-    if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce')) {
+add_action('wp_ajax_operaton_clear_update_cache', function ()
+{
+    if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['_ajax_nonce'], 'operaton_admin_nonce'))
+    {
         wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
 
@@ -1097,7 +1152,8 @@ function operaton_dmn_create_files()
     $upload_dir = wp_upload_dir();
     $plugin_dir = $upload_dir['basedir'] . '/operaton-dmn/';
 
-    if (!file_exists($plugin_dir)) {
+    if (!file_exists($plugin_dir))
+    {
         wp_mkdir_p($plugin_dir);
     }
 }
@@ -1136,7 +1192,8 @@ function operaton_dmn_get_manager($manager)
 {
     $instance = OperatonDMNEvaluator::get_instance();
 
-    switch ($manager) {
+    switch ($manager)
+    {
         case 'api':
             return $instance->get_api_instance();
         case 'database':
@@ -1163,7 +1220,9 @@ function operaton_dmn_get_manager($manager)
  */
 function operaton_dmn_debug_status()
 {
-    if (!defined('WP_DEBUG') || !WP_DEBUG) {
+    $debug_manager = operaton_debug_manager();
+    if (!$debug_manager->get_debug_level())
+    {
         return;
     }
 
@@ -1171,27 +1230,25 @@ function operaton_dmn_debug_status()
     $status = $instance->get_managers_status();
     $health = $instance->health_check();
 
-    error_log('=== OPERATON DMN PLUGIN STATUS ===');
-    error_log('Plugin Version: ' . OPERATON_DMN_VERSION);
-    error_log('Managers Status: ' . print_r($status, true));
+    operaton_debug_diagnostic('Main', '=== OPERATON DMN PLUGIN STATUS ===', [
+        'plugin_version' => OPERATON_DMN_VERSION,
+        'managers_status' => $status,
+        'health_status' => !empty($health) ? $health : 'All systems operational'
+    ]);
 
-    if (!empty($health)) {
-        error_log('Health Issues: ' . implode(', ', $health));
-    } else {
-        error_log('Health Status: All systems operational');
-    }
-
-    // ADDED: Performance status
+    // KEEP: Performance status
     $performance = $instance->get_performance_instance();
-    if ($performance) {
-        error_log('Performance Monitor: Available');
+    if ($performance)
+    {
         $summary = $performance->get_summary();
-        error_log('Performance Summary: ' . print_r($summary, true));
-    } else {
-        error_log('Performance Monitor: Not available');
+        operaton_debug_diagnostic('Main', 'Performance Monitor Available', [
+            'performance_summary' => $summary
+        ]);
     }
-
-    error_log('==================================');
+    else
+    {
+        operaton_debug_minimal('Main', 'Performance Monitor: Not available');
+    }
 }
 
 /**
@@ -1206,9 +1263,9 @@ if (!function_exists('operaton_dmn_debug_asset_loading_status'))
         if (defined('WP_DEBUG') && WP_DEBUG && current_user_can('administrator'))
         {
             $status = Operaton_DMN_Assets::get_asset_loading_status();
-            error_log('=== ISSUE 4 ASSET LOADING STATUS ===');
-            error_log(print_r($status, true));
-            error_log('====================================');
+            operaton_debug_diagnostic('Main', '=== ISSUE 4 ASSET LOADING STATUS ===', [
+                'asset_loading_status' => $status
+            ]);
             return $status;
         }
         return null;

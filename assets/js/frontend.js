@@ -6,7 +6,7 @@
  * @since 1.0.0
  */
 
-console.log('🚀 Operaton DMN FIXED frontend script loading...');
+operatonDebugFrontend('Frontend script loading...');
 
 // =============================================================================
 // FIXED GLOBAL STATE MANAGEMENT
@@ -42,7 +42,7 @@ const formConfigCache = new Map();
 window.showEvaluateButton = function (formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for showEvaluateButton');
+    operatonDebugMinimal('Frontend', 'jQuery not available for showEvaluateButton');
     return;
   }
 
@@ -50,11 +50,10 @@ window.showEvaluateButton = function (formId) {
     const $button = getCachedElement(`#operaton-evaluate-${formId}`);
     const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
 
-    console.log('✅ Showing evaluate button for form', formId);
     $button.addClass('operaton-show-button').show();
     $summary.removeClass('operaton-show-summary');
   } catch (error) {
-    console.error('Error in showEvaluateButton:', error);
+    operatonDebugMinimal('Frontend', 'Error in showEvaluateButton:', error);
     $(`#operaton-evaluate-${formId}`).addClass('operaton-show-button').show();
     $(`#decision-flow-summary-${formId}`).removeClass('operaton-show-summary');
   }
@@ -63,7 +62,7 @@ window.showEvaluateButton = function (formId) {
 window.showDecisionFlowSummary = function (formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for showDecisionFlowSummary');
+    operatonDebugMinimal('Frontend', 'jQuery not available for showDecisionFlowSummary');
     return;
   }
 
@@ -75,20 +74,20 @@ window.showDecisionFlowSummary = function (formId) {
     $summary.addClass('operaton-show-summary');
 
     if (typeof window.loadDecisionFlowSummary === 'function') {
-      console.log('📊 Delegating decision flow loading to decision-flow.js for form', formId);
+       operatonDebugVerbose('Frontend', '📊 Delegating decision flow loading to decision-flow.js for form', formId);
       window.loadDecisionFlowSummary(formId);
     } else {
-      console.log('📊 Decision flow manager not available for form', formId);
+       operatonDebugVerbose('Frontend', '📊 Decision flow manager not available for form', formId);
     }
   } catch (error) {
-    console.error('Error in showDecisionFlowSummary:', error);
+    operatonDebugMinimal('Frontend', 'Error in showDecisionFlowSummary:', error);
   }
 };
 
 window.hideAllElements = function (formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for hideAllElements');
+    operatonDebugMinimal('Frontend', 'jQuery not available for hideAllElements');
     return;
   }
 
@@ -112,18 +111,17 @@ window.hideAllElements = function (formId) {
     }
 
     if (currentPage === targetPage) {
-      console.log('⏱️ Skipping hide - we are on target page', currentPage);
       return;
     }
 
     const $button = getCachedElement(`#operaton-evaluate-${formId}`);
     const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
 
-    console.log('❌ Hiding all elements for form', formId);
+     operatonDebugVerbose('Frontend', '❌ Hiding all elements for form', formId);
     $button.removeClass('operaton-show-button').hide();
     $summary.removeClass('operaton-show-summary');
   } catch (error) {
-    console.error('Error in hideAllElements:', error);
+    operatonDebugMinimal('Frontend', 'Error in hideAllElements:', error);
     $(`#operaton-evaluate-${formId}`).removeClass('operaton-show-button').hide();
     $(`#decision-flow-summary-${formId}`).removeClass('operaton-show-summary');
   }
@@ -136,7 +134,7 @@ window.hideAllElements = function (formId) {
 function getCachedElement(selector, maxAge = 5000) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for getCachedElement');
+    operatonDebugMinimal('Frontend', 'jQuery not available for getCachedElement');
     return $();
   }
 
@@ -314,7 +312,7 @@ function getResultFieldIds(formId) {
   const resultFieldIds = [];
 
   if (!config) {
-    console.warn(`No configuration found for form ${formId}`);
+    operatonDebugMinimal('Frontend', `No configuration found for form ${formId}`);
     return resultFieldIds;
   }
 
@@ -355,12 +353,12 @@ function getResultFieldIds(formId) {
     });
   }
 
-  console.log(`Result field IDs for form ${formId}:`, resultFieldIds);
+   operatonDebugVerbose('Frontend', `Result field IDs for form ${formId}:`, resultFieldIds);
   return resultFieldIds;
 }
 
 function clearAllResultFields(formId, reason) {
-  console.log(`CLEARING result fields for form ${formId}: ${reason}`);
+   operatonDebugVerbose('Frontend', `CLEARING result fields for form ${formId}: ${reason}`);
 
   const $ = window.jQuery || window.$;
   if (!$) return;
@@ -369,7 +367,7 @@ function clearAllResultFields(formId, reason) {
   const resultFieldIds = getResultFieldIds(formId);
 
   if (resultFieldIds.length === 0) {
-    console.log(`No result fields configured for form ${formId}`);
+     operatonDebugVerbose('Frontend', `No result fields configured for form ${formId}`);
     return;
   }
 
@@ -396,7 +394,7 @@ function clearAllResultFields(formId, reason) {
           const currentValue = $field.val();
 
           if (currentValue && currentValue.trim() !== '') {
-            console.log(`Clearing field ${fieldId} (${selector}): "${currentValue}"`);
+             operatonDebugVerbose('Frontend', `Clearing field ${fieldId} (${selector}): "${currentValue}"`);
             $field.val('');
             $field.trigger('change');
             $field.trigger('input');
@@ -410,12 +408,12 @@ function clearAllResultFields(formId, reason) {
     }
 
     if (!fieldCleared) {
-      console.log(`Result field ${fieldId} not found or already empty`);
+       operatonDebugMinimal('Frontend', `Result field ${fieldId} not found or already empty`);
     }
   });
 
   if (clearedCount > 0) {
-    console.log(`Successfully cleared ${clearedCount} result fields`);
+     operatonDebugVerbose('Frontend', `Successfully cleared ${clearedCount} result fields`);
 
     // Verification
     setTimeout(() => {
@@ -423,20 +421,19 @@ function clearAllResultFields(formId, reason) {
       resultFieldIds.forEach(fieldId => {
         const $field = $form.find(`#input_${formId}_${fieldId}`);
         if ($field.length > 0 && $field.val() && $field.val().trim() !== '') {
-          console.warn(`Field ${fieldId} still has value after clearing: "${$field.val()}"`);
+          operatonDebugMinimal('Frontend', `Field ${fieldId} still has value after clearing: "${$field.val()}"`);
         } else {
           verifyCount++;
         }
       });
-      console.log(`Verified ${verifyCount}/${resultFieldIds.length} fields are properly cleared`);
+       operatonDebugVerbose('Frontend', `Verified ${verifyCount}/${resultFieldIds.length} fields are properly cleared`);
     }, 100);
   } else {
-    console.log('No result fields needed clearing');
+     operatonDebugVerbose('Frontend', 'No result fields needed clearing');
   }
 }
 
 function clearResultFieldWithMessage(formId, reason) {
-  console.log('🧹 Clearing result field for form:', formId, 'Reason:', reason);
   clearAllResultFields(formId, reason);
   clearStoredResults(formId);
   clearDOMCache(formId);
@@ -460,7 +457,6 @@ function clearStoredResults(formId) {
   }
 
   delete window[`operaton_process_${formId}`];
-  console.log('🧹 Cleared all stored results and process data for form:', formId);
 }
 
 // =============================================================================
@@ -479,16 +475,14 @@ function handleButtonPlacement(formId) {
   const showDecisionFlow = config.show_decision_flow || false;
   const useProcess = config.use_process || false;
 
-  console.log(`Button placement check - Form: ${formId}, Current page: ${currentPage}, Target: ${targetPage}`);
+   operatonDebugVerbose('Frontend', `Button placement check - Form: ${formId}, Current page: ${currentPage}, Target: ${targetPage}`);
 
   if (currentPage === targetPage) {
-    console.log(`Showing evaluate button for form ${formId}`);
     window.showEvaluateButton(formId);
   } else if (currentPage === targetPage + 1 && showDecisionFlow && useProcess) {
-    console.log(`Showing decision flow for form ${formId}`);
     window.showDecisionFlowSummary(formId);
   } else {
-    console.log(`Hiding elements for form ${formId}`);
+     operatonDebugVerbose('Frontend', `Hiding elements for form ${formId}`);
     window.hideAllElements(formId);
   }
 }
@@ -517,7 +511,7 @@ function setupPageChangeDetection(formId) {
       'gform_page_loaded',
       function (loadedFormId, currentPage) {
         if (loadedFormId == formId) {
-          console.log(`Page loaded for form ${formId}: page ${currentPage}`);
+           operatonDebugVerbose('Frontend', `Page loaded for form ${formId}: page ${currentPage}`);
           setTimeout(() => {
             handleButtonPlacement(formId);
           }, 200);
@@ -533,7 +527,7 @@ function setupPageChangeDetection(formId) {
   const urlCheckInterval = setInterval(() => {
     if (window.location.href !== currentUrl) {
       currentUrl = window.location.href;
-      console.log(`URL changed for form ${formId}, updating button placement`);
+       operatonDebugVerbose('Frontend', `URL changed for form ${formId}, updating button placement`);
       setTimeout(() => {
         handleButtonPlacement(formId);
       }, 300);
@@ -558,7 +552,7 @@ function setupInputChangeMonitoring(formId) {
   const $form = $(`#gform_${formId}`);
 
   if ($form.length === 0) {
-    console.log(`Form ${formId} not found for input monitoring`);
+     operatonDebugMinimal('Frontend', `Form ${formId} not found for input monitoring`);
     return;
   }
 
@@ -567,7 +561,7 @@ function setupInputChangeMonitoring(formId) {
 
   // Cache result field IDs once
   const resultFieldIds = getResultFieldIds(formId);
-  console.log(`Result field IDs for monitoring form ${formId}:`, resultFieldIds);
+   operatonDebugVerbose('Frontend', `Result field IDs for monitoring form ${formId}:`, resultFieldIds);
 
   // State tracking for intelligent clearing
   let debounceTimer = null;
@@ -600,11 +594,11 @@ function setupInputChangeMonitoring(formId) {
     debounceTimer = setTimeout(() => {
       // Final check before clearing
       if (window.operatonPopulatingResults || window.operatonFieldLogicUpdating) {
-        console.log('SAFEGUARD: Canceling clear due to active operations');
+         operatonDebugVerbose('Frontend', 'SAFEGUARD: Canceling clear due to active operations');
         return;
       }
 
-      console.log(`CLEARING RESULTS: ${reason}`);
+       operatonDebugVerbose('Frontend', `CLEARING RESULTS: ${reason}`);
       clearAllResultFields(formId, reason);
       clearStoredResults(formId);
       lastClearTime = Date.now();
@@ -653,7 +647,7 @@ function setupInputChangeMonitoring(formId) {
     const fieldName = $field.attr('name') || $field.attr('id');
     const fieldValue = $field.val();
 
-    console.log(`CHANGE DETECTED: ${fieldName} = "${fieldValue}"`);
+     operatonDebugVerbose('Frontend', `CHANGE DETECTED: ${fieldName} = "${fieldValue}"`);
     scheduleResultsClear(`Field changed: ${fieldName}`, 300);
   });
 
@@ -689,7 +683,7 @@ function setupInputChangeMonitoring(formId) {
 
       if (!stillTyping && shouldClearResults()) {
         const finalValue = $field.val();
-        console.log(`TYPING SESSION COMPLETED: ${fieldName} = "${finalValue}"`);
+         operatonDebugVerbose('Frontend', `TYPING SESSION COMPLETED: ${fieldName} = "${finalValue}"`);
         clearAllResultFields(formId, `Typing completed: ${fieldName}`);
         clearStoredResults(formId);
         lastClearTime = Date.now();
@@ -713,7 +707,7 @@ function setupInputChangeMonitoring(formId) {
       return;
     }
 
-    console.log(`RADIO SELECTED: ${radioName} = "${radioValue}"`);
+     operatonDebugVerbose('Frontend', `RADIO SELECTED: ${radioName} = "${radioValue}"`);
     scheduleResultsClear(`Radio selected: ${radioName}`, 200);
   });
 
@@ -727,11 +721,11 @@ function setupInputChangeMonitoring(formId) {
       return;
     }
 
-    console.log(`CHECKBOX TOGGLED: ${checkboxName} = ${isChecked}`);
+     operatonDebugVerbose('Frontend', `CHECKBOX TOGGLED: ${checkboxName} = ${isChecked}`);
     scheduleResultsClear(`Checkbox changed: ${checkboxName}`, 200);
   });
 
-  console.log(`NON-BLOCKING input monitoring active for form ${formId} - all fields monitorable, input unrestricted`);
+   operatonDebugVerbose('Frontend', `NON-BLOCKING input monitoring active for form ${formId} - all fields monitorable, input unrestricted`);
 }
 
 /**
@@ -780,10 +774,10 @@ if (window.OperatonFieldLogic) {
       });
     }
 
-    console.log(`NON-BLOCKING field logic events set up for form ${formId}`);
+     operatonDebugVerbose('Frontend', `NON-BLOCKING field logic events set up for form ${formId}`);
   };
 
-  console.log("Field logic updated to be completely non-blocking");
+   operatonDebugVerbose('Frontend', "Field logic updated to be completely non-blocking");
 }
 
 /**
@@ -796,16 +790,16 @@ window.testInputFunctionality = function(formId = 8) {
     {id: 16, name: 'kind_geboorteplaats'}
   ];
 
-  console.log("=== TESTING INPUT FUNCTIONALITY ===");
+   operatonDebugVerbose('Frontend', "=== TESTING INPUT FUNCTIONALITY ===");
 
   fields.forEach(field => {
     const $field = $(`#input_${formId}_${field.id}`);
-    console.log(`Field ${field.name} (${field.id}):`);
-    console.log(`  Found: ${$field.length > 0}`);
-    console.log(`  Disabled: ${$field.prop('disabled')}`);
-    console.log(`  Readonly: ${$field.prop('readonly')}`);
-    console.log(`  Current value: "${$field.val()}"`);
-    console.log(`  Event handlers: ${Object.keys($._data($field[0], 'events') || {}).join(', ') || 'none'}`);
+     operatonDebugVerbose('Frontend', `Field ${field.name} (${field.id}):`);
+     operatonDebugVerbose('Frontend', `  Found: ${$field.length > 0}`);
+     operatonDebugVerbose('Frontend', `  Disabled: ${$field.prop('disabled')}`);
+     operatonDebugVerbose('Frontend', `  Readonly: ${$field.prop('readonly')}`);
+     operatonDebugVerbose('Frontend', `  Current value: "${$field.val()}"`);
+     operatonDebugVerbose('Frontend', `  Event handlers: ${Object.keys($._data($field[0], 'events') || {}).join(', ') || 'none'}`);
   });
 
   return "Test complete - check console output";
@@ -819,7 +813,7 @@ window.testInputFunctionality = function(formId = 8) {
 function bindNavigationEventsOptimized(formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for bindNavigationEventsOptimized');
+    operatonDebugMinimal('Frontend', 'jQuery not available for bindNavigationEventsOptimized');
     return;
   }
 
@@ -866,13 +860,13 @@ function bindNavigationEventsOptimized(formId) {
       }
     });
 
-    console.log('Captured form state (excluding result fields):', Object.keys(state));
+     operatonDebugVerbose('Frontend', 'Captured form state (excluding result fields):', Object.keys(state));
     return state;
   }
 
   function hasActualFormChanges(oldState, newState) {
     if (!oldState || !newState) {
-      console.log('No previous state to compare - treating as NO change for navigation');
+       operatonDebugVerbose('Frontend', 'No previous state to compare - treating as NO change for navigation');
       return false;
     }
 
@@ -905,11 +899,11 @@ function bindNavigationEventsOptimized(formId) {
     }
 
     if (changedFields.length > 0) {
-      console.log('ACTUAL form changes detected (non-result fields):', changedFields);
+       operatonDebugVerbose('Frontend', 'ACTUAL form changes detected (non-result fields):', changedFields);
       return true;
     }
 
-    console.log('No actual USER INPUT changes detected');
+     operatonDebugVerbose('Frontend', 'No actual USER INPUT changes detected');
     return false;
   }
 
@@ -917,7 +911,7 @@ function bindNavigationEventsOptimized(formId) {
   setTimeout(() => {
     if (!formStateSnapshot) {
       formStateSnapshot = captureFormState();
-      console.log(
+       operatonDebugVerbose('Frontend',
         `Captured initial form state for form ${formId} with ${
           Object.keys(formStateSnapshot).length
         } input fields (result fields excluded)`
@@ -933,19 +927,16 @@ function bindNavigationEventsOptimized(formId) {
     `click.operaton-nav-${formId}`,
     '.gform_previous_button input, .gform_previous_button button, input[value*="Previous"], button:contains("Previous")',
     function (e) {
-      console.log('Previous button clicked for form:', formId);
+       operatonDebugFrontend('Frontend', 'Previous button clicked for form:', formId);
       navigationInProgress = true;
 
       const currentState = captureFormState();
       const hasChanged = hasActualFormChanges(formStateSnapshot, currentState);
 
       if (hasChanged) {
-        console.log('REAL USER INPUT changes detected before navigation - clearing result fields');
         clearAllResultFields(formId, 'User input changed before navigation');
         clearStoredResults(formId);
         formStateSnapshot = currentState;
-      } else {
-        console.log('NO user input changes detected - PRESERVING result fields during navigation');
       }
 
       // Always safe to clear DOM cache
@@ -968,7 +959,7 @@ function bindNavigationEventsOptimized(formId) {
       'gform_page_loaded',
       function (loadedFormId, currentPage) {
         if (loadedFormId == formId) {
-          console.log('Form page loaded for form:', formId, 'page:', currentPage);
+           operatonDebugVerbose('Frontend', 'Form page loaded for form:', formId, 'page:', currentPage);
           navigationInProgress = true;
 
           clearDOMCache(formId); // Safe to clear DOM cache
@@ -978,10 +969,10 @@ function bindNavigationEventsOptimized(formId) {
             const currentState = captureFormState();
 
             if (!formStateSnapshot) {
-              console.log(`First page load for form ${formId} - capturing initial state`);
+               operatonDebugVerbose('Frontend', `First page load for form ${formId} - capturing initial state`);
               formStateSnapshot = currentState;
             } else {
-              console.log(`Page ${currentPage} loaded - updating state snapshot WITHOUT clearing results`);
+               operatonDebugVerbose('Frontend', `Page ${currentPage} loaded - updating state snapshot WITHOUT clearing results`);
 
               // Just update snapshot after navigation completes
               setTimeout(() => {
@@ -1014,7 +1005,7 @@ function bindNavigationEventsOptimized(formId) {
     );
 
     if (isResultField || navigationInProgress || window.operatonPopulatingResults) {
-      console.log(
+       operatonDebugVerbose('Frontend',
         `Skipping change handler: ${fieldName} (result field: ${isResultField}, navigation: ${navigationInProgress}, populating: ${window.operatonPopulatingResults})`
       );
       return;
@@ -1032,7 +1023,7 @@ function bindNavigationEventsOptimized(formId) {
         const hasChanged = hasActualFormChanges(formStateSnapshot, currentState);
 
         if (hasChanged) {
-          console.log(`USER INPUT change detected: ${fieldName} - clearing results`);
+           operatonDebugVerbose('Frontend', `USER INPUT change detected: ${fieldName} - clearing results`);
           clearAllResultFields(formId, `User input changed: ${fieldName}`);
           clearStoredResults(formId);
           formStateSnapshot = currentState;
@@ -1052,26 +1043,21 @@ function simpleFormInitialization(formId) {
   // Prevent concurrent initialization
   const initKey = `init_${formId}`;
   if (window.operatonInitialized[initKey]) {
-    console.log(`Form ${formId} initialization already in progress`);
     return;
   }
 
   // Prevent duplicate initialization
   if (window.operatonInitialized.forms.has(formId)) {
-    console.log(`Form ${formId} already initialized`);
     return;
   }
 
   const config = getFormConfigCached(formId);
   if (!config) {
-    console.log(`No configuration found for form ${formId}`);
     return;
   }
 
   // Set progress flag
   window.operatonInitialized[initKey] = true;
-
-  console.log(`=== INITIALIZING FORM ${formId} ===`);
 
   try {
     // Mark as initialized
@@ -1094,7 +1080,7 @@ function simpleFormInitialization(formId) {
         bindEvaluationEventsOptimized(formId);
         window.operatonInitialized.eventsBound.add(formId);
       } else {
-        console.log('Event handler already bound for form:', formId);
+         operatonDebugVerbose('Frontend', 'Event handler already bound for form:', formId);
       }
 
       // Set up enhanced navigation events
@@ -1131,13 +1117,13 @@ function simpleFormInitialization(formId) {
             const $field = $form.find(`#input_${formId}_${fieldId}`);
             if ($field.length > 0 && $field.val() && $field.val().trim() !== '') {
               hasExistingResults = true;
-              console.log(`Found existing result in field ${fieldId}: "${$field.val()}"`);
+               operatonDebugVerbose('Frontend', `Found existing result in field ${fieldId}: "${$field.val()}"`);
             }
           });
         }
 
         if (hasExistingResults) {
-          console.log(`PRESERVING existing results during re-initialization - Form ${formId}, page ${currentPage}`);
+           operatonDebugVerbose('Frontend', `PRESERVING existing results during re-initialization - Form ${formId}, page ${currentPage}`);
           // Only clear stored process data, keep the visible results
           if (typeof Storage !== 'undefined') {
             sessionStorage.removeItem(`operaton_process_${formId}`);
@@ -1146,21 +1132,21 @@ function simpleFormInitialization(formId) {
         }
 
         if (!isDecisionFlowPage) {
-          console.log(
+           operatonDebugVerbose('Frontend',
             `Clearing results on fresh initialization - Form ${formId}, page ${currentPage} (no existing results found)`
           );
           clearResultFieldWithMessage(formId, 'Form initialized (no existing results)');
         } else {
-          console.log(`PRESERVING results on decision flow page - Form ${formId}, page ${currentPage}`);
+           operatonDebugVerbose('Frontend', `PRESERVING results on decision flow page - Form ${formId}, page ${currentPage}`);
           // Only clear stored data, not the actual result fields
           clearStoredResults(formId);
         }
       }, 500);
     }
 
-    console.log(`=== FORM ${formId} INITIALIZATION COMPLETE ===`);
+     operatonDebugVerbose('Frontend', `=== FORM ${formId} INITIALIZATION COMPLETE ===`);
   } catch (error) {
-    console.error(`Error initializing form ${formId}:`, error);
+    operatonDebugMinimal('Frontend', `Error initializing form ${formId}:`, error);
     window.operatonInitialized.forms.delete(formId);
   } finally {
     delete window.operatonInitialized[initKey];
@@ -1173,14 +1159,13 @@ function simplifiedFormDetection() {
 
   // Prevent concurrent detection
   if (window.operatonInitialized.initInProgress) {
-    console.log('Form detection already in progress, skipping');
+     operatonDebugVerbose('Frontend', 'Form detection already in progress, skipping');
     return;
   }
 
   window.operatonInitialized.initInProgress = true;
 
   try {
-    console.log('🔍 Running simplified form detection...');
     window.operatonInitialized.performanceStats.initializationAttempts++;
 
     $('form[id^="gform_"]').each(function () {
@@ -1190,13 +1175,13 @@ function simplifiedFormDetection() {
       if (formId && !isNaN(formId)) {
         const config = getFormConfigCached(formId);
         if (config) {
-          console.log(`🎯 DMN-enabled form detected: ${formId}`);
+           operatonDebugVerbose('Frontend', `🎯 DMN-enabled form detected: ${formId}`);
           simpleFormInitialization(formId);
         }
       }
     });
 
-    console.log('✅ Simplified detection complete');
+     operatonDebugVerbose('Frontend', '✅ Simplified detection complete');
   } finally {
     window.operatonInitialized.initInProgress = false;
   }
@@ -1205,11 +1190,10 @@ function simplifiedFormDetection() {
 function initOperatonDMN() {
   // Prevent duplicate global initialization
   if (window.operatonInitialized.globalInit) {
-    console.log('Global initialization already complete, skipping');
     return;
   }
 
-  console.log('🚀 Starting Operaton DMN initialization...');
+   operatonDebugFrontend('Frontend', '🚀 Starting Operaton DMN initialization...');
 
   // Hook into Gravity Forms events if available
   if (typeof gform !== 'undefined' && gform.addAction) {
@@ -1221,7 +1205,6 @@ function initOperatonDMN() {
     gform.addAction(
       'gform_post_render',
       function (formId) {
-        console.log('📋 Gravity Form rendered:', formId);
         clearDOMCache(formId);
 
         // Small delay to ensure DOM is fully rendered
@@ -1232,8 +1215,6 @@ function initOperatonDMN() {
       10,
       'operaton_form_render'
     );
-
-    console.log('✅ Hooked into gform_post_render action');
   }
 
   // Initial form detection
@@ -1246,7 +1227,6 @@ function initOperatonDMN() {
 }
 
 function resetFormSystem() {
-  console.log('🧹 Resetting form system...');
 
   // Clear state
   window.operatonInitialized.forms.clear();
@@ -1280,7 +1260,6 @@ function resetFormSystem() {
     simplifiedFormDetection();
   }, 500);
 
-  console.log('✅ System reset complete');
 }
 
 // =============================================================================
@@ -1312,23 +1291,23 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
    */
   initializeForm: function (formId) {
     if (this.initializedForms.has(formId)) {
-      console.log(`Field logic already initialized for form ${formId}`);
+       operatonDebugVerbose('Frontend', `Field logic already initialized for form ${formId}`);
       return;
     }
 
     const mapping = this.fieldMappings[formId];
     if (!mapping) {
-      console.log(`No field logic mapping for form ${formId}`);
+       operatonDebugVerbose('Frontend', `No field logic mapping for form ${formId}`);
       return;
     }
 
-    console.log(`Initializing field logic for form ${formId}`);
+     operatonDebugVerbose('Frontend', `Initializing field logic for form ${formId}`);
 
     const $ = window.jQuery || window.$;
     const $form = $(`#gform_${formId}`);
 
     if ($form.length === 0) {
-      console.log(`Form ${formId} not found for field logic`);
+       operatonDebugMinimal('Frontend', `Form ${formId} not found for field logic`);
       return;
     }
 
@@ -1340,7 +1319,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
     this.setupEventListeners(formId, mapping, $form);
 
     this.initializedForms.add(formId);
-    console.log(`Field logic initialized for form ${formId}`);
+     operatonDebugVerbose('Frontend', `Field logic initialized for form ${formId}`);
   },
 
   /**
@@ -1350,7 +1329,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
     const $partnerField = $form.find(`#input_${formId}_${mapping.partnerField}`);
 
     if ($partnerField.length === 0) {
-      console.log(`Partner field not found: #input_${formId}_${mapping.partnerField}`);
+       operatonDebugMinimal('Frontend', `Partner field not found: #input_${formId}_${mapping.partnerField}`);
       return;
     }
 
@@ -1358,7 +1337,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
     const isEmpty = !partnerValue || partnerValue.trim() === '';
     const isAlleenstaand = isEmpty;
 
-    console.log(`Partner field "${partnerValue}" -> alleenstaand: ${isAlleenstaand}`);
+     operatonDebugVerbose('Frontend', `Partner field "${partnerValue}" -> alleenstaand: ${isAlleenstaand}`);
 
     // Update the radio field directly (field 33 is the actual radio field)
     const radioSelector = `input[name="input_${mapping.alleenstaandField}"][value="${
@@ -1366,21 +1345,20 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
     }"]`;
     const $radio = $form.find(radioSelector);
 
-    console.log(`Looking for radio: ${radioSelector}`);
-    console.log(`Found radio buttons: ${$radio.length}`);
+     operatonDebugVerbose('Frontend', `Looking for radio: ${radioSelector}`);
+     operatonDebugVerbose('Frontend', `Found radio buttons: ${$radio.length}`);
 
     if ($radio.length > 0) {
       // Set flag to prevent interference
       window.operatonFieldLogicUpdating = true;
 
       $radio.prop('checked', true).trigger('change');
-      console.log(`Updated alleenstaand radio to: ${isAlleenstaand ? 'true' : 'false'}`);
 
       setTimeout(() => {
         window.operatonFieldLogicUpdating = false;
       }, 100);
     } else {
-      console.log(`No radio button found for alleenstaand`);
+       operatonDebugVerbose('Frontend', `No radio button found for alleenstaand`);
     }
   },
 
@@ -1391,7 +1369,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
     const $childField = $form.find(`#input_${formId}_${mapping.childField}`);
 
     if ($childField.length === 0) {
-      console.log(`Child field not found: #input_${formId}_${mapping.childField}`);
+       operatonDebugMinimal('Frontend', `Child field not found: #input_${formId}_${mapping.childField}`);
       return;
     }
 
@@ -1399,27 +1377,26 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
     const hasValue = childValue && childValue.trim() !== '';
     const hasChildren = hasValue;
 
-    console.log(`Child field "${childValue}" -> has children: ${hasChildren}`);
+     operatonDebugVerbose('Frontend', `Child field "${childValue}" -> has children: ${hasChildren}`);
 
     // Update the radio field directly (field 34 is the actual radio field)
     const radioSelector = `input[name="input_${mapping.childrenField}"][value="${hasChildren ? 'true' : 'false'}"]`;
     const $radio = $form.find(radioSelector);
 
-    console.log(`Looking for radio: ${radioSelector}`);
-    console.log(`Found radio buttons: ${$radio.length}`);
+     operatonDebugVerbose('Frontend', `Looking for radio: ${radioSelector}`);
+     operatonDebugVerbose('Frontend', `Found radio buttons: ${$radio.length}`);
 
     if ($radio.length > 0) {
       // Set flag to prevent interference
       window.operatonFieldLogicUpdating = true;
 
       $radio.prop('checked', true).trigger('change');
-      console.log(`Updated children radio to: ${hasChildren ? 'true' : 'false'}`);
 
       setTimeout(() => {
         window.operatonFieldLogicUpdating = false;
       }, 100);
     } else {
-      console.log(`No radio button found for children`);
+       operatonDebugVerbose('Frontend', `No radio button found for children`);
     }
   },
 
@@ -1441,7 +1418,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
         clearTimeout(partnerTimeout);
         partnerTimeout = setTimeout(() => {
           if (!window.operatonPopulatingResults && !window.operatonFieldLogicUpdating) {
-            console.log('Partner field changed - updating alleenstaand logic');
+             operatonDebugVerbose('Frontend', 'Partner field changed - updating alleenstaand logic');
             self.updateAlleenstaandLogic(formId, mapping, $form);
           }
         }, 150);
@@ -1460,7 +1437,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
         clearTimeout(childTimeout);
         childTimeout = setTimeout(() => {
           if (!window.operatonPopulatingResults && !window.operatonFieldLogicUpdating) {
-            console.log('Child field changed - updating children logic');
+             operatonDebugVerbose('Frontend', 'Child field changed - updating children logic');
             self.updateChildrenLogic(formId, mapping, $form);
           }
         }, 150);
@@ -1481,7 +1458,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
     // Remove from initialized set
     this.initializedForms.delete(formId);
 
-    console.log(`Field logic cleared for form ${formId}`);
+     operatonDebugVerbose('Frontend', `Field logic cleared for form ${formId}`);
   },
 
   /**
@@ -1489,7 +1466,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
    */
   addFormMapping: function (formId, mapping) {
     this.fieldMappings[formId] = mapping;
-    console.log(`Added field mapping for form ${formId}:`, mapping);
+     operatonDebugVerbose('Frontend', `Added field mapping for form ${formId}:`, mapping);
   },
 };
 
@@ -1576,7 +1553,7 @@ function findResultFieldOnCurrentPageOptimized(formId) {
 function handleEvaluateClick($button) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.error('jQuery not available for handleEvaluateClick');
+    operatonDebugMinimal('Frontend', 'jQuery not available for handleEvaluateClick');
     showError('System error: jQuery not available. Please refresh the page.');
     return;
   }
@@ -1587,18 +1564,18 @@ function handleEvaluateClick($button) {
   // CRITICAL: Prevent duplicate processing
   const lockKey = `eval_${formId}_${configId}`;
   if (window.operatonProcessingLock[lockKey]) {
-    console.log('🔒 Duplicate evaluation blocked for form:', formId);
+     operatonDebugVerbose('Frontend', '🔒 Duplicate evaluation blocked for form:', formId);
     return;
   }
 
   // Set processing lock
   window.operatonProcessingLock[lockKey] = true;
 
-  console.log('Button clicked for form:', formId, 'config:', configId);
+   operatonDebugFrontend('Frontend', 'Button clicked for form:', formId, 'config:', configId);
 
   const config = getFormConfigCached(formId);
   if (!config) {
-    console.error('Configuration not found for form:', formId);
+    operatonDebugMinimal('Frontend', 'Configuration not found for form:', formId);
     showError('Configuration error. Please contact the administrator.');
     return;
   }
@@ -1628,10 +1605,8 @@ function handleEvaluateClick($button) {
 
     Object.entries(fieldMappings).forEach(([dmnVariable, mapping]) => {
       const fieldId = mapping.field_id;
-      console.log('Processing variable:', dmnVariable, 'Field ID:', fieldId);
 
       let value = getGravityFieldValueOptimized(formId, fieldId);
-      console.log('Found raw value for field', fieldId + ':', value);
 
       // Handle date field conversions
       if (
@@ -1644,16 +1619,15 @@ function handleEvaluateClick($button) {
         }
       }
 
-      console.log('Processed value for', dmnVariable + ':', value);
       formData[dmnVariable] = value;
     });
 
     // Apply conditional logic for partner-related fields
     const isAlleenstaand = formData['aanvragerAlleenstaand'];
-    console.log('User is single (alleenstaand):', isAlleenstaand);
+     operatonDebugVerbose('Frontend', 'User is single (alleenstaand):', isAlleenstaand);
 
     if (isAlleenstaand === 'true' || isAlleenstaand === true) {
-      console.log('User is single, setting geboortedatumPartner to null');
+       operatonDebugVerbose('Frontend', 'User is single, setting geboortedatumPartner to null');
       formData['geboortedatumPartner'] = null;
     }
 
@@ -1689,13 +1663,13 @@ function handleEvaluateClick($button) {
 
     // Check if operaton_ajax is available
     if (typeof window.operaton_ajax === 'undefined') {
-      console.error('operaton_ajax not available');
+      operatonDebugMinimal('Frontend', 'operaton_ajax not available');
       showError('System error: AJAX configuration not loaded. Please refresh the page.');
       window.operatonButtonManager.restoreOriginalState($button, formId);
       return;
     }
 
-    console.log('Making AJAX call to:', window.operaton_ajax.url);
+     operatonDebugFrontend('Frontend', 'Making AJAX call to:', window.operaton_ajax.url);
 
     // Make AJAX call
     $.ajax({
@@ -1710,14 +1684,14 @@ function handleEvaluateClick($button) {
         xhr.setRequestHeader('X-WP-Nonce', window.operaton_ajax.nonce);
       },
       success: function (response) {
-        console.log('AJAX success:', response);
+         operatonDebugFrontend('Frontend', 'AJAX success:', response);
 
         if (response.success && response.results) {
-          console.log('Results received:', response.results);
+           operatonDebugVerbose('Frontend', 'Results received:', response.results);
 
           // 🚩 Set safeguard flag
           window.operatonPopulatingResults = true;
-          console.log('🛡️ SAFEGUARD: Result population started - blocking change handlers');
+           operatonDebugVerbose('Frontend', '🛡️ SAFEGUARD: Result population started - blocking change handlers');
 
           let populatedCount = 0;
           const resultSummary = [];
@@ -1725,8 +1699,6 @@ function handleEvaluateClick($button) {
           Object.entries(response.results).forEach(([dmnResultField, resultData]) => {
             const resultValue = resultData.value;
             const fieldId = resultData.field_id;
-
-            console.log('Processing result:', dmnResultField, 'Value:', resultValue, 'Field ID:', fieldId);
 
             let $resultField = null;
 
@@ -1745,22 +1717,21 @@ function handleEvaluateClick($button) {
               resultSummary.push(`${dmnResultField}: ${resultValue}`);
 
               highlightField($resultField);
-              console.log('Populated field', fieldId, 'with result:', resultValue);
             } else {
-              console.warn('No field found for result:', dmnResultField, 'Field ID:', fieldId);
+              operatonDebugMinimal('Frontend', 'No field found for result:', dmnResultField, 'Field ID:', fieldId);
             }
           });
 
           // 🚩 Reset safeguard flag shortly after population
           setTimeout(() => {
             window.operatonPopulatingResults = false;
-            console.log('🛡️ SAFEGUARD: Result population completed - change handlers re-enabled');
+             operatonDebugVerbose('Frontend', '🛡️ SAFEGUARD: Result population completed - change handlers re-enabled');
           }, 200);
 
           // Store process instance ID if provided
           if (response.process_instance_id) {
             storeProcessInstanceId(formId, response.process_instance_id);
-            console.log('Stored process instance ID:', response.process_instance_id);
+             operatonDebugVerbose('Frontend', 'Stored process instance ID:', response.process_instance_id);
           }
 
           if (populatedCount > 0) {
@@ -1794,14 +1765,14 @@ function handleEvaluateClick($button) {
             sessionStorage.setItem(`operaton_dmn_eval_data_${formId}`, JSON.stringify(evalData));
           }
         } else {
-          console.error('Invalid response structure:', response);
+          operatonDebugMinimal('Frontend', 'Invalid response structure:', response);
           showError('No results received from evaluation.');
         }
       },
       error: function (xhr, status, error) {
-        console.error('AJAX Error:', error);
-        console.error('XHR Status:', xhr.status);
-        console.error('XHR Response:', xhr.responseText);
+        operatonDebugMinimal('Frontend', 'AJAX Error:', error);
+        operatonDebugMinimal('Frontend', 'XHR Status:', xhr.status);
+        operatonDebugMinimal('Frontend', 'XHR Response:', xhr.responseText);
 
         let errorMessage = 'Error during evaluation. Please try again.';
 
@@ -1844,7 +1815,7 @@ function handleEvaluateClick($button) {
 function validateForm(formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for validateForm');
+    operatonDebugMinimal('Frontend', 'jQuery not available for validateForm');
     return true;
   }
 
@@ -1911,7 +1882,7 @@ function validateFieldType(value, expectedType) {
 function forceSyncRadioButtons(formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for forceSyncRadioButtons');
+    operatonDebugMinimal('Frontend', 'jQuery not available for forceSyncRadioButtons');
     return;
   }
 
@@ -1946,8 +1917,6 @@ function convertDateFormat(dateStr, fieldName) {
     return null;
   }
 
-  console.log('Converting date for field:', fieldName, 'Input:', dateStr);
-
   // If already in ISO format (YYYY-MM-DD), return as-is
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     return dateStr;
@@ -1971,7 +1940,6 @@ function convertDateFormat(dateStr, fieldName) {
 
     // FIXED: Correct order is YYYY-MM-DD, not YYYY-DD-MM
     const convertedDate = `${year}-${month}-${day}`;
-    console.log('DD/MM/YYYY conversion:', dateStr, '->', convertedDate);
     return convertedDate;
   }
 
@@ -1979,7 +1947,7 @@ function convertDateFormat(dateStr, fieldName) {
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
     // Note: This creates ambiguity with DD/MM/YYYY
     // You may need to specify which format your forms use
-    console.warn('Ambiguous date format detected:', dateStr, 'Assuming DD/MM/YYYY');
+    operatonDebugMinimal('Frontend', 'Ambiguous date format detected:', dateStr, 'Assuming DD/MM/YYYY');
   }
 
   // Handle YYYY/MM/DD format
@@ -1999,15 +1967,14 @@ function convertDateFormat(dateStr, fieldName) {
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       const result = `${year}-${month}-${day}`;
-      console.log('Date object conversion:', dateStr, '->', result);
       return result;
     }
   } catch (e) {
-    console.error('Error parsing date:', dateStr, e);
+    operatonDebugMinimal('Frontend', 'Error parsing date:', dateStr, e);
   }
 
   // If all else fails, return original string
-  console.warn('Could not convert date format:', dateStr);
+  operatonDebugMinimal('Frontend', 'Could not convert date format:', dateStr);
   return dateStr;
 }
 
@@ -2093,7 +2060,7 @@ function getGravityFieldValueOptimized(formId, fieldId) {
 function findCustomRadioValueOptimized(formId, fieldId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for findCustomRadioValueOptimized');
+    operatonDebugMinimal('Frontend', 'jQuery not available for findCustomRadioValueOptimized');
     return null;
   }
 
@@ -2178,7 +2145,7 @@ function storeProcessInstanceId(formId, processInstanceId) {
     sessionStorage.setItem(`operaton_process_${formId}`, processInstanceId);
   }
   window[`operaton_process_${formId}`] = processInstanceId;
-  console.log('Stored process instance ID for form', formId + ':', processInstanceId);
+   operatonDebugVerbose('Frontend', 'Stored process instance ID for form', formId + ':', processInstanceId);
 }
 
 // =============================================================================
@@ -2188,7 +2155,7 @@ function storeProcessInstanceId(formId, processInstanceId) {
 function showSuccessNotification(message) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for showSuccessNotification');
+    operatonDebugMinimal('Frontend', 'jQuery not available for showSuccessNotification');
     alert(message);
     return;
   }
@@ -2225,7 +2192,7 @@ function showSuccessNotification(message) {
 function showError(message) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for showError');
+    operatonDebugMinimal('Frontend', 'jQuery not available for showError');
     alert('Error: ' + message);
     return;
   }
@@ -2261,7 +2228,7 @@ function showError(message) {
 function highlightField($field) {
   const $ = window.jQuery || window.$;
   if (!$ || !$field || $field.length === 0) {
-    console.warn('jQuery or field not available for highlightField');
+    operatonDebugMinimal('Frontend', 'jQuery or field not available for highlightField');
     return;
   }
 
@@ -2296,7 +2263,7 @@ function highlightField($field) {
 function bindEvaluationEventsOptimized(formId) {
   const $ = window.jQuery || window.$;
   if (!$) {
-    console.warn('jQuery not available for bindEvaluationEventsOptimized');
+    operatonDebugMinimal('Frontend', 'jQuery not available for bindEvaluationEventsOptimized');
     return;
   }
 
@@ -2305,11 +2272,11 @@ function bindEvaluationEventsOptimized(formId) {
   $(document).off(`click.operaton-${formId}`, selector);
   $(document).on(`click.operaton-${formId}`, selector, function (e) {
     e.preventDefault();
-    console.log('🎯 Button clicked for form:', formId);
+     operatonDebugFrontend('Frontend', '🎯 Button clicked for form:', formId);
     handleEvaluateClick($(this));
   });
 
-  console.log('✅ Event handler bound for form:', formId);
+   operatonDebugVerbose('Frontend', '✅ Event handler bound for form:', formId);
 }
 
 // =============================================================================
@@ -2323,15 +2290,15 @@ function waitForOperatonAjax(callback, maxAttempts = 50) {
     attempts++;
 
     if (typeof window.operaton_ajax !== 'undefined') {
-      console.log('✅ operaton_ajax found after', attempts, 'attempts');
+       operatonDebugVerbose('Frontend', '✅ operaton_ajax found after', attempts, 'attempts');
       callback();
     } else if (attempts < maxAttempts) {
       if (attempts % 10 === 0) {
-        console.log('⏳ Still waiting for operaton_ajax... attempt', attempts);
+         operatonDebugVerbose('Frontend', '⏳ Still waiting for operaton_ajax... attempt', attempts);
       }
       setTimeout(check, 100);
     } else {
-      console.error('❌ operaton_ajax not found after', maxAttempts, 'attempts');
+      operatonDebugMinimal('Frontend', '❌ operaton_ajax not found after', maxAttempts, 'attempts');
       createEmergencyOperatonAjax();
       callback();
     }
@@ -2341,7 +2308,7 @@ function waitForOperatonAjax(callback, maxAttempts = 50) {
 
 function createEmergencyOperatonAjax() {
   if (typeof window.operaton_ajax === 'undefined') {
-    console.log('🆘 Creating emergency operaton_ajax fallback');
+     operatonDebugVerbose('Frontend', '🆘 Creating emergency operaton_ajax fallback');
     window.operaton_ajax = {
       url: '/wp-json/operaton-dmn/v1/evaluate',
       nonce: 'fallback',
@@ -2365,13 +2332,6 @@ function createEmergencyOperatonAjax() {
  */
 window.handleEvaluateClick = handleEvaluateClick;
 
-// Also add verification logging:
-if (typeof window.handleEvaluateClick === 'function') {
-    console.log('✅ handleEvaluateClick is globally accessible');
-} else {
-    console.error('❌ handleEvaluateClick is NOT globally accessible');
-}
-
 // =============================================================================
 // MAIN INITIALIZATION (SINGLE VERSION)
 // =============================================================================
@@ -2383,16 +2343,14 @@ function waitForJQuery(callback, maxAttempts = 50) {
     attempts++;
 
     if (typeof jQuery !== 'undefined') {
-      console.log(`✅ jQuery found after ${attempts} attempts`);
       callback();
     } else if (attempts < maxAttempts) {
       if (attempts % 10 === 0) {
-        console.log(`⏳ Still waiting for jQuery... attempt ${attempts}`);
       }
       const delay = Math.min(100 * Math.pow(1.1, attempts), 1000);
       setTimeout(check, delay);
     } else {
-      console.error(`❌ jQuery not found after ${maxAttempts} attempts`);
+      operatonDebugMinimal('Frontend', `❌ jQuery not found after ${maxAttempts} attempts`);
     }
   }
   check();
@@ -2404,18 +2362,16 @@ function waitForJQuery(callback, maxAttempts = 50) {
 
   // Ensure we only run once per page load
   if (window.operatonMainInitCalled) {
-    console.log('Main initialization already called, skipping');
     return;
   }
   window.operatonMainInitCalled = true;
 
   function performInitialization($) {
-    console.log('✅ jQuery available, version:', $.fn.jquery);
 
     // Wait for operaton_ajax and initialize
     waitForOperatonAjax(() => {
       const initStartTime = performance.now();
-      console.log('🚀 Initializing Operaton DMN...');
+       operatonDebugFrontend('Frontend', '🚀 Initializing Operaton DMN...');
 
       window.operatonInitialized.jQueryReady = true;
       initOperatonDMN();
@@ -2430,7 +2386,7 @@ function waitForJQuery(callback, maxAttempts = 50) {
       const initEndTime = performance.now();
       window.operatonInitialized.performanceStats.totalProcessingTime += initEndTime - initStartTime;
 
-      console.log(`🎉 Operaton DMN initialization complete in ${(initEndTime - initStartTime).toFixed(2)}ms`);
+       operatonDebugFrontend('Frontend', `🎉 Operaton DMN initialization complete in ${(initEndTime - initStartTime).toFixed(2)}ms`);
     });
 
     $(window).on('beforeunload', e => {
@@ -2442,7 +2398,7 @@ function waitForJQuery(callback, maxAttempts = 50) {
 
       if (hasActiveForm && isGravityFormsPage) {
         // This looks like form navigation - do minimal cleanup only
-        console.log('🔄 Form navigation detected - minimal cleanup only');
+         operatonDebugVerbose('Frontend', '🔄 Form navigation detected - minimal cleanup only');
 
         // Only clear performance-related caches that are safe to clear
         if (domQueryCache && domQueryCache.size > 100) {
@@ -2454,7 +2410,7 @@ function waitForJQuery(callback, maxAttempts = 50) {
       }
 
       // This appears to be actual page navigation - safe to do full cleanup
-      console.log('🧹 Page navigation detected - performing cleanup');
+       operatonDebugVerbose('Frontend', '🧹 Page navigation detected - performing cleanup');
 
       // Clear caches
       domQueryCache.clear();
@@ -2484,16 +2440,13 @@ function waitForJQuery(callback, maxAttempts = 50) {
     });
 
     $(document).ready(() => {
-      console.log('📋 Document ready - initialization active');
     });
   }
 
   // Initialize based on jQuery availability
   if (typeof jQuery !== 'undefined') {
-    console.log('✅ jQuery available immediately');
     performInitialization(jQuery);
   } else {
-    console.log('⏳ jQuery not immediately available - waiting...');
     waitForJQuery(() => {
       performInitialization(jQuery);
     });
@@ -2507,22 +2460,17 @@ function waitForJQuery(callback, maxAttempts = 50) {
 window.addEventListener('load', () => {
   setTimeout(() => {
     if (!window.operatonInitialized.globalInit) {
-      console.log('Window load: Attempting late initialization...');
       if (typeof jQuery !== 'undefined') {
         simplifiedFormDetection();
       } else {
-        console.warn('Window load: jQuery still not available');
+        operatonDebugMinimal('Frontend', 'Window load: jQuery still not available');
       }
-    } else {
-      console.log('Window load: Initialization already complete');
     }
   }, 1000);
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM Content Loaded - checking initialization state');
   if (typeof jQuery !== 'undefined' && !window.operatonInitialized.globalInit) {
-    console.log('Early DOM initialization trigger');
     setTimeout(simplifiedFormDetection, 100);
   }
 });
@@ -2531,22 +2479,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // GLOBAL DEBUGGING FUNCTIONS
 // =============================================================================
 
-// Debug function for testing delegation
-window.testDelegation = function() {
-    console.log('Testing delegation availability:');
-    console.log('operatonButtonManager:', typeof window.operatonButtonManager !== 'undefined');
-    console.log('handleEvaluateClick:', typeof window.handleEvaluateClick !== 'undefined');
-    console.log('Should delegate:',
-        typeof window.operatonButtonManager !== 'undefined' &&
-        typeof window.handleEvaluateClick !== 'undefined'
-    );
-};
-
 if (typeof window !== 'undefined') {
   window.operatonDebugFixed = function () {
     const stats = window.operatonInitialized.performanceStats;
 
-    console.log('Debug Info:', {
+     operatonDebugVerbose('Frontend', 'Debug Info:', {
       initializationState: window.operatonInitialized,
       performanceStats: stats,
       cacheStats: {
@@ -2567,9 +2504,9 @@ if (typeof window !== 'undefined') {
   window.operatonForceCleanup = resetFormSystem;
 
   window.operatonReinitialize = function () {
-    console.log('MANUAL REINIT: Starting re-initialization');
+     operatonDebugVerbose('Frontend', 'MANUAL REINIT: Starting re-initialization');
     resetFormSystem();
   };
 }
 
-console.log('Operaton DMN frontend script loaded - FIXED VERSION');
+ operatonDebugFrontend('Frontend', 'Operaton DMN frontend script loaded');

@@ -16,12 +16,7 @@ if (!defined('ABSPATH'))
     exit;
 }
 
-// Add to your admin page temporarily
-if (defined('WP_DEBUG') && WP_DEBUG)
-{
-    global $wp_filter;
-    error_log('AJAX handlers: ' . print_r($wp_filter['wp_ajax_operaton_test_configuration_complete'], true));
-}
+operaton_debug_verbose('Admin', 'AJAX handler registered: wp_ajax_operaton_test_configuration_complete');
 ?>
 
 <!-- Add New Configuration Button - Now at the top -->
