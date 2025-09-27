@@ -11,7 +11,8 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH')) {
+if (!defined('ABSPATH'))
+{
     exit;
 }
 
@@ -62,7 +63,8 @@ trait Operaton_DMN_API_REST_Endpoints
         ];
 
         // Detailed health information
-        if ($detailed) {
+        if ($detailed)
+        {
             $health['details'] = $this->get_detailed_health_info();
         }
 
@@ -71,7 +73,8 @@ trait Operaton_DMN_API_REST_Endpoints
 
         // Check for any critical issues
         $critical_issues = $this->check_critical_health();
-        if (!empty($critical_issues)) {
+        if (!empty($critical_issues))
+        {
             $health['status'] = 'degraded';
             $health['issues'] = $critical_issues;
 
@@ -104,13 +107,16 @@ trait Operaton_DMN_API_REST_Endpoints
         ];
 
         // Database connectivity
-        try {
+        try
+        {
             $db_check = $wpdb->get_var("SELECT 1");
             $details['database'] = [
                 'status' => $db_check === '1' ? 'connected' : 'error',
                 'version' => $wpdb->get_var("SELECT VERSION()"),
             ];
-        } catch (Exception $e) {
+        }
+        catch (Exception $e)
+        {
             $details['database'] = [
                 'status' => 'error',
                 'error' => $e->getMessage(),
@@ -153,22 +159,26 @@ trait Operaton_DMN_API_REST_Endpoints
         // Check memory usage
         $memory_usage = memory_get_usage(true);
         $memory_limit = wp_convert_hr_to_bytes(ini_get('memory_limit'));
-        if ($memory_usage > ($memory_limit * 0.9)) {
+        if ($memory_usage > ($memory_limit * 0.9))
+        {
             $issues[] = 'High memory usage: ' . round($memory_usage / 1024 / 1024, 2) . 'MB';
         }
 
         // Check database connectivity
         global $wpdb;
-        if ($wpdb->last_error) {
+        if ($wpdb->last_error)
+        {
             $issues[] = 'Database error: ' . $wpdb->last_error;
         }
 
         // Check required dependencies
-        if (!class_exists('GFCommon')) {
+        if (!class_exists('GFCommon'))
+        {
             $issues[] = 'Gravity Forms not available';
         }
 
-        if (!function_exists('curl_init')) {
+        if (!function_exists('curl_init'))
+        {
             $issues[] = 'cURL extension not available';
         }
 
@@ -191,7 +201,8 @@ trait Operaton_DMN_API_REST_Endpoints
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
 
         // Check if table exists
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name) {
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name)
+        {
             return (int) $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
         }
 
@@ -211,7 +222,8 @@ trait Operaton_DMN_API_REST_Endpoints
         global $wpdb;
         $table_name = $wpdb->prefix . 'operaton_dmn_configs';
 
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name) {
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name)
+        {
             return (int) $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE active = 1");
         }
 
@@ -231,7 +243,8 @@ trait Operaton_DMN_API_REST_Endpoints
         global $wpdb;
         $table_name = $wpdb->prefix . 'operaton_dmn_evaluations';
 
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name) {
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name)
+        {
             $last_24h = $wpdb->get_var("
             SELECT COUNT(*)
             FROM $table_name
