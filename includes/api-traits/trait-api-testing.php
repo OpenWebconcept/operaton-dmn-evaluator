@@ -28,8 +28,8 @@ trait Operaton_DMN_API_Testing
      */
     public function test_full_endpoint_configuration($base_endpoint, $decision_key)
     {
-        $this->log_standard('Testing full endpoint configuration', ['decision_key' => $decision_key]);
-        
+        operaton_debug('API', 'Testing full endpoint configuration', ['decision_key' => $decision_key]);
+
         $full_endpoint = $this->build_evaluation_endpoint($base_endpoint, $decision_key);
 
         // Test with minimal DMN evaluation payload
@@ -179,10 +179,7 @@ trait Operaton_DMN_API_Testing
      */
     public function test_configuration_complete($config_id)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Testing complete configuration ID: ' . $config_id);
-        }
+        operaton_debug('API', 'Testing complete configuration ID: ' . $config_id);
 
         // Get configuration
         $config = $this->database->get_configuration($config_id);
@@ -328,10 +325,7 @@ trait Operaton_DMN_API_Testing
             $test_data[$dmn_variable] = $this->generate_test_value_for_type($type, $dmn_variable);
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('Operaton DMN API: Generated test data: ' . json_encode($test_data));
-        }
+        operaton_debug_verbose('API', 'Generated test data', $test_data);
 
         return $test_data;
     }
@@ -551,10 +545,7 @@ trait Operaton_DMN_API_Testing
         catch (Exception $e)
         {
             $test_results['message'] = sprintf(__('Test execution error: %s', 'operaton-dmn'), $e->getMessage());
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN API: Process test error: ' . $e->getMessage());
-            }
+            operaton_debug_minimal('API', 'Process test error: ' . $e->getMessage());
         }
 
         $test_results['performance']['total_time_ms'] = round((microtime(true) - $start_time) * 1000, 2);
@@ -695,10 +686,7 @@ trait Operaton_DMN_API_Testing
         catch (Exception $e)
         {
             $test_results['message'] = sprintf(__('Test execution error: %s', 'operaton-dmn'), $e->getMessage());
-            if (defined('WP_DEBUG') && WP_DEBUG)
-            {
-                error_log('Operaton DMN API: Decision test error: ' . $e->getMessage());
-            }
+            operaton_debug_minimal('API', 'Decision test error: ' . $e->getMessage());
         }
 
         $test_results['performance']['total_time_ms'] = round((microtime(true) - $start_time) * 1000, 2);
@@ -751,12 +739,8 @@ trait Operaton_DMN_API_Testing
      */
     private function validate_result_fields_in_response($result_mappings, $api_response)
     {
-        // Temporary debug logging
-        if (defined('WP_DEBUG') && WP_DEBUG)
-        {
-            error_log('DMN Test Debug - API Response: ' . json_encode($api_response));
-            error_log('DMN Test Debug - Expected Fields: ' . json_encode(array_keys($result_mappings)));
-        }
+        operaton_debug_diagnostic('API', 'DMN Test Debug - API Response', $api_response);
+        operaton_debug_diagnostic('API', 'DMN Test Debug - Expected Fields', array_keys($result_mappings));
 
         $validation = array(
             'total_expected' => count($result_mappings),
@@ -881,7 +865,7 @@ trait Operaton_DMN_API_Testing
      */
     private function test_server_config()
     {
-        error_log("=== SERVER CONFIGURATION DEBUG ===");
+        operaton_debug('API', '=== SERVER CONFIGURATION DEBUG ===');
 
         $config = array(
             'allow_url_fopen' => ini_get('allow_url_fopen') ? 'Enabled' : 'Disabled',
@@ -889,10 +873,7 @@ trait Operaton_DMN_API_Testing
             'openssl_loaded' => extension_loaded('openssl') ? 'Available' : 'Not available'
         );
 
-        foreach ($config as $key => $value)
-        {
-            error_log("$key: $value");
-        }
+        operaton_debug_diagnostic('API', 'Server configuration', $config);
 
         return $config;
     }
@@ -906,7 +887,7 @@ trait Operaton_DMN_API_Testing
      */
     private function test_plugin_initialization()
     {
-        error_log("=== PLUGIN INITIALIZATION DEBUG ===");
+        operaton_debug('API', '=== PLUGIN INITIALIZATION DEBUG ===');
 
         $status = array(
             'api_manager_class' => class_exists('OperatonDMNApiManager'),
@@ -914,10 +895,7 @@ trait Operaton_DMN_API_Testing
             'handle_evaluation_method' => method_exists($this, 'handle_evaluation')
         );
 
-        foreach ($status as $check => $result)
-        {
-            error_log("$check: " . ($result ? 'YES' : 'NO'));
-        }
+        operaton_debug_diagnostic('API', 'Plugin initialization status', $status);
 
         return $status;
     }
@@ -931,11 +909,11 @@ trait Operaton_DMN_API_Testing
      */
     private function test_rest_api_availability()
     {
-        error_log("=== REST API AVAILABILITY DEBUG ===");
+        operaton_debug('API', '=== REST API AVAILABILITY DEBUG ===');
 
         if (!function_exists('rest_get_url_prefix'))
         {
-            error_log("ERROR: WordPress REST API not available");
+            operaton_debug_minimal('API', 'ERROR: WordPress REST API not available');
             return false;
         }
 
@@ -943,8 +921,8 @@ trait Operaton_DMN_API_Testing
         $namespaces = $rest_server->get_namespaces();
         $has_operaton = in_array('operaton-dmn/v1', $namespaces);
 
-        error_log("Available namespaces: " . implode(', ', $namespaces));
-        error_log("Operaton namespace registered: " . ($has_operaton ? 'YES' : 'NO'));
+        operaton_debug_verbose('API', 'Available namespaces: ' . implode(', ', $namespaces));
+        operaton_debug_verbose('API', 'Operaton namespace registered: ' . ($has_operaton ? 'YES' : 'NO'));
 
         return $has_operaton;
     }
@@ -958,22 +936,22 @@ trait Operaton_DMN_API_Testing
      */
     private function test_rest_api_call()
     {
-        error_log("=== REST API CALL TEST ===");
+        operaton_debug('API', '=== REST API CALL TEST ===');
 
         $test_url = home_url('/wp-json/operaton-dmn/v1/test');
         $response = wp_remote_get($test_url);
 
         if (is_wp_error($response))
         {
-            error_log("REST API Error: " . $response->get_error_message());
+            operaton_debug_minimal('API', 'REST API Error: ' . $response->get_error_message());
             return false;
         }
 
         $status_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
 
-        error_log("REST API Response Status: " . $status_code);
-        error_log("REST API Response Body: " . $body);
+        operaton_debug_verbose('API', 'REST API Response Status: ' . $status_code);
+        operaton_debug_verbose('API', 'REST API Response Body: ' . $body);
 
         return $status_code === 200;
     }
