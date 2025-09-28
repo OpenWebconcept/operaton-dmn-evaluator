@@ -24,6 +24,12 @@ if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.ui) {
   throw new Error('Operaton DMN: UI module must be loaded before main frontend script');
 }
 
+// Ensure Forms module is loaded
+if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.forms) {
+  operatonDebugMinimal('Frontend', 'ERROR: Forms module not loaded! This script requires frontend-forms.js');
+  throw new Error('Operaton DMN: Forms module must be loaded before main frontend script');
+}
+
 // =============================================================================
 // BUTTON MANAGER
 // =============================================================================
@@ -279,62 +285,6 @@ function clearStoredResults(formId) {
   delete window[`operaton_process_${formId}`];
 }
 
-// =============================================================================
-// PAGE CHANGE DETECTION AND HANDLING
-// =============================================================================
-
-function setupPageChangeDetection(formId) {
-  const $ = window.jQuery || window.$;
-  if (!$) return;
-
-  // Initial button placement
-  setTimeout(() => {
-    window.handleButtonPlacement(formId);
-  }, 100);
-
-  // Hook into Gravity Forms page events
-  if (typeof gform !== 'undefined' && gform.addAction) {
-    // Remove existing handler
-    if (gform.removeAction) {
-      gform.removeAction('gform_page_loaded', `operaton_button_${formId}`);
-    }
-
-    gform.addAction(
-      'gform_page_loaded',
-      function (loadedFormId, currentPage) {
-        if (loadedFormId == formId) {
-           operatonDebugVerbose('Frontend', `Page loaded for form ${formId}: page ${currentPage}`);
-          setTimeout(() => {
-            window.handleButtonPlacement(formId);
-          }, 200);
-        }
-      },
-      10,
-      `operaton_button_${formId}`
-    );
-  }
-
-  // URL change detection for manual navigation
-  let currentUrl = window.location.href;
-  const urlCheckInterval = setInterval(() => {
-    if (window.location.href !== currentUrl) {
-      currentUrl = window.location.href;
-       operatonDebugVerbose('Frontend', `URL changed for form ${formId}, updating button placement`);
-      setTimeout(() => {
-        window.handleButtonPlacement(formId);
-      }, 300);
-    }
-  }, 500);
-
-  // Store interval for cleanup
-  window[`operaton_url_check_${formId}`] = urlCheckInterval;
-
-  // Fallback button placement check
-  setTimeout(() => {
-    window.handleButtonPlacement(formId);
-  }, 2000);
-}
-
 /**
  * Non-blocking input monitoring that preserves all input functionality
  */
@@ -535,6 +485,9 @@ if (window.OperatonFieldLogic) {
 
       // Only respond to blur (when user leaves field) and change (when value actually changes)
       $partnerField.on('blur.fieldlogic change.fieldlogic', function() {
+        const $ = window.jQuery || window.$; // ← ADD THIS LINE
+        if (!$) return; // ← ADD THIS SAFETY CHECK
+
         // Don't interfere during active typing or focus
         if ($(this).is(':focus')) {
           return;
@@ -554,6 +507,9 @@ if (window.OperatonFieldLogic) {
       $childField.off('.fieldlogic');
 
       $childField.on('blur.fieldlogic change.fieldlogic', function() {
+        const $ = window.jQuery || window.$; // ← ADD THIS LINE
+        if (!$) return; // ← ADD THIS SAFETY CHECK
+
         if ($(this).is(':focus')) {
           return;
         }
@@ -824,407 +780,6 @@ function bindNavigationEventsOptimized(formId) {
     }, 300);
   });
 }
-
-// =============================================================================
-// FORM INITIALIZATION (SINGLE VERSION)
-// =============================================================================
-
-function simpleFormInitialization(formId) {
-  formId = parseInt(formId);
-
-  // Prevent concurrent initialization
-  const initKey = `init_${formId}`;
-  if (window.operatonInitialized[initKey]) {
-    return;
-  }
-
-  // Prevent duplicate initialization
-  if (window.operatonInitialized.forms.has(formId)) {
-    return;
-  }
-
-  const config = window.getFormConfigCached(formId);
-  if (!config) {
-    return;
-  }
-
-  // Set progress flag
-  window.operatonInitialized[initKey] = true;
-
-  try {
-    // Mark as initialized
-    window.operatonInitialized.forms.add(formId);
-    window.operatonInitialized.performanceStats.successfulInits++;
-
-    const $ = window.jQuery || window.$;
-    const $form = $(`#gform_${formId}`);
-
-    if ($form.length > 0) {
-      // Use enhanced input monitoring
-      setupInputChangeMonitoring(formId);
-
-      // Set up evaluation button events (with duplicate prevention)
-      if (!window.operatonInitialized.eventsBound) {
-        window.operatonInitialized.eventsBound = new Set();
-      }
-
-      if (!window.operatonInitialized.eventsBound.has(formId)) {
-        bindEvaluationEventsOptimized(formId);
-        window.operatonInitialized.eventsBound.add(formId);
-      } else {
-         operatonDebugVerbose('Frontend', 'Event handler already bound for form:', formId);
-      }
-
-      // Set up enhanced navigation events
-      bindNavigationEventsOptimized(formId);
-
-      // Set up page change detection and button placement
-      setupPageChangeDetection(formId);
-
-      // Initialize decision flow if enabled
-      if (config.show_decision_flow && typeof window.initializeDecisionFlowForForm === 'function') {
-        window.initializeDecisionFlowForForm(formId, config);
-      }
-
-      // Initialize field logic BEFORE the result field management
-      if (window.OperatonFieldLogic) {
-        setTimeout(() => {
-          window.OperatonFieldLogic.initializeForm(formId);
-        }, 100); // Earlier timing, separate from result field logic
-      }
-
-      // Clear any existing results after initialization - BUT NOT on decision flow page
-      setTimeout(() => {
-        const currentPage = window.getCurrentPageCached(formId);
-        const targetPage = parseInt(config.evaluation_step) || 2;
-        const isDecisionFlowPage = currentPage === targetPage + 1 && config.show_decision_flow;
-
-        // CRITICAL: Check if result fields already have values (indicating navigation back from evaluation)
-        const resultFieldIds = getResultFieldIds(formId);
-        let hasExistingResults = false;
-
-        if (resultFieldIds.length > 0) {
-          const $form = $(`#gform_${formId}`);
-          resultFieldIds.forEach(fieldId => {
-            const $field = $form.find(`#input_${formId}_${fieldId}`);
-            if ($field.length > 0 && $field.val() && $field.val().trim() !== '') {
-              hasExistingResults = true;
-               operatonDebugVerbose('Frontend', `Found existing result in field ${fieldId}: "${$field.val()}"`);
-            }
-          });
-        }
-
-        if (hasExistingResults) {
-           operatonDebugVerbose('Frontend', `PRESERVING existing results during re-initialization - Form ${formId}, page ${currentPage}`);
-          // Only clear stored process data, keep the visible results
-          if (typeof Storage !== 'undefined') {
-            sessionStorage.removeItem(`operaton_process_${formId}`);
-          }
-          return; // Don't clear anything else
-        }
-
-        if (!isDecisionFlowPage) {
-           operatonDebugVerbose('Frontend',
-            `Clearing results on fresh initialization - Form ${formId}, page ${currentPage} (no existing results found)`
-          );
-          clearResultFieldWithMessage(formId, 'Form initialized (no existing results)');
-        } else {
-           operatonDebugVerbose('Frontend', `PRESERVING results on decision flow page - Form ${formId}, page ${currentPage}`);
-          // Only clear stored data, not the actual result fields
-          clearStoredResults(formId);
-        }
-      }, 500);
-    }
-
-     operatonDebugVerbose('Frontend', `=== FORM ${formId} INITIALIZATION COMPLETE ===`);
-  } catch (error) {
-    operatonDebugMinimal('Frontend', `Error initializing form ${formId}:`, error);
-    window.operatonInitialized.forms.delete(formId);
-  } finally {
-    delete window.operatonInitialized[initKey];
-  }
-}
-
-function simplifiedFormDetection() {
-  const $ = window.jQuery || window.$;
-  if (!$) return;
-
-  // Prevent concurrent detection
-  if (window.operatonInitialized.initInProgress) {
-     operatonDebugVerbose('Frontend', 'Form detection already in progress, skipping');
-    return;
-  }
-
-  window.operatonInitialized.initInProgress = true;
-
-  try {
-    window.operatonInitialized.performanceStats.initializationAttempts++;
-
-    $('form[id^="gform_"]').each(function () {
-      const $form = $(this);
-      const formId = parseInt($form.attr('id').replace('gform_', ''));
-
-      if (formId && !isNaN(formId)) {
-        const config = window.getFormConfigCached(formId);
-        if (config) {
-           operatonDebugVerbose('Frontend', `🎯 DMN-enabled form detected: ${formId}`);
-          simpleFormInitialization(formId);
-        }
-      }
-    });
-
-     operatonDebugVerbose('Frontend', '✅ Simplified detection complete');
-  } finally {
-    window.operatonInitialized.initInProgress = false;
-  }
-}
-
-function initOperatonDMN() {
-  // Prevent duplicate global initialization
-  if (window.operatonInitialized.globalInit) {
-    return;
-  }
-
-   operatonDebugFrontend('Frontend', '🚀 Starting Operaton DMN initialization...');
-
-  // Hook into Gravity Forms events if available
-  if (typeof gform !== 'undefined' && gform.addAction) {
-    // Remove any existing handlers first
-    if (gform.removeAction) {
-      gform.removeAction('gform_post_render', 'operaton_form_render');
-    }
-
-    gform.addAction(
-      'gform_post_render',
-      function (formId) {
-        window.clearDOMCache(formId);
-
-        // Small delay to ensure DOM is fully rendered
-        setTimeout(() => {
-          simpleFormInitialization(formId);
-        }, 100);
-      },
-      10,
-      'operaton_form_render'
-    );
-  }
-
-  // Initial form detection
-  setTimeout(() => {
-    simplifiedFormDetection();
-  }, 200);
-
-  // Set global flag
-  window.operatonInitialized.globalInit = true;
-}
-
-// =============================================================================
-// INTEGRATED FIELD LOGIC - Works with your existing frontend.js system
-// Add this to your form initialization or create a separate file
-// =============================================================================
-
-/**
- * Enhanced field logic that integrates with your existing form system
- * Handles partner/alleenstaand and children logic without interfering with result fields
- */
-window.OperatonFieldLogic = window.OperatonFieldLogic || {
-  // Track forms that have been initialized
-  initializedForms: new Set(),
-
-  // Form-specific field mappings
-  fieldMappings: {
-    2: {
-      partnerField: 14,
-      alleenstaandField: 33,
-      childField: 16,
-      childrenField: 34,
-      // No radio mappings needed - we update the fields directly
-    }
-  },
-
-  /**
-   * Initialize field logic for a specific form
-   */
-  initializeForm: function (formId) {
-    if (this.initializedForms.has(formId)) {
-       operatonDebugVerbose('Frontend', `Field logic already initialized for form ${formId}`);
-      return;
-    }
-
-    const mapping = this.fieldMappings[formId];
-    if (!mapping) {
-       operatonDebugVerbose('Frontend', `No field logic mapping for form ${formId}`);
-      return;
-    }
-
-     operatonDebugVerbose('Frontend', `Initializing field logic for form ${formId}`);
-
-    const $ = window.jQuery || window.$;
-    const $form = $(`#gform_${formId}`);
-
-    if ($form.length === 0) {
-       operatonDebugMinimal('Frontend', `Form ${formId} not found for field logic`);
-      return;
-    }
-
-    // Set initial values based on current field content
-    this.updateAlleenstaandLogic(formId, mapping, $form);
-    this.updateChildrenLogic(formId, mapping, $form);
-
-    // Setup event listeners with proper namespacing
-    this.setupEventListeners(formId, mapping, $form);
-
-    this.initializedForms.add(formId);
-     operatonDebugVerbose('Frontend', `Field logic initialized for form ${formId}`);
-  },
-
-  /**
-   * Update alleenstaand field based on partner surname
-   */
-  updateAlleenstaandLogic: function (formId, mapping, $form) {
-    const $partnerField = $form.find(`#input_${formId}_${mapping.partnerField}`);
-
-    if ($partnerField.length === 0) {
-       operatonDebugMinimal('Frontend', `Partner field not found: #input_${formId}_${mapping.partnerField}`);
-      return;
-    }
-
-    const partnerValue = $partnerField.val();
-    const isEmpty = !partnerValue || partnerValue.trim() === '';
-    const isAlleenstaand = isEmpty;
-
-     operatonDebugVerbose('Frontend', `Partner field "${partnerValue}" -> alleenstaand: ${isAlleenstaand}`);
-
-    // Update the radio field directly (field 33 is the actual radio field)
-    const radioSelector = `input[name="input_${mapping.alleenstaandField}"][value="${
-      isAlleenstaand ? 'true' : 'false'
-    }"]`;
-    const $radio = $form.find(radioSelector);
-
-     operatonDebugVerbose('Frontend', `Looking for radio: ${radioSelector}`);
-     operatonDebugVerbose('Frontend', `Found radio buttons: ${$radio.length}`);
-
-    if ($radio.length > 0) {
-      // Set flag to prevent interference
-      window.operatonFieldLogicUpdating = true;
-
-      $radio.prop('checked', true).trigger('change');
-
-      setTimeout(() => {
-        window.operatonFieldLogicUpdating = false;
-      }, 100);
-    } else {
-       operatonDebugVerbose('Frontend', `No radio button found for alleenstaand`);
-    }
-  },
-
-  /**
-   * Update children field based on child birthplace
-   */
-  updateChildrenLogic: function (formId, mapping, $form) {
-    const $childField = $form.find(`#input_${formId}_${mapping.childField}`);
-
-    if ($childField.length === 0) {
-       operatonDebugMinimal('Frontend', `Child field not found: #input_${formId}_${mapping.childField}`);
-      return;
-    }
-
-    const childValue = $childField.val();
-    const hasValue = childValue && childValue.trim() !== '';
-    const hasChildren = hasValue;
-
-     operatonDebugVerbose('Frontend', `Child field "${childValue}" -> has children: ${hasChildren}`);
-
-    // Update the radio field directly (field 34 is the actual radio field)
-    const radioSelector = `input[name="input_${mapping.childrenField}"][value="${hasChildren ? 'true' : 'false'}"]`;
-    const $radio = $form.find(radioSelector);
-
-     operatonDebugVerbose('Frontend', `Looking for radio: ${radioSelector}`);
-     operatonDebugVerbose('Frontend', `Found radio buttons: ${$radio.length}`);
-
-    if ($radio.length > 0) {
-      // Set flag to prevent interference
-      window.operatonFieldLogicUpdating = true;
-
-      $radio.prop('checked', true).trigger('change');
-
-      setTimeout(() => {
-        window.operatonFieldLogicUpdating = false;
-      }, 100);
-    } else {
-       operatonDebugVerbose('Frontend', `No radio button found for children`);
-    }
-  },
-
-  /**
-   * Setup event listeners with proper integration
-   */
-  setupEventListeners: function (formId, mapping, $form) {
-    const self = this;
-
-    // Partner field listener
-    const $partnerField = $form.find(`#input_${formId}_${mapping.partnerField}`);
-    if ($partnerField.length > 0) {
-      // Remove existing listeners to prevent duplicates
-      $partnerField.off('.fieldlogic');
-
-      // Add debounced listener
-      let partnerTimeout;
-      $partnerField.on('input.fieldlogic change.fieldlogic', function () {
-        clearTimeout(partnerTimeout);
-        partnerTimeout = setTimeout(() => {
-          if (!window.operatonPopulatingResults && !window.operatonFieldLogicUpdating) {
-             operatonDebugVerbose('Frontend', 'Partner field changed - updating alleenstaand logic');
-            self.updateAlleenstaandLogic(formId, mapping, $form);
-          }
-        }, 150);
-      });
-    }
-
-    // Child field listener
-    const $childField = $form.find(`#input_${formId}_${mapping.childField}`);
-    if ($childField.length > 0) {
-      // Remove existing listeners to prevent duplicates
-      $childField.off('.fieldlogic');
-
-      // Add debounced listener
-      let childTimeout;
-      $childField.on('input.fieldlogic change.fieldlogic', function () {
-        clearTimeout(childTimeout);
-        childTimeout = setTimeout(() => {
-          if (!window.operatonPopulatingResults && !window.operatonFieldLogicUpdating) {
-             operatonDebugVerbose('Frontend', 'Child field changed - updating children logic');
-            self.updateChildrenLogic(formId, mapping, $form);
-          }
-        }, 150);
-      });
-    }
-  },
-
-  /**
-   * Clear initialization for a form (useful for cleanup)
-   */
-  clearForm: function (formId) {
-    const $ = window.jQuery || window.$;
-    const $form = $(`#gform_${formId}`);
-
-    // Remove event listeners
-    $form.find('input').off('.fieldlogic');
-
-    // Remove from initialized set
-    this.initializedForms.delete(formId);
-
-     operatonDebugVerbose('Frontend', `Field logic cleared for form ${formId}`);
-  },
-
-  /**
-   * Add new form mapping
-   */
-  addFormMapping: function (formId, mapping) {
-    this.fieldMappings[formId] = mapping;
-     operatonDebugVerbose('Frontend', `Added field mapping for form ${formId}:`, mapping);
-  },
-};
 
 // =============================================================================
 // EVALUATION HANDLING
@@ -2130,12 +1685,12 @@ function waitForJQuery(callback, maxAttempts = 50) {
        operatonDebugFrontend('Frontend', '🚀 Initializing Operaton DMN...');
 
       window.operatonInitialized.jQueryReady = true;
-      initOperatonDMN();
+      window.initOperatonDMN();
 
       // Secondary detection for late-loading forms
       setTimeout(() => {
         if (!window.operatonInitialized.initInProgress) {
-          simplifiedFormDetection();
+          window.simplifiedFormDetection();
         }
       }, 1000);
 
@@ -2217,7 +1772,7 @@ window.addEventListener('load', () => {
   setTimeout(() => {
     if (!window.operatonInitialized.globalInit) {
       if (typeof jQuery !== 'undefined') {
-        simplifiedFormDetection();
+        window.simplifiedFormDetection();
       } else {
         operatonDebugMinimal('Frontend', 'Window load: jQuery still not available');
       }
@@ -2227,7 +1782,7 @@ window.addEventListener('load', () => {
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof jQuery !== 'undefined' && !window.operatonInitialized.globalInit) {
-    setTimeout(simplifiedFormDetection, 100);
+    setTimeout(window.simplifiedFormDetection, 100);
   }
 });
 
