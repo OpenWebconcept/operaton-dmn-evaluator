@@ -287,7 +287,7 @@ class Operaton_DMN_Assets
      * Enqueue frontend assets for DMN evaluation functionality
      *
      * Loads all required CSS and JavaScript files for frontend DMN evaluation,
-     * including Gravity Forms integration and decision flow visualization.
+     * including modular frontend structure and Gravity Forms integration.
      *
      * @since 1.0.0
      * @return void
@@ -313,11 +313,20 @@ class Operaton_DMN_Assets
             true
         );
 
-        // Main frontend script
+        // 📦 Core Module - Foundation and global state (NEW)
+        wp_enqueue_script(
+            'operaton-dmn-frontend-core',
+            $this->plugin_url . 'assets/js/frontend-core.js',
+            array('jquery', 'operaton-dmn-debug'),
+            $this->version,
+            true
+        );
+
+        // Main frontend script - Now depends on core module
         wp_enqueue_script(
             'operaton-dmn-frontend',
             $this->plugin_url . 'assets/js/frontend.js',
-            array('jquery', 'operaton-dmn-debug'),
+            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core'),
             $this->version,
             true
         );
@@ -326,7 +335,7 @@ class Operaton_DMN_Assets
         wp_enqueue_script(
             'operaton-dmn-gravity-integration',
             $this->plugin_url . 'assets/js/gravity-forms.js',
-            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend'),
+            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend'),
             $this->version,
             true
         );
@@ -337,7 +346,7 @@ class Operaton_DMN_Assets
             wp_enqueue_script(
                 'operaton-dmn-decision-flow',
                 $this->plugin_url . 'assets/js/decision-flow.js',
-                array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend'),
+                array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend'),
                 $this->version,
                 true
             );
@@ -363,11 +372,11 @@ class Operaton_DMN_Assets
 
         if ($timer_id)
         {
-            $this->performance->stop_timer($timer_id, 'Frontend assets loaded');
+            $this->performance->stop_timer($timer_id, 'Frontend assets loaded with modular core');
         }
 
         self::$asset_loading_state['frontend_loaded'] = true;
-        operaton_debug('Assets', 'Frontend assets enqueued successfully');
+        operaton_debug('Assets', 'Frontend assets enqueued successfully with modular core');
     }
 
     /**

@@ -9,32 +9,14 @@
 operatonDebugFrontend('Frontend script loading...');
 
 // =============================================================================
-// FIXED GLOBAL STATE MANAGEMENT
+// MODULE DEPENDENCY CHECK
 // =============================================================================
 
-window.operatonProcessingLock = window.operatonProcessingLock || {};
-
-/**
- * Enhanced global state - better tracking without loops
- */
-window.operatonInitialized = window.operatonInitialized || {
-  forms: new Set(),
-  globalInit: false,
-  jQueryReady: false,
-  initInProgress: false,
-  performanceStats: {
-    initializationAttempts: 0,
-    successfulInits: 0,
-    totalProcessingTime: 0,
-    cacheHits: 0,
-  },
-};
-
-/**
- * Caching utilities (keeping the useful parts)
- */
-const domQueryCache = new Map();
-const formConfigCache = new Map();
+// Ensure core module is loaded first
+if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.core) {
+  operatonDebugMinimal('Frontend', 'ERROR: Core module not loaded! This script requires frontend-core.js');
+  throw new Error('Operaton DMN: Core module must be loaded before main frontend script');
+}
 
 /**
  * Define global functions FIRST for inline script compatibility
@@ -47,8 +29,8 @@ window.showEvaluateButton = function (formId) {
   }
 
   try {
-    const $button = getCachedElement(`#operaton-evaluate-${formId}`);
-    const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
+    const $button = window.getCachedElement(`#operaton-evaluate-${formId}`);
+    const $summary = window.getCachedElement(`#decision-flow-summary-${formId}`);
 
     $button.addClass('operaton-show-button').show();
     $summary.removeClass('operaton-show-summary');
@@ -67,10 +49,10 @@ window.showDecisionFlowSummary = function (formId) {
   }
 
   try {
-    const $button = getCachedElement(`#operaton-evaluate-${formId}`);
+    const $button = window.getCachedElement(`#operaton-evaluate-${formId}`);
     $button.removeClass('operaton-show-button');
 
-    const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
+    const $summary = window.getCachedElement(`#decision-flow-summary-${formId}`);
     $summary.addClass('operaton-show-summary');
 
     if (typeof window.loadDecisionFlowSummary === 'function') {
@@ -92,32 +74,18 @@ window.hideAllElements = function (formId) {
   }
 
   try {
-    let currentPage = 1;
-    let targetPage = 2;
-
-    if (typeof getCurrentPageCached === 'function') {
-      currentPage = getCurrentPageCached(formId);
-    } else {
-      const urlParams = new URLSearchParams(window.location.search);
-      const pageParam = urlParams.get('gf_page');
-      if (pageParam) {
-        currentPage = parseInt(pageParam);
-      }
-    }
-
-    if (typeof getFormConfigCached === 'function') {
-      const config = getFormConfigCached(formId);
-      targetPage = config ? parseInt(config.evaluation_step) || 2 : 2;
-    }
+    const currentPage = window.getCurrentPageCached(formId);
+    const config = window.getFormConfigCached(formId);
+    const targetPage = config ? parseInt(config.evaluation_step) || 2 : 2;
 
     if (currentPage === targetPage) {
       return;
     }
 
-    const $button = getCachedElement(`#operaton-evaluate-${formId}`);
-    const $summary = getCachedElement(`#decision-flow-summary-${formId}`);
+    const $button = window.getCachedElement(`#operaton-evaluate-${formId}`);
+    const $summary = window.getCachedElement(`#decision-flow-summary-${formId}`);
 
-     operatonDebugVerbose('Frontend', '❌ Hiding all elements for form', formId);
+    operatonDebugVerbose('Frontend', '❌ Hiding all elements for form', formId);
     $button.removeClass('operaton-show-button').hide();
     $summary.removeClass('operaton-show-summary');
   } catch (error) {
@@ -126,83 +94,6 @@ window.hideAllElements = function (formId) {
     $(`#decision-flow-summary-${formId}`).removeClass('operaton-show-summary');
   }
 };
-
-// =============================================================================
-// CACHING UTILITIES
-// =============================================================================
-
-function getCachedElement(selector, maxAge = 5000) {
-  const $ = window.jQuery || window.$;
-  if (!$) {
-    operatonDebugMinimal('Frontend', 'jQuery not available for getCachedElement');
-    return $();
-  }
-
-  const cacheKey = `element_${selector}`;
-  const cached = domQueryCache.get(cacheKey);
-
-  if (cached && Date.now() - cached.timestamp < maxAge) {
-    window.operatonInitialized.performanceStats.cacheHits++;
-    return cached.element;
-  }
-
-  const element = $(selector);
-  domQueryCache.set(cacheKey, {
-    element: element,
-    timestamp: Date.now(),
-  });
-
-  return element;
-}
-
-function getFormConfigCached(formId) {
-  const cacheKey = `config_${formId}`;
-
-  if (formConfigCache.has(cacheKey)) {
-    window.operatonInitialized.performanceStats.cacheHits++;
-    return formConfigCache.get(cacheKey);
-  }
-
-  const configVar = `operaton_config_${formId}`;
-  const config = window[configVar];
-
-  if (config) {
-    formConfigCache.set(cacheKey, config);
-  }
-
-  return config;
-}
-
-function getCurrentPageCached(formId) {
-  const urlParams = new URLSearchParams(window.location.search);
-  const pageParam = urlParams.get('gf_page');
-  if (pageParam) {
-    return parseInt(pageParam);
-  }
-
-  const $ = window.jQuery || window.$;
-  if ($) {
-    const $form = getCachedElement(`#gform_${formId}`);
-    const $pageField = $form.find(`input[name="gform_source_page_number_${formId}"]`);
-    if ($pageField.length > 0) {
-      return parseInt($pageField.val()) || 1;
-    }
-  }
-
-  return 1;
-}
-
-function clearDOMCache(formId = null) {
-  if (formId) {
-    const keysToDelete = Array.from(domQueryCache.keys()).filter(
-      key =>
-        key.includes(`_${formId}`) || key.includes(`#gform_${formId}`) || key.includes(`#operaton-evaluate-${formId}`)
-    );
-    keysToDelete.forEach(key => domQueryCache.delete(key));
-  } else {
-    domQueryCache.clear();
-  }
-}
 
 // =============================================================================
 // BUTTON MANAGER
@@ -220,7 +111,7 @@ window.operatonButtonManager = window.operatonButtonManager || {
       return cached.button;
     }
 
-    const $button = getCachedElement(`#operaton-evaluate-${formId}`);
+    const $button = window.getCachedElement(`#operaton-evaluate-${formId}`);
     this.buttonCache.set(cacheKey, {
       button: $button,
       timestamp: Date.now(),
@@ -308,7 +199,7 @@ window.operatonButtonManager = window.operatonButtonManager || {
 // =============================================================================
 
 function getResultFieldIds(formId) {
-  const config = getFormConfigCached(formId);
+  const config = window.getFormConfigCached(formId);
   const resultFieldIds = [];
 
   if (!config) {
@@ -363,7 +254,7 @@ function clearAllResultFields(formId, reason) {
   const $ = window.jQuery || window.$;
   if (!$) return;
 
-  const $form = getCachedElement(`#gform_${formId}`);
+  const $form = window.getCachedElement(`#gform_${formId}`);
   const resultFieldIds = getResultFieldIds(formId);
 
   if (resultFieldIds.length === 0) {
@@ -436,7 +327,7 @@ function clearAllResultFields(formId, reason) {
 function clearResultFieldWithMessage(formId, reason) {
   clearAllResultFields(formId, reason);
   clearStoredResults(formId);
-  clearDOMCache(formId);
+  window.clearDOMCache(formId);
 
   if (typeof window.OperatonDecisionFlow !== 'undefined') {
     window.OperatonDecisionFlow.clearCache();
@@ -467,10 +358,10 @@ function handleButtonPlacement(formId) {
   const $ = window.jQuery || window.$;
   if (!$) return;
 
-  const config = getFormConfigCached(formId);
+  const config = window.getFormConfigCached(formId);
   if (!config) return;
 
-  const currentPage = getCurrentPageCached(formId);
+  const currentPage = window.getCurrentPageCached(formId);
   const targetPage = parseInt(config.evaluation_step) || 2;
   const showDecisionFlow = config.show_decision_flow || false;
   const useProcess = config.use_process || false;
@@ -817,7 +708,7 @@ function bindNavigationEventsOptimized(formId) {
     return;
   }
 
-  const $form = getCachedElement(`#gform_${formId}`);
+  const $form = window.getCachedElement(`#gform_${formId}`);
   const resultFieldIds = getResultFieldIds(formId);
 
   // Store form state for comparison - EXCLUDE result fields entirely
@@ -940,7 +831,7 @@ function bindNavigationEventsOptimized(formId) {
       }
 
       // Always safe to clear DOM cache
-      clearDOMCache(formId);
+      window.clearDOMCache(formId);
 
       // Reset navigation flag after delay
       setTimeout(() => {
@@ -962,7 +853,7 @@ function bindNavigationEventsOptimized(formId) {
            operatonDebugVerbose('Frontend', 'Form page loaded for form:', formId, 'page:', currentPage);
           navigationInProgress = true;
 
-          clearDOMCache(formId); // Safe to clear DOM cache
+          window.clearDOMCache(formId); // Safe to clear DOM cache
 
           // Update state snapshot without clearing result fields
           setTimeout(() => {
@@ -1051,7 +942,7 @@ function simpleFormInitialization(formId) {
     return;
   }
 
-  const config = getFormConfigCached(formId);
+  const config = window.getFormConfigCached(formId);
   if (!config) {
     return;
   }
@@ -1103,7 +994,7 @@ function simpleFormInitialization(formId) {
 
       // Clear any existing results after initialization - BUT NOT on decision flow page
       setTimeout(() => {
-        const currentPage = getCurrentPageCached(formId);
+        const currentPage = window.getCurrentPageCached(formId);
         const targetPage = parseInt(config.evaluation_step) || 2;
         const isDecisionFlowPage = currentPage === targetPage + 1 && config.show_decision_flow;
 
@@ -1173,7 +1064,7 @@ function simplifiedFormDetection() {
       const formId = parseInt($form.attr('id').replace('gform_', ''));
 
       if (formId && !isNaN(formId)) {
-        const config = getFormConfigCached(formId);
+        const config = window.getFormConfigCached(formId);
         if (config) {
            operatonDebugVerbose('Frontend', `🎯 DMN-enabled form detected: ${formId}`);
           simpleFormInitialization(formId);
@@ -1205,7 +1096,7 @@ function initOperatonDMN() {
     gform.addAction(
       'gform_post_render',
       function (formId) {
-        clearDOMCache(formId);
+        window.clearDOMCache(formId);
 
         // Small delay to ensure DOM is fully rendered
         setTimeout(() => {
@@ -1224,42 +1115,6 @@ function initOperatonDMN() {
 
   // Set global flag
   window.operatonInitialized.globalInit = true;
-}
-
-function resetFormSystem() {
-
-  // Clear state
-  window.operatonInitialized.forms.clear();
-  window.operatonInitialized.globalInit = false;
-  window.operatonInitialized.initInProgress = false;
-
-  // Clear progress flags
-  Object.keys(window.operatonInitialized).forEach(key => {
-    if (key.startsWith('init_')) {
-      delete window.operatonInitialized[key];
-    }
-  });
-
-  // Clear caches
-  domQueryCache.clear();
-  formConfigCache.clear();
-  if (window.operatonButtonManager) {
-    window.operatonButtonManager.clearCache();
-  }
-
-  // Reset stats
-  window.operatonInitialized.performanceStats = {
-    initializationAttempts: 0,
-    successfulInits: 0,
-    totalProcessingTime: 0,
-    cacheHits: 0,
-  };
-
-  // Re-initialize
-  setTimeout(() => {
-    simplifiedFormDetection();
-  }, 500);
-
 }
 
 // =============================================================================
@@ -1479,14 +1334,14 @@ function findResultFieldOnCurrentPageOptimized(formId) {
   if (!$) return null;
 
   const cacheKey = `result_field_${formId}`;
-  const cached = domQueryCache.get(cacheKey);
+  const cached = window.operatonCaches.domQueryCache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < 3000) {
     return cached.element;
   }
 
-  const $form = getCachedElement(`#gform_${formId}`);
-  const config = getFormConfigCached(formId);
+  const $form = window.getCachedElement(`#gform_${formId}`);
+  const config = window.getFormConfigCached(formId);
 
   if (config && config.result_display_field) {
     const selectors = [
@@ -1499,7 +1354,7 @@ function findResultFieldOnCurrentPageOptimized(formId) {
     for (const selector of selectors) {
       const $field = $form.find(`${selector}:visible`);
       if ($field.length > 0) {
-        domQueryCache.set(cacheKey, {
+        window.operatonCaches.domQueryCache.set(cacheKey, {
           element: $field.first(),
           timestamp: Date.now(),
         });
@@ -1539,7 +1394,7 @@ function findResultFieldOnCurrentPageOptimized(formId) {
   for (const strategy of detectionStrategies) {
     const $field = strategy();
     if ($field && $field.length > 0) {
-      domQueryCache.set(cacheKey, {
+      window.operatonCaches.domQueryCache.set(cacheKey, {
         element: $field,
         timestamp: Date.now(),
       });
@@ -1573,7 +1428,7 @@ function handleEvaluateClick($button) {
 
    operatonDebugFrontend('Frontend', 'Button clicked for form:', formId, 'config:', configId);
 
-  const config = getFormConfigCached(formId);
+  const config = window.getFormConfigCached(formId);
   if (!config) {
     operatonDebugMinimal('Frontend', 'Configuration not found for form:', formId);
     showError('Configuration error. Please contact the administrator.');
@@ -1752,7 +1607,7 @@ function handleEvaluateClick($button) {
           }
 
           // Store evaluation metadata
-          const currentPage = getCurrentPageCached(formId);
+          const currentPage = window.getCurrentPageCached(formId);
           const evalData = {
             results: response.results,
             page: currentPage,
@@ -1823,7 +1678,7 @@ function validateForm(formId) {
     return gform.validators[formId]();
   }
 
-  const $form = getCachedElement(`#gform_${formId}`);
+  const $form = window.getCachedElement(`#gform_${formId}`);
   let allValid = true;
 
   $form
@@ -1886,8 +1741,8 @@ function forceSyncRadioButtons(formId) {
     return;
   }
 
-  const $form = getCachedElement(`#gform_${formId}`);
-  const config = getFormConfigCached(formId);
+  const $form = window.getCachedElement(`#gform_${formId}`);
+  const config = window.getFormConfigCached(formId);
 
   if (!config || !config.field_mappings) {
     return;
@@ -1980,14 +1835,14 @@ function convertDateFormat(dateStr, fieldName) {
 
 function findFieldOnCurrentPageOptimized(formId, fieldId) {
   const cacheKey = `field_${formId}_${fieldId}`;
-  const cached = domQueryCache.get(cacheKey);
+  const cached = window.operatonCaches.domQueryCache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < 3000) {
     return cached.element;
   }
 
   const $ = window.jQuery || window.$;
-  const $form = getCachedElement(`#gform_${formId}`);
+  const $form = window.getCachedElement(`#gform_${formId}`);
 
   const selectors = [
     `#input_${formId}_${fieldId}`,
@@ -1999,7 +1854,7 @@ function findFieldOnCurrentPageOptimized(formId, fieldId) {
   for (const selector of selectors) {
     const $field = $form.find(`${selector}:visible`);
     if ($field.length > 0) {
-      domQueryCache.set(cacheKey, {
+      window.operatonCaches.domQueryCache.set(cacheKey, {
         element: $field.first(),
         timestamp: Date.now(),
       });
@@ -2012,7 +1867,7 @@ function findFieldOnCurrentPageOptimized(formId, fieldId) {
 
 function getGravityFieldValueOptimized(formId, fieldId) {
   const $ = window.jQuery || window.$;
-  const $form = getCachedElement(`#gform_${formId}`);
+  const $form = window.getCachedElement(`#gform_${formId}`);
   let value = null;
 
   const standardSelectors = [
@@ -2064,7 +1919,7 @@ function findCustomRadioValueOptimized(formId, fieldId) {
     return null;
   }
 
-  const $form = getCachedElement(`#gform_${formId}`);
+  const $form = window.getCachedElement(`#gform_${formId}`);
   const $hiddenField = $form.find(`#input_${formId}_${fieldId}`);
 
   if ($hiddenField.length > 0) {
@@ -2090,7 +1945,7 @@ function findCustomRadioValueOptimized(formId, fieldId) {
   }
 
   // Check using DMN variable name
-  const config = getFormConfigCached(formId);
+  const config = window.getFormConfigCached(formId);
   if (config && config.field_mappings) {
     let targetDmnVariable = null;
     Object.entries(config.field_mappings).forEach(([dmnVariable, mapping]) => {
@@ -2401,8 +2256,8 @@ function waitForJQuery(callback, maxAttempts = 50) {
          operatonDebugVerbose('Frontend', '🔄 Form navigation detected - minimal cleanup only');
 
         // Only clear performance-related caches that are safe to clear
-        if (domQueryCache && domQueryCache.size > 100) {
-          domQueryCache.clear();
+        if (window.operatonCaches.domQueryCache && window.operatonCaches.domQueryCache.size > 100) {
+          window.operatonCaches.domQueryCache.clear();
         }
 
         // Don't clear form state, initialization flags, or button manager
@@ -2413,8 +2268,8 @@ function waitForJQuery(callback, maxAttempts = 50) {
        operatonDebugVerbose('Frontend', '🧹 Page navigation detected - performing cleanup');
 
       // Clear caches
-      domQueryCache.clear();
-      formConfigCache.clear();
+      window.operatonCaches.domQueryCache.clear();
+      window.operatonCaches.formConfigCache.clear();
 
       // Clear button manager cache but preserve core functionality
       if (window.operatonButtonManager) {
@@ -2487,8 +2342,8 @@ if (typeof window !== 'undefined') {
       initializationState: window.operatonInitialized,
       performanceStats: stats,
       cacheStats: {
-        domCache: domQueryCache.size,
-        configCache: formConfigCache.size,
+        domCache: window.operatonCaches.domQueryCache.size,
+        configCache: window.operatonCaches.formConfigCache.size,
         buttonCache: window.operatonButtonManager.buttonCache.size,
       },
       status: 'fixed - single initialization, smart clearing',
@@ -2501,12 +2356,19 @@ if (typeof window !== 'undefined') {
     };
   };
 
-  window.operatonForceCleanup = resetFormSystem;
+  window.operatonForceCleanup = window.resetFormSystem;
 
   window.operatonReinitialize = function () {
      operatonDebugVerbose('Frontend', 'MANUAL REINIT: Starting re-initialization');
-    resetFormSystem();
+    window.resetFormSystem();
   };
 }
 
- operatonDebugFrontend('Frontend', 'Operaton DMN frontend script loaded');
+// =============================================================================
+// MODULE COMPLETION FLAG
+// =============================================================================
+
+window.operatonModulesLoaded = window.operatonModulesLoaded || {};
+window.operatonModulesLoaded.main = true;
+
+operatonDebugFrontend('Frontend', 'Main frontend script loaded successfully (modular version)');
