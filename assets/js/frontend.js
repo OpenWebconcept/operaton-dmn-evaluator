@@ -30,6 +30,12 @@ if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.forms) {
   throw new Error('Operaton DMN: Forms module must be loaded before main frontend script');
 }
 
+// Ensure Utils module is loaded
+if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.utils) {
+  operatonDebugMinimal('Frontend', 'ERROR: Utils module not loaded! This script requires frontend-utils.js');
+  throw new Error('Operaton DMN: Utils module must be loaded before main frontend script');
+}
+
 // =============================================================================
 // BUTTON MANAGER
 // =============================================================================
@@ -133,56 +139,6 @@ window.operatonButtonManager = window.operatonButtonManager || {
 // FIXED RESULT FIELD MANAGEMENT
 // =============================================================================
 
-function getResultFieldIds(formId) {
-  const config = window.getFormConfigCached(formId);
-  const resultFieldIds = [];
-
-  if (!config) {
-    operatonDebugMinimal('Frontend', `No configuration found for form ${formId}`);
-    return resultFieldIds;
-  }
-
-  // Primary: result_field_ids from config (most reliable)
-  if (config.result_field_ids && Array.isArray(config.result_field_ids)) {
-    config.result_field_ids.forEach(fieldId => {
-      const normalizedId = parseInt(fieldId);
-      if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
-        resultFieldIds.push(normalizedId);
-      }
-    });
-  }
-
-  // Secondary: result_mappings (more reliable than field_mappings for results)
-  if (config.result_mappings && typeof config.result_mappings === 'object') {
-    Object.values(config.result_mappings).forEach(mapping => {
-      if (mapping && mapping.field_id) {
-        const normalizedId = parseInt(mapping.field_id);
-        if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
-          resultFieldIds.push(normalizedId);
-        }
-      }
-    });
-  }
-
-  // Tertiary: STRICT filtering from field_mappings - only clear result variables
-  if (config.field_mappings && typeof config.field_mappings === 'object') {
-    Object.entries(config.field_mappings).forEach(([dmnVariable, mapping]) => {
-      if (mapping && mapping.field_id) {
-        // ONLY include variables that clearly start with result indicators
-        if (dmnVariable.startsWith('aanmerking')) {
-          const normalizedId = parseInt(mapping.field_id);
-          if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
-            resultFieldIds.push(normalizedId);
-          }
-        }
-      }
-    });
-  }
-
-   operatonDebugVerbose('Frontend', `Result field IDs for form ${formId}:`, resultFieldIds);
-  return resultFieldIds;
-}
-
 function clearAllResultFields(formId, reason) {
    operatonDebugVerbose('Frontend', `CLEARING result fields for form ${formId}: ${reason}`);
 
@@ -190,7 +146,7 @@ function clearAllResultFields(formId, reason) {
   if (!$) return;
 
   const $form = window.getCachedElement(`#gform_${formId}`);
-  const resultFieldIds = getResultFieldIds(formId);
+  const resultFieldIds = window.getResultFieldIds(formId);
 
   if (resultFieldIds.length === 0) {
      operatonDebugVerbose('Frontend', `No result fields configured for form ${formId}`);
@@ -302,7 +258,7 @@ function setupInputChangeMonitoring(formId) {
   $form.off('.operaton-clear');
 
   // Cache result field IDs once
-  const resultFieldIds = getResultFieldIds(formId);
+  const resultFieldIds = window.getResultFieldIds(formId);
    operatonDebugVerbose('Frontend', `Result field IDs for monitoring form ${formId}:`, resultFieldIds);
 
   // State tracking for intelligent clearing
@@ -566,7 +522,7 @@ function bindNavigationEventsOptimized(formId) {
   }
 
   const $form = window.getCachedElement(`#gform_${formId}`);
-  const resultFieldIds = getResultFieldIds(formId);
+  const resultFieldIds = window.getResultFieldIds(formId);
 
   // Store form state for comparison - EXCLUDE result fields entirely
   let formStateSnapshot = null;
@@ -865,7 +821,7 @@ function handleEvaluateClick($button) {
   const $ = window.jQuery || window.$;
   if (!$) {
     operatonDebugMinimal('Frontend', 'jQuery not available for handleEvaluateClick');
-    showError('System error: jQuery not available. Please refresh the page.');
+    window.showError('System error: jQuery not available. Please refresh the page.');
     return;
   }
 
@@ -887,7 +843,7 @@ function handleEvaluateClick($button) {
   const config = window.getFormConfigCached(formId);
   if (!config) {
     operatonDebugMinimal('Frontend', 'Configuration not found for form:', formId);
-    showError('Configuration error. Please contact the administrator.');
+    window.showError('Configuration error. Please contact the administrator.');
     return;
   }
 
@@ -905,7 +861,7 @@ function handleEvaluateClick($button) {
 
   function continueEvaluation() {
     if (!validateForm(formId)) {
-      showError('Please fill in all required fields before evaluation.');
+      window.showError('Please fill in all required fields before evaluation.');
       return;
     }
 
@@ -926,7 +882,7 @@ function handleEvaluateClick($button) {
         ['dagVanAanvraag', 'geboortedatumAanvrager', 'geboortedatumPartner'].includes(dmnVariable)
       ) {
         if (value !== null && value !== '' && value !== undefined) {
-          value = convertDateFormat(value, dmnVariable);
+          value = window.convertDateFormat(value, dmnVariable);
         }
       }
 
@@ -958,14 +914,14 @@ function handleEvaluateClick($button) {
         missingFields.push(`${dmnVariable} (field ID: ${mapping.field_id})`);
       } else {
         if (!validateFieldType(value, mapping.type)) {
-          showError(`Invalid data type for field ${dmnVariable}. Expected: ${mapping.type}`);
+          window.showError(`Invalid data type for field ${dmnVariable}. Expected: ${mapping.type}`);
           return false;
         }
       }
     });
 
     if (!hasRequiredData) {
-      showError(`Please fill in all required fields: ${missingFields.join(', ')}`);
+      window.showError(`Please fill in all required fields: ${missingFields.join(', ')}`);
       return;
     }
 
@@ -975,7 +931,7 @@ function handleEvaluateClick($button) {
     // Check if operaton_ajax is available
     if (typeof window.operaton_ajax === 'undefined') {
       operatonDebugMinimal('Frontend', 'operaton_ajax not available');
-      showError('System error: AJAX configuration not loaded. Please refresh the page.');
+      window.showError('System error: AJAX configuration not loaded. Please refresh the page.');
       window.operatonButtonManager.restoreOriginalState($button, formId);
       return;
     }
@@ -1014,7 +970,7 @@ function handleEvaluateClick($button) {
             let $resultField = null;
 
             if (fieldId) {
-              $resultField = findFieldOnCurrentPageOptimized(formId, fieldId);
+              $resultField = window.findFieldOnCurrentPageOptimized(formId, fieldId);
             } else {
               $resultField = findResultFieldOnCurrentPageOptimized(formId);
             }
@@ -1059,7 +1015,7 @@ function handleEvaluateClick($button) {
 
             showSuccessNotification(message);
           } else {
-            showError('No result fields found on this page to populate.');
+            window.showError('No result fields found on this page to populate.');
           }
 
           // Store evaluation metadata
@@ -1077,7 +1033,7 @@ function handleEvaluateClick($button) {
           }
         } else {
           operatonDebugMinimal('Frontend', 'Invalid response structure:', response);
-          showError('No results received from evaluation.');
+          window.showError('No results received from evaluation.');
         }
       },
       error: function (xhr, status, error) {
@@ -1104,7 +1060,7 @@ function handleEvaluateClick($button) {
           errorMessage = 'Server error occurred during evaluation. Please try again.';
         }
 
-        showError(errorMessage);
+        window.showError(errorMessage);
       },
       complete: function () {
         // Always use centralized button manager for restoration
@@ -1221,104 +1177,6 @@ function forceSyncRadioButtons(formId) {
       }
     }
   });
-}
-
-function convertDateFormat(dateStr, fieldName) {
-  if (!dateStr || dateStr === null) {
-    return null;
-  }
-
-  // If already in ISO format (YYYY-MM-DD), return as-is
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    return dateStr;
-  }
-
-  // Handle DD-MM-YYYY format (with dashes)
-  if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
-    const parts = dateStr.split('-');
-    const day = parts[0];
-    const month = parts[1];
-    const year = parts[2];
-    return `${year}-${month}-${day}`;
-  }
-
-  // Handle DD/MM/YYYY format (with slashes) - THIS WAS THE BUG
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
-    const parts = dateStr.split('/');
-    const day = parts[0].padStart(2, '0');
-    const month = parts[1].padStart(2, '0');
-    const year = parts[2];
-
-    // FIXED: Correct order is YYYY-MM-DD, not YYYY-DD-MM
-    const convertedDate = `${year}-${month}-${day}`;
-    return convertedDate;
-  }
-
-  // Handle MM/DD/YYYY format (US format)
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
-    // Note: This creates ambiguity with DD/MM/YYYY
-    // You may need to specify which format your forms use
-    operatonDebugMinimal('Frontend', 'Ambiguous date format detected:', dateStr, 'Assuming DD/MM/YYYY');
-  }
-
-  // Handle YYYY/MM/DD format
-  if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(dateStr)) {
-    const parts = dateStr.split('/');
-    const year = parts[0];
-    const month = parts[1].padStart(2, '0');
-    const day = parts[2].padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  // Try JavaScript Date parsing as fallback
-  try {
-    const date = new Date(dateStr);
-    if (!isNaN(date.getTime())) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const result = `${year}-${month}-${day}`;
-      return result;
-    }
-  } catch (e) {
-    operatonDebugMinimal('Frontend', 'Error parsing date:', dateStr, e);
-  }
-
-  // If all else fails, return original string
-  operatonDebugMinimal('Frontend', 'Could not convert date format:', dateStr);
-  return dateStr;
-}
-
-function findFieldOnCurrentPageOptimized(formId, fieldId) {
-  const cacheKey = `field_${formId}_${fieldId}`;
-  const cached = window.operatonCaches.domQueryCache.get(cacheKey);
-
-  if (cached && Date.now() - cached.timestamp < 3000) {
-    return cached.element;
-  }
-
-  const $ = window.jQuery || window.$;
-  const $form = window.getCachedElement(`#gform_${formId}`);
-
-  const selectors = [
-    `#input_${formId}_${fieldId}`,
-    `input[name="input_${formId}_${fieldId}"]`,
-    `select[name="input_${formId}_${fieldId}"]`,
-    `textarea[name="input_${formId}_${fieldId}"]`,
-  ];
-
-  for (const selector of selectors) {
-    const $field = $form.find(`${selector}:visible`);
-    if ($field.length > 0) {
-      window.operatonCaches.domQueryCache.set(cacheKey, {
-        element: $field.first(),
-        timestamp: Date.now(),
-      });
-      return $field.first();
-    }
-  }
-
-  return null;
 }
 
 function getGravityFieldValueOptimized(formId, fieldId) {
@@ -1500,42 +1358,6 @@ function showSuccessNotification(message) {
   }, 6000);
 }
 
-function showError(message) {
-  const $ = window.jQuery || window.$;
-  if (!$) {
-    operatonDebugMinimal('Frontend', 'jQuery not available for showError');
-    alert('Error: ' + message);
-    return;
-  }
-
-  $('.operaton-notification').remove();
-
-  const $notification = $(`<div class="operaton-notification">Error: ${message}</div>`);
-  $notification.css({
-    position: 'fixed',
-    top: '20px',
-    right: '20px',
-    background: '#f44336',
-    color: 'white',
-    padding: '15px 20px',
-    'border-radius': '6px',
-    'box-shadow': '0 3px 15px rgba(0,0,0,0.2)',
-    'z-index': 99999,
-    'font-family': 'Arial, sans-serif',
-    'font-size': '14px',
-    'font-weight': 'bold',
-    'max-width': '400px',
-  });
-
-  $('body').append($notification);
-
-  setTimeout(() => {
-    $notification.fadeOut(300, function () {
-      $(this).remove();
-    });
-  }, 8000);
-}
-
 function highlightField($field) {
   const $ = window.jQuery || window.$;
   if (!$ || !$field || $field.length === 0) {
@@ -1594,29 +1416,6 @@ function bindEvaluationEventsOptimized(formId) {
 // AJAX SETUP
 // =============================================================================
 
-function waitForOperatonAjax(callback, maxAttempts = 50) {
-  let attempts = 0;
-
-  function check() {
-    attempts++;
-
-    if (typeof window.operaton_ajax !== 'undefined') {
-       operatonDebugVerbose('Frontend', '✅ operaton_ajax found after', attempts, 'attempts');
-      callback();
-    } else if (attempts < maxAttempts) {
-      if (attempts % 10 === 0) {
-         operatonDebugVerbose('Frontend', '⏳ Still waiting for operaton_ajax... attempt', attempts);
-      }
-      setTimeout(check, 100);
-    } else {
-      operatonDebugMinimal('Frontend', '❌ operaton_ajax not found after', maxAttempts, 'attempts');
-      createEmergencyOperatonAjax();
-      callback();
-    }
-  }
-  check();
-}
-
 function createEmergencyOperatonAjax() {
   if (typeof window.operaton_ajax === 'undefined') {
      operatonDebugVerbose('Frontend', '🆘 Creating emergency operaton_ajax fallback');
@@ -1647,26 +1446,6 @@ window.handleEvaluateClick = handleEvaluateClick;
 // MAIN INITIALIZATION (SINGLE VERSION)
 // =============================================================================
 
-function waitForJQuery(callback, maxAttempts = 50) {
-  let attempts = 0;
-
-  function check() {
-    attempts++;
-
-    if (typeof jQuery !== 'undefined') {
-      callback();
-    } else if (attempts < maxAttempts) {
-      if (attempts % 10 === 0) {
-      }
-      const delay = Math.min(100 * Math.pow(1.1, attempts), 1000);
-      setTimeout(check, delay);
-    } else {
-      operatonDebugMinimal('Frontend', `❌ jQuery not found after ${maxAttempts} attempts`);
-    }
-  }
-  check();
-}
-
 // SINGLE MAIN INITIALIZATION - NO DUPLICATES
 (function () {
   'use strict';
@@ -1680,7 +1459,7 @@ function waitForJQuery(callback, maxAttempts = 50) {
   function performInitialization($) {
 
     // Wait for operaton_ajax and initialize
-    waitForOperatonAjax(() => {
+    window.waitForOperatonAjax(() => {
       const initStartTime = performance.now();
        operatonDebugFrontend('Frontend', '🚀 Initializing Operaton DMN...');
 
@@ -1758,7 +1537,7 @@ function waitForJQuery(callback, maxAttempts = 50) {
   if (typeof jQuery !== 'undefined') {
     performInitialization(jQuery);
   } else {
-    waitForJQuery(() => {
+    window.waitForJQuery(() => {
       performInitialization(jQuery);
     });
   }
