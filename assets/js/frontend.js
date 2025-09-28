@@ -18,82 +18,11 @@ if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.core) {
   throw new Error('Operaton DMN: Core module must be loaded before main frontend script');
 }
 
-/**
- * Define global functions FIRST for inline script compatibility
- */
-window.showEvaluateButton = function (formId) {
-  const $ = window.jQuery || window.$;
-  if (!$) {
-    operatonDebugMinimal('Frontend', 'jQuery not available for showEvaluateButton');
-    return;
-  }
-
-  try {
-    const $button = window.getCachedElement(`#operaton-evaluate-${formId}`);
-    const $summary = window.getCachedElement(`#decision-flow-summary-${formId}`);
-
-    $button.addClass('operaton-show-button').show();
-    $summary.removeClass('operaton-show-summary');
-  } catch (error) {
-    operatonDebugMinimal('Frontend', 'Error in showEvaluateButton:', error);
-    $(`#operaton-evaluate-${formId}`).addClass('operaton-show-button').show();
-    $(`#decision-flow-summary-${formId}`).removeClass('operaton-show-summary');
-  }
-};
-
-window.showDecisionFlowSummary = function (formId) {
-  const $ = window.jQuery || window.$;
-  if (!$) {
-    operatonDebugMinimal('Frontend', 'jQuery not available for showDecisionFlowSummary');
-    return;
-  }
-
-  try {
-    const $button = window.getCachedElement(`#operaton-evaluate-${formId}`);
-    $button.removeClass('operaton-show-button');
-
-    const $summary = window.getCachedElement(`#decision-flow-summary-${formId}`);
-    $summary.addClass('operaton-show-summary');
-
-    if (typeof window.loadDecisionFlowSummary === 'function') {
-       operatonDebugVerbose('Frontend', '📊 Delegating decision flow loading to decision-flow.js for form', formId);
-      window.loadDecisionFlowSummary(formId);
-    } else {
-       operatonDebugVerbose('Frontend', '📊 Decision flow manager not available for form', formId);
-    }
-  } catch (error) {
-    operatonDebugMinimal('Frontend', 'Error in showDecisionFlowSummary:', error);
-  }
-};
-
-window.hideAllElements = function (formId) {
-  const $ = window.jQuery || window.$;
-  if (!$) {
-    operatonDebugMinimal('Frontend', 'jQuery not available for hideAllElements');
-    return;
-  }
-
-  try {
-    const currentPage = window.getCurrentPageCached(formId);
-    const config = window.getFormConfigCached(formId);
-    const targetPage = config ? parseInt(config.evaluation_step) || 2 : 2;
-
-    if (currentPage === targetPage) {
-      return;
-    }
-
-    const $button = window.getCachedElement(`#operaton-evaluate-${formId}`);
-    const $summary = window.getCachedElement(`#decision-flow-summary-${formId}`);
-
-    operatonDebugVerbose('Frontend', '❌ Hiding all elements for form', formId);
-    $button.removeClass('operaton-show-button').hide();
-    $summary.removeClass('operaton-show-summary');
-  } catch (error) {
-    operatonDebugMinimal('Frontend', 'Error in hideAllElements:', error);
-    $(`#operaton-evaluate-${formId}`).removeClass('operaton-show-button').hide();
-    $(`#decision-flow-summary-${formId}`).removeClass('operaton-show-summary');
-  }
-};
+// Ensure UI module is loaded
+if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.ui) {
+  operatonDebugMinimal('Frontend', 'ERROR: UI module not loaded! This script requires frontend-ui.js');
+  throw new Error('Operaton DMN: UI module must be loaded before main frontend script');
+}
 
 // =============================================================================
 // BUTTON MANAGER
@@ -351,34 +280,6 @@ function clearStoredResults(formId) {
 }
 
 // =============================================================================
-// BUTTON PLACEMENT AND VISIBILITY MANAGEMENT
-// =============================================================================
-
-function handleButtonPlacement(formId) {
-  const $ = window.jQuery || window.$;
-  if (!$) return;
-
-  const config = window.getFormConfigCached(formId);
-  if (!config) return;
-
-  const currentPage = window.getCurrentPageCached(formId);
-  const targetPage = parseInt(config.evaluation_step) || 2;
-  const showDecisionFlow = config.show_decision_flow || false;
-  const useProcess = config.use_process || false;
-
-   operatonDebugVerbose('Frontend', `Button placement check - Form: ${formId}, Current page: ${currentPage}, Target: ${targetPage}`);
-
-  if (currentPage === targetPage) {
-    window.showEvaluateButton(formId);
-  } else if (currentPage === targetPage + 1 && showDecisionFlow && useProcess) {
-    window.showDecisionFlowSummary(formId);
-  } else {
-     operatonDebugVerbose('Frontend', `Hiding elements for form ${formId}`);
-    window.hideAllElements(formId);
-  }
-}
-
-// =============================================================================
 // PAGE CHANGE DETECTION AND HANDLING
 // =============================================================================
 
@@ -388,7 +289,7 @@ function setupPageChangeDetection(formId) {
 
   // Initial button placement
   setTimeout(() => {
-    handleButtonPlacement(formId);
+    window.handleButtonPlacement(formId);
   }, 100);
 
   // Hook into Gravity Forms page events
@@ -404,7 +305,7 @@ function setupPageChangeDetection(formId) {
         if (loadedFormId == formId) {
            operatonDebugVerbose('Frontend', `Page loaded for form ${formId}: page ${currentPage}`);
           setTimeout(() => {
-            handleButtonPlacement(formId);
+            window.handleButtonPlacement(formId);
           }, 200);
         }
       },
@@ -420,7 +321,7 @@ function setupPageChangeDetection(formId) {
       currentUrl = window.location.href;
        operatonDebugVerbose('Frontend', `URL changed for form ${formId}, updating button placement`);
       setTimeout(() => {
-        handleButtonPlacement(formId);
+        window.handleButtonPlacement(formId);
       }, 300);
     }
   }, 500);
@@ -430,7 +331,7 @@ function setupPageChangeDetection(formId) {
 
   // Fallback button placement check
   setTimeout(() => {
-    handleButtonPlacement(formId);
+    window.handleButtonPlacement(formId);
   }, 2000);
 }
 
