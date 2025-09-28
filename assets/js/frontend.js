@@ -18,6 +18,18 @@ if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.core) {
   throw new Error('Operaton DMN: Core module must be loaded before main frontend script');
 }
 
+// Ensure Utils module is loaded
+if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.utils) {
+  operatonDebugMinimal('Frontend', 'ERROR: Utils module not loaded! This script requires frontend-utils.js');
+  throw new Error('Operaton DMN: Utils module must be loaded before main frontend script');
+}
+
+// Ensure Fields module is loaded
+if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.fields) {
+  operatonDebugMinimal('Frontend', 'ERROR: Fields module not loaded! This script requires frontend-fields.js');
+  throw new Error('Operaton DMN: Fields module must be loaded before main frontend script');
+}
+
 // Ensure UI module is loaded
 if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.ui) {
   operatonDebugMinimal('Frontend', 'ERROR: UI module not loaded! This script requires frontend-ui.js');
@@ -28,12 +40,6 @@ if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.ui) {
 if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.forms) {
   operatonDebugMinimal('Frontend', 'ERROR: Forms module not loaded! This script requires frontend-forms.js');
   throw new Error('Operaton DMN: Forms module must be loaded before main frontend script');
-}
-
-// Ensure Utils module is loaded
-if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.utils) {
-  operatonDebugMinimal('Frontend', 'ERROR: Utils module not loaded! This script requires frontend-utils.js');
-  throw new Error('Operaton DMN: Utils module must be loaded before main frontend script');
 }
 
 // =============================================================================
@@ -139,299 +145,12 @@ window.operatonButtonManager = window.operatonButtonManager || {
 // FIXED RESULT FIELD MANAGEMENT
 // =============================================================================
 
-function clearAllResultFields(formId, reason) {
-   operatonDebugVerbose('Frontend', `CLEARING result fields for form ${formId}: ${reason}`);
-
-  const $ = window.jQuery || window.$;
-  if (!$) return;
-
-  const $form = window.getCachedElement(`#gform_${formId}`);
-  const resultFieldIds = window.getResultFieldIds(formId);
-
-  if (resultFieldIds.length === 0) {
-     operatonDebugVerbose('Frontend', `No result fields configured for form ${formId}`);
-    return;
-  }
-
-  let clearedCount = 0;
-
-  // Enhanced clearing with multiple selector attempts
-  resultFieldIds.forEach(fieldId => {
-    let fieldCleared = false;
-
-    // Try multiple selectors for each field
-    const selectors = [
-      `#input_${formId}_${fieldId}`,
-      `input[name="input_${formId}_${fieldId}"]`,
-      `select[name="input_${formId}_${fieldId}"]`,
-      `textarea[name="input_${formId}_${fieldId}"]`,
-    ];
-
-    for (const selector of selectors) {
-      const $resultField = $form.find(selector);
-
-      if ($resultField.length > 0) {
-        $resultField.each(function () {
-          const $field = $(this);
-          const currentValue = $field.val();
-
-          if (currentValue && currentValue.trim() !== '') {
-             operatonDebugVerbose('Frontend', `Clearing field ${fieldId} (${selector}): "${currentValue}"`);
-            $field.val('');
-            $field.trigger('change');
-            $field.trigger('input');
-            clearedCount++;
-            fieldCleared = true;
-          }
-        });
-
-        if (fieldCleared) break;
-      }
-    }
-
-    if (!fieldCleared) {
-       operatonDebugMinimal('Frontend', `Result field ${fieldId} not found or already empty`);
-    }
-  });
-
-  if (clearedCount > 0) {
-     operatonDebugVerbose('Frontend', `Successfully cleared ${clearedCount} result fields`);
-
-    // Verification
-    setTimeout(() => {
-      let verifyCount = 0;
-      resultFieldIds.forEach(fieldId => {
-        const $field = $form.find(`#input_${formId}_${fieldId}`);
-        if ($field.length > 0 && $field.val() && $field.val().trim() !== '') {
-          operatonDebugMinimal('Frontend', `Field ${fieldId} still has value after clearing: "${$field.val()}"`);
-        } else {
-          verifyCount++;
-        }
-      });
-       operatonDebugVerbose('Frontend', `Verified ${verifyCount}/${resultFieldIds.length} fields are properly cleared`);
-    }, 100);
-  } else {
-     operatonDebugVerbose('Frontend', 'No result fields needed clearing');
-  }
-}
-
-function clearResultFieldWithMessage(formId, reason) {
-  clearAllResultFields(formId, reason);
-  clearStoredResults(formId);
-  window.clearDOMCache(formId);
-
-  if (typeof window.OperatonDecisionFlow !== 'undefined') {
-    window.OperatonDecisionFlow.clearCache();
-  }
-}
-
-function clearStoredResults(formId) {
-  if (typeof Storage !== 'undefined') {
-    const keysToRemove = [
-      `operaton_dmn_result_${formId}`,
-      `operaton_dmn_eval_page_${formId}`,
-      `operaton_dmn_data_${formId}`,
-      `operaton_dmn_eval_data_${formId}`,
-      `operaton_process_${formId}`,
-    ];
-
-    keysToRemove.forEach(key => sessionStorage.removeItem(key));
-  }
-
-  delete window[`operaton_process_${formId}`];
-}
-
-/**
- * Non-blocking input monitoring that preserves all input functionality
- */
-
-function setupInputChangeMonitoring(formId) {
-  const $ = window.jQuery || window.$;
-  const $form = $(`#gform_${formId}`);
-
-  if ($form.length === 0) {
-     operatonDebugMinimal('Frontend', `Form ${formId} not found for input monitoring`);
-    return;
-  }
-
-  // Remove ALL existing handlers first
-  $form.off('.operaton-clear');
-
-  // Cache result field IDs once
-  const resultFieldIds = window.getResultFieldIds(formId);
-   operatonDebugVerbose('Frontend', `Result field IDs for monitoring form ${formId}:`, resultFieldIds);
-
-  // State tracking for intelligent clearing
-  let debounceTimer = null;
-  let lastClearTime = 0;
-  let inputActivity = new Map(); // Track input activity per field
-
-  function shouldClearResults(fieldName, fieldValue, eventType) {
-    // Never clear during safeguard periods
-    if (window.operatonPopulatingResults || window.operatonFieldLogicUpdating) {
-      return false;
-    }
-
-    // Don't clear too frequently
-    if (Date.now() - lastClearTime < 1000) {
-      return false;
-    }
-
-    return true;
-  }
-
-  function scheduleResultsClear(reason, delay = 500) {
-    if (!shouldClearResults()) {
-      return;
-    }
-
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-    }
-
-    debounceTimer = setTimeout(() => {
-      // Final check before clearing
-      if (window.operatonPopulatingResults || window.operatonFieldLogicUpdating) {
-         operatonDebugVerbose('Frontend', 'SAFEGUARD: Canceling clear due to active operations');
-        return;
-      }
-
-       operatonDebugVerbose('Frontend', `CLEARING RESULTS: ${reason}`);
-      clearAllResultFields(formId, reason);
-      clearStoredResults(formId);
-      lastClearTime = Date.now();
-    }, delay);
-  }
-
-  function isMonitorableField($field) {
-    const fieldId = $field.attr('id');
-    const fieldName = $field.attr('name') || fieldId;
-
-    if (!fieldName) return false;
-
-    // Skip result fields
-    const isResult = resultFieldIds.some(
-      id => fieldId && (fieldId.includes(`input_${formId}_${id}`) || fieldId === `input_${formId}_${id}`)
-    );
-
-    if (isResult) {
-      return false;
-    }
-
-    // Skip system fields
-    if (fieldName.includes('gform_') || fieldName.includes('honeypot')) {
-      return false;
-    }
-
-    // Skip hidden sync fields (but not all hidden fields)
-    if (fieldName.startsWith('input_') && $field.attr('type') === 'hidden') {
-      return false;
-    }
-
-    return true;
-  }
-
-  // CRITICAL FIX: Use completely passive event monitoring
-  // These handlers do NOT call preventDefault() or stopPropagation()
-
-  // Method 1: Monitor via 'change' events (when user finishes with field)
-  $form.on('change.operaton-clear', 'input, select, textarea', function(event) {
-    const $field = $(this);
-
-    if (!isMonitorableField($field)) {
-      return;
-    }
-
-    const fieldName = $field.attr('name') || $field.attr('id');
-    const fieldValue = $field.val();
-
-     operatonDebugVerbose('Frontend', `CHANGE DETECTED: ${fieldName} = "${fieldValue}"`);
-    scheduleResultsClear(`Field changed: ${fieldName}`, 300);
-  });
-
-  // Method 2: Monitor typing completion with very long delay
-  $form.on('input.operaton-clear', 'input[type="text"], input[type="number"], input[type="email"]', function(event) {
-    const $field = $(this);
-
-    if (!isMonitorableField($field)) {
-      return;
-    }
-
-    const fieldName = $field.attr('name') || $field.attr('id');
-
-    // Track input activity
-    inputActivity.set(fieldName, Date.now());
-
-    // Very long delay - only clear after user completely stops typing
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-    }
-
-    debounceTimer = setTimeout(() => {
-      // Check if user is still typing in ANY field
-      const now = Date.now();
-      let stillTyping = false;
-
-      for (let [field, lastActivity] of inputActivity) {
-        if (now - lastActivity < 2000) { // If any field was active in last 2 seconds
-          stillTyping = true;
-          break;
-        }
-      }
-
-      if (!stillTyping && shouldClearResults()) {
-        const finalValue = $field.val();
-         operatonDebugVerbose('Frontend', `TYPING SESSION COMPLETED: ${fieldName} = "${finalValue}"`);
-        clearAllResultFields(formId, `Typing completed: ${fieldName}`);
-        clearStoredResults(formId);
-        lastClearTime = Date.now();
-      }
-    }, 4000); // 4 second delay - very conservative
-  });
-
-  // Method 3: Monitor radio buttons (these can have immediate clearing)
-  $form.on('change.operaton-clear', 'input[type="radio"]', function(event) {
-    const $radio = $(this);
-    const radioName = $radio.attr('name');
-    const radioValue = $radio.val();
-
-    // Skip system radio fields
-    if (radioName && radioName.startsWith('input_')) {
-      return;
-    }
-
-    // Skip during sync operations
-    if (window.operatonRadioSyncInProgress || window.operatonPopulatingResults) {
-      return;
-    }
-
-     operatonDebugVerbose('Frontend', `RADIO SELECTED: ${radioName} = "${radioValue}"`);
-    scheduleResultsClear(`Radio selected: ${radioName}`, 200);
-  });
-
-  // Method 4: Monitor checkboxes
-  $form.on('change.operaton-clear', 'input[type="checkbox"]', function(event) {
-    const $checkbox = $(this);
-    const checkboxName = $checkbox.attr('name') || $checkbox.attr('id');
-    const isChecked = $checkbox.is(':checked');
-
-    if (!isMonitorableField($checkbox)) {
-      return;
-    }
-
-     operatonDebugVerbose('Frontend', `CHECKBOX TOGGLED: ${checkboxName} = ${isChecked}`);
-    scheduleResultsClear(`Checkbox changed: ${checkboxName}`, 200);
-  });
-
-   operatonDebugVerbose('Frontend', `NON-BLOCKING input monitoring active for form ${formId} - all fields monitorable, input unrestricted`);
-}
-
 /**
  * Make field logic completely non-blocking
  */
 if (window.OperatonFieldLogic) {
   // Override the setupEventListeners to be completely passive
-  window.OperatonFieldLogic.setupEventListeners = function(formId, mapping, $form) {
+  window.OperatonFieldLogic.setupEventListeners = function (formId, mapping, $form) {
     const self = this;
 
     // Partner field - use only blur and change, never input
@@ -440,7 +159,7 @@ if (window.OperatonFieldLogic) {
       $partnerField.off('.fieldlogic');
 
       // Only respond to blur (when user leaves field) and change (when value actually changes)
-      $partnerField.on('blur.fieldlogic change.fieldlogic', function() {
+      $partnerField.on('blur.fieldlogic change.fieldlogic', function () {
         const $ = window.jQuery || window.$; // ← ADD THIS LINE
         if (!$) return; // ← ADD THIS SAFETY CHECK
 
@@ -462,7 +181,7 @@ if (window.OperatonFieldLogic) {
     if ($childField.length > 0) {
       $childField.off('.fieldlogic');
 
-      $childField.on('blur.fieldlogic change.fieldlogic', function() {
+      $childField.on('blur.fieldlogic change.fieldlogic', function () {
         const $ = window.jQuery || window.$; // ← ADD THIS LINE
         if (!$) return; // ← ADD THIS SAFETY CHECK
 
@@ -478,344 +197,43 @@ if (window.OperatonFieldLogic) {
       });
     }
 
-     operatonDebugVerbose('Frontend', `NON-BLOCKING field logic events set up for form ${formId}`);
+    operatonDebugVerbose('Frontend', `NON-BLOCKING field logic events set up for form ${formId}`);
   };
 
-   operatonDebugVerbose('Frontend', "Field logic updated to be completely non-blocking");
+  operatonDebugVerbose('Frontend', 'Field logic updated to be completely non-blocking');
 }
 
 /**
  * TEST FUNCTION: Verify input functionality
  */
-window.testInputFunctionality = function(formId = 8) {
+window.testInputFunctionality = function (formId = 8) {
   const $ = jQuery;
   const fields = [
-    {id: 14, name: 'partner_geslachtsnaam'},
-    {id: 16, name: 'kind_geboorteplaats'}
+    { id: 14, name: 'partner_geslachtsnaam' },
+    { id: 16, name: 'kind_geboorteplaats' },
   ];
 
-   operatonDebugVerbose('Frontend', "=== TESTING INPUT FUNCTIONALITY ===");
+  operatonDebugVerbose('Frontend', '=== TESTING INPUT FUNCTIONALITY ===');
 
   fields.forEach(field => {
     const $field = $(`#input_${formId}_${field.id}`);
-     operatonDebugVerbose('Frontend', `Field ${field.name} (${field.id}):`);
-     operatonDebugVerbose('Frontend', `  Found: ${$field.length > 0}`);
-     operatonDebugVerbose('Frontend', `  Disabled: ${$field.prop('disabled')}`);
-     operatonDebugVerbose('Frontend', `  Readonly: ${$field.prop('readonly')}`);
-     operatonDebugVerbose('Frontend', `  Current value: "${$field.val()}"`);
-     operatonDebugVerbose('Frontend', `  Event handlers: ${Object.keys($._data($field[0], 'events') || {}).join(', ') || 'none'}`);
+    operatonDebugVerbose('Frontend', `Field ${field.name} (${field.id}):`);
+    operatonDebugVerbose('Frontend', `  Found: ${$field.length > 0}`);
+    operatonDebugVerbose('Frontend', `  Disabled: ${$field.prop('disabled')}`);
+    operatonDebugVerbose('Frontend', `  Readonly: ${$field.prop('readonly')}`);
+    operatonDebugVerbose('Frontend', `  Current value: "${$field.val()}"`);
+    operatonDebugVerbose(
+      'Frontend',
+      `  Event handlers: ${Object.keys($._data($field[0], 'events') || {}).join(', ') || 'none'}`
+    );
   });
 
-  return "Test complete - check console output";
+  return 'Test complete - check console output';
 };
-
-// =============================================================================
-// FIXED ENHANCED NAVIGATION HANDLING - Preserves results during navigation
-// The issue was that result fields are being included in state comparison
-// =============================================================================
-
-function bindNavigationEventsOptimized(formId) {
-  const $ = window.jQuery || window.$;
-  if (!$) {
-    operatonDebugMinimal('Frontend', 'jQuery not available for bindNavigationEventsOptimized');
-    return;
-  }
-
-  const $form = window.getCachedElement(`#gform_${formId}`);
-  const resultFieldIds = window.getResultFieldIds(formId);
-
-  // Store form state for comparison - EXCLUDE result fields entirely
-  let formStateSnapshot = null;
-  let navigationInProgress = false;
-
-  function captureFormState() {
-    const state = {};
-    // Only capture actual INPUT fields, completely exclude result fields
-    $form.find('input, select, textarea').each(function () {
-      const $field = $(this);
-      const fieldName = $field.attr('name') || $field.attr('id');
-
-      if (fieldName) {
-        // CRITICAL FIX: More thorough result field exclusion
-        const isResultField = resultFieldIds.some(id => {
-          // Check multiple patterns for result field identification
-          return (
-            fieldName.includes(`input_${formId}_${id}`) ||
-            fieldName === `input_${formId}_${id}` ||
-            fieldName === `input_${id}` ||
-            fieldName.endsWith(`_${id}`)
-          );
-        });
-
-        // Also skip hidden sync fields and other non-user fields
-        const isHiddenSyncField = fieldName.startsWith('input_') && $field.attr('type') === 'hidden';
-        const isSystemField = fieldName.includes('gform_') || fieldName.includes('honeypot');
-
-        // ADDITIONAL: Skip fields that contain result variable names
-        const isResultVariableField = fieldName.includes('aanmerking') || fieldName.includes('result');
-
-        if (!isResultField && !isHiddenSyncField && !isSystemField && !isResultVariableField) {
-          if ($field.is(':radio') || $field.is(':checkbox')) {
-            state[fieldName] = $field.is(':checked') ? $field.val() : '';
-          } else {
-            state[fieldName] = $field.val() || '';
-          }
-        }
-      }
-    });
-
-     operatonDebugVerbose('Frontend', 'Captured form state (excluding result fields):', Object.keys(state));
-    return state;
-  }
-
-  function hasActualFormChanges(oldState, newState) {
-    if (!oldState || !newState) {
-       operatonDebugVerbose('Frontend', 'No previous state to compare - treating as NO change for navigation');
-      return false;
-    }
-
-    // Get all unique field names from both states
-    const allFields = new Set([...Object.keys(oldState), ...Object.keys(newState)]);
-    const changedFields = [];
-
-    for (const fieldName of allFields) {
-      const oldValue = oldState[fieldName] || '';
-      const newValue = newState[fieldName] || '';
-
-      if (oldValue !== newValue) {
-        // ADDITIONAL FILTER: Ignore changes that are likely navigation artifacts
-        const isLikelyNavigationArtifact =
-          ((oldValue === '' && newValue !== '') || (oldValue !== '' && newValue === '')) && navigationInProgress;
-
-        // ADDITIONAL FILTER: Double-check this isn't a result field
-        const isResultFieldChange = resultFieldIds.some(
-          id => fieldName.includes(`_${id}`) || fieldName.includes(`input_${formId}_${id}`)
-        );
-
-        if (!isLikelyNavigationArtifact && !isResultFieldChange) {
-          changedFields.push({
-            field: fieldName,
-            from: oldValue,
-            to: newValue,
-          });
-        }
-      }
-    }
-
-    if (changedFields.length > 0) {
-       operatonDebugVerbose('Frontend', 'ACTUAL form changes detected (non-result fields):', changedFields);
-      return true;
-    }
-
-     operatonDebugVerbose('Frontend', 'No actual USER INPUT changes detected');
-    return false;
-  }
-
-  // Capture initial state when document is ready
-  setTimeout(() => {
-    if (!formStateSnapshot) {
-      formStateSnapshot = captureFormState();
-       operatonDebugVerbose('Frontend',
-        `Captured initial form state for form ${formId} with ${
-          Object.keys(formStateSnapshot).length
-        } input fields (result fields excluded)`
-      );
-    }
-  }, 500);
-
-  // Remove existing navigation handlers
-  $form.off(`.operaton-nav-${formId}`);
-
-  // FIXED: Conservative Previous button handler
-  $form.on(
-    `click.operaton-nav-${formId}`,
-    '.gform_previous_button input, .gform_previous_button button, input[value*="Previous"], button:contains("Previous")',
-    function (e) {
-       operatonDebugFrontend('Frontend', 'Previous button clicked for form:', formId);
-      navigationInProgress = true;
-
-      const currentState = captureFormState();
-      const hasChanged = hasActualFormChanges(formStateSnapshot, currentState);
-
-      if (hasChanged) {
-        clearAllResultFields(formId, 'User input changed before navigation');
-        clearStoredResults(formId);
-        formStateSnapshot = currentState;
-      }
-
-      // Always safe to clear DOM cache
-      window.clearDOMCache(formId);
-
-      // Reset navigation flag after delay
-      setTimeout(() => {
-        navigationInProgress = false;
-      }, 1000);
-    }
-  );
-
-  // FIXED: Conservative Gravity Forms page load handler
-  if (typeof gform !== 'undefined' && gform.addAction) {
-    if (gform.removeAction) {
-      gform.removeAction('gform_page_loaded', `operaton_clear_${formId}`);
-    }
-
-    gform.addAction(
-      'gform_page_loaded',
-      function (loadedFormId, currentPage) {
-        if (loadedFormId == formId) {
-           operatonDebugVerbose('Frontend', 'Form page loaded for form:', formId, 'page:', currentPage);
-          navigationInProgress = true;
-
-          window.clearDOMCache(formId); // Safe to clear DOM cache
-
-          // Update state snapshot without clearing result fields
-          setTimeout(() => {
-            const currentState = captureFormState();
-
-            if (!formStateSnapshot) {
-               operatonDebugVerbose('Frontend', `First page load for form ${formId} - capturing initial state`);
-              formStateSnapshot = currentState;
-            } else {
-               operatonDebugVerbose('Frontend', `Page ${currentPage} loaded - updating state snapshot WITHOUT clearing results`);
-
-              // Just update snapshot after navigation completes
-              setTimeout(() => {
-                formStateSnapshot = captureFormState();
-                navigationInProgress = false;
-              }, 200);
-            }
-          }, 100);
-        }
-      },
-      10,
-      `operaton_clear_${formId}`
-    );
-  }
-
-  // ENHANCED: Input change monitoring that excludes result fields
-  let changeTimeout;
-
-  $form.on('change input', 'input, select, textarea', function () {
-    const $field = $(this);
-    const fieldName = $field.attr('name') || $field.attr('id');
-
-    // Skip if it's a result field or during navigation
-    const isResultField = resultFieldIds.some(
-      id =>
-        fieldName &&
-        (fieldName.includes(`input_${formId}_${id}`) ||
-          fieldName === `input_${formId}_${id}` ||
-          fieldName.includes(`_${id}`))
-    );
-
-    if (isResultField || navigationInProgress || window.operatonPopulatingResults) {
-       operatonDebugVerbose('Frontend',
-        `Skipping change handler: ${fieldName} (result field: ${isResultField}, navigation: ${navigationInProgress}, populating: ${window.operatonPopulatingResults})`
-      );
-      return;
-    }
-
-    // Clear any existing timeout
-    if (changeTimeout) {
-      clearTimeout(changeTimeout);
-    }
-
-    // Set a debounced check for actual changes
-    changeTimeout = setTimeout(() => {
-      if (!navigationInProgress && !window.operatonPopulatingResults) {
-        const currentState = captureFormState();
-        const hasChanged = hasActualFormChanges(formStateSnapshot, currentState);
-
-        if (hasChanged) {
-           operatonDebugVerbose('Frontend', `USER INPUT change detected: ${fieldName} - clearing results`);
-          clearAllResultFields(formId, `User input changed: ${fieldName}`);
-          clearStoredResults(formId);
-          formStateSnapshot = currentState;
-        }
-      }
-    }, 300);
-  });
-}
 
 // =============================================================================
 // EVALUATION HANDLING
 // =============================================================================
-
-function findResultFieldOnCurrentPageOptimized(formId) {
-  const $ = window.jQuery || window.$;
-  if (!$) return null;
-
-  const cacheKey = `result_field_${formId}`;
-  const cached = window.operatonCaches.domQueryCache.get(cacheKey);
-
-  if (cached && Date.now() - cached.timestamp < 3000) {
-    return cached.element;
-  }
-
-  const $form = window.getCachedElement(`#gform_${formId}`);
-  const config = window.getFormConfigCached(formId);
-
-  if (config && config.result_display_field) {
-    const selectors = [
-      `#input_${formId}_${config.result_display_field}`,
-      `input[name="input_${formId}_${config.result_display_field}"]`,
-      `select[name="input_${formId}_${config.result_display_field}"]`,
-      `textarea[name="input_${formId}_${config.result_display_field}"]`,
-    ];
-
-    for (const selector of selectors) {
-      const $field = $form.find(`${selector}:visible`);
-      if ($field.length > 0) {
-        window.operatonCaches.domQueryCache.set(cacheKey, {
-          element: $field.first(),
-          timestamp: Date.now(),
-        });
-        return $field.first();
-      }
-    }
-  }
-
-  // Fallback detection strategies
-  const detectionStrategies = [
-    () =>
-      $form
-        .find('label:visible')
-        .filter(function () {
-          const text = $(this).text().toLowerCase().trim();
-          return text === 'desired dish' || text === 'result' || text === 'desireddish';
-        })
-        .closest('.gfield')
-        .find('input:visible, select:visible, textarea:visible')
-        .first(),
-
-    () =>
-      $form
-        .find(
-          'input:visible[name*="dish"], input:visible[id*="dish"], select:visible[name*="dish"], select:visible[id*="dish"], textarea:visible[name*="dish"], textarea:visible[id*="dish"]'
-        )
-        .first(),
-
-    () =>
-      $form
-        .find(
-          'input:visible[name*="result"], input:visible[id*="result"], select:visible[name*="result"], select:visible[id*="result"], textarea:visible[name*="result"], textarea:visible[id*="result"]'
-        )
-        .first(),
-  ];
-
-  for (const strategy of detectionStrategies) {
-    const $field = strategy();
-    if ($field && $field.length > 0) {
-      window.operatonCaches.domQueryCache.set(cacheKey, {
-        element: $field,
-        timestamp: Date.now(),
-      });
-      return $field;
-    }
-  }
-
-  return null;
-}
 
 function handleEvaluateClick($button) {
   const $ = window.jQuery || window.$;
@@ -831,14 +249,14 @@ function handleEvaluateClick($button) {
   // CRITICAL: Prevent duplicate processing
   const lockKey = `eval_${formId}_${configId}`;
   if (window.operatonProcessingLock[lockKey]) {
-     operatonDebugVerbose('Frontend', '🔒 Duplicate evaluation blocked for form:', formId);
+    operatonDebugVerbose('Frontend', '🔒 Duplicate evaluation blocked for form:', formId);
     return;
   }
 
   // Set processing lock
   window.operatonProcessingLock[lockKey] = true;
 
-   operatonDebugFrontend('Frontend', 'Button clicked for form:', formId, 'config:', configId);
+  operatonDebugFrontend('Frontend', 'Button clicked for form:', formId, 'config:', configId);
 
   const config = window.getFormConfigCached(formId);
   if (!config) {
@@ -891,10 +309,10 @@ function handleEvaluateClick($button) {
 
     // Apply conditional logic for partner-related fields
     const isAlleenstaand = formData['aanvragerAlleenstaand'];
-     operatonDebugVerbose('Frontend', 'User is single (alleenstaand):', isAlleenstaand);
+    operatonDebugVerbose('Frontend', 'User is single (alleenstaand):', isAlleenstaand);
 
     if (isAlleenstaand === 'true' || isAlleenstaand === true) {
-       operatonDebugVerbose('Frontend', 'User is single, setting geboortedatumPartner to null');
+      operatonDebugVerbose('Frontend', 'User is single, setting geboortedatumPartner to null');
       formData['geboortedatumPartner'] = null;
     }
 
@@ -936,7 +354,10 @@ function handleEvaluateClick($button) {
       return;
     }
 
-     operatonDebugFrontend('Frontend', 'Making AJAX call to:', window.operaton_ajax.url);
+    // for production ready code
+    operatonDebugFrontend('Frontend', 'Making AJAX call to:', window.operaton_ajax.url);
+    // for developing
+    console.log('Making AJAX call to:', window.operaton_ajax.url);
 
     // Make AJAX call
     $.ajax({
@@ -951,14 +372,20 @@ function handleEvaluateClick($button) {
         xhr.setRequestHeader('X-WP-Nonce', window.operaton_ajax.nonce);
       },
       success: function (response) {
-         operatonDebugFrontend('Frontend', 'AJAX success:', response);
+        // for production ready code
+        operatonDebugFrontend('Frontend', 'AJAX success:', response);
+        // for developing
+        console.log('AJAX success:', response);
 
         if (response.success && response.results) {
-           operatonDebugVerbose('Frontend', 'Results received:', response.results);
+          // for production ready code
+          operatonDebugVerbose('Frontend', 'Results received:', response.results);
+          // for developing
+          console.log('Results received:', response.results);
 
           // 🚩 Set safeguard flag
           window.operatonPopulatingResults = true;
-           operatonDebugVerbose('Frontend', '🛡️ SAFEGUARD: Result population started - blocking change handlers');
+          operatonDebugVerbose('Frontend', '🛡️ SAFEGUARD: Result population started - blocking change handlers');
 
           let populatedCount = 0;
           const resultSummary = [];
@@ -972,7 +399,7 @@ function handleEvaluateClick($button) {
             if (fieldId) {
               $resultField = window.findFieldOnCurrentPageOptimized(formId, fieldId);
             } else {
-              $resultField = findResultFieldOnCurrentPageOptimized(formId);
+              $resultField = window.findResultFieldOnCurrentPageOptimized(formId);
             }
 
             if ($resultField && $resultField.length > 0) {
@@ -992,13 +419,13 @@ function handleEvaluateClick($button) {
           // 🚩 Reset safeguard flag shortly after population
           setTimeout(() => {
             window.operatonPopulatingResults = false;
-             operatonDebugVerbose('Frontend', '🛡️ SAFEGUARD: Result population completed - change handlers re-enabled');
+            operatonDebugVerbose('Frontend', '🛡️ SAFEGUARD: Result population completed - change handlers re-enabled');
           }, 200);
 
           // Store process instance ID if provided
           if (response.process_instance_id) {
             storeProcessInstanceId(formId, response.process_instance_id);
-             operatonDebugVerbose('Frontend', 'Stored process instance ID:', response.process_instance_id);
+            operatonDebugVerbose('Frontend', 'Stored process instance ID:', response.process_instance_id);
           }
 
           if (populatedCount > 0) {
@@ -1314,7 +741,7 @@ function storeProcessInstanceId(formId, processInstanceId) {
     sessionStorage.setItem(`operaton_process_${formId}`, processInstanceId);
   }
   window[`operaton_process_${formId}`] = processInstanceId;
-   operatonDebugVerbose('Frontend', 'Stored process instance ID for form', formId + ':', processInstanceId);
+  operatonDebugVerbose('Frontend', 'Stored process instance ID for form', formId + ':', processInstanceId);
 }
 
 // =============================================================================
@@ -1405,11 +832,11 @@ function bindEvaluationEventsOptimized(formId) {
   $(document).off(`click.operaton-${formId}`, selector);
   $(document).on(`click.operaton-${formId}`, selector, function (e) {
     e.preventDefault();
-     operatonDebugFrontend('Frontend', '🎯 Button clicked for form:', formId);
+    operatonDebugFrontend('Frontend', '🎯 Button clicked for form:', formId);
     handleEvaluateClick($(this));
   });
 
-   operatonDebugVerbose('Frontend', '✅ Event handler bound for form:', formId);
+  operatonDebugVerbose('Frontend', '✅ Event handler bound for form:', formId);
 }
 
 // =============================================================================
@@ -1418,7 +845,7 @@ function bindEvaluationEventsOptimized(formId) {
 
 function createEmergencyOperatonAjax() {
   if (typeof window.operaton_ajax === 'undefined') {
-     operatonDebugVerbose('Frontend', '🆘 Creating emergency operaton_ajax fallback');
+    operatonDebugVerbose('Frontend', '🆘 Creating emergency operaton_ajax fallback');
     window.operaton_ajax = {
       url: '/wp-json/operaton-dmn/v1/evaluate',
       nonce: 'fallback',
@@ -1457,11 +884,10 @@ window.handleEvaluateClick = handleEvaluateClick;
   window.operatonMainInitCalled = true;
 
   function performInitialization($) {
-
     // Wait for operaton_ajax and initialize
     window.waitForOperatonAjax(() => {
       const initStartTime = performance.now();
-       operatonDebugFrontend('Frontend', '🚀 Initializing Operaton DMN...');
+      operatonDebugFrontend('Frontend', '🚀 Initializing Operaton DMN...');
 
       window.operatonInitialized.jQueryReady = true;
       window.initOperatonDMN();
@@ -1476,7 +902,10 @@ window.handleEvaluateClick = handleEvaluateClick;
       const initEndTime = performance.now();
       window.operatonInitialized.performanceStats.totalProcessingTime += initEndTime - initStartTime;
 
-       operatonDebugFrontend('Frontend', `🎉 Operaton DMN initialization complete in ${(initEndTime - initStartTime).toFixed(2)}ms`);
+      operatonDebugFrontend(
+        'Frontend',
+        `🎉 Operaton DMN initialization complete in ${(initEndTime - initStartTime).toFixed(2)}ms`
+      );
     });
 
     $(window).on('beforeunload', e => {
@@ -1488,7 +917,7 @@ window.handleEvaluateClick = handleEvaluateClick;
 
       if (hasActiveForm && isGravityFormsPage) {
         // This looks like form navigation - do minimal cleanup only
-         operatonDebugVerbose('Frontend', '🔄 Form navigation detected - minimal cleanup only');
+        operatonDebugVerbose('Frontend', '🔄 Form navigation detected - minimal cleanup only');
 
         // Only clear performance-related caches that are safe to clear
         if (window.operatonCaches.domQueryCache && window.operatonCaches.domQueryCache.size > 100) {
@@ -1500,7 +929,7 @@ window.handleEvaluateClick = handleEvaluateClick;
       }
 
       // This appears to be actual page navigation - safe to do full cleanup
-       operatonDebugVerbose('Frontend', '🧹 Page navigation detected - performing cleanup');
+      operatonDebugVerbose('Frontend', '🧹 Page navigation detected - performing cleanup');
 
       // Clear caches
       window.operatonCaches.domQueryCache.clear();
@@ -1529,8 +958,7 @@ window.handleEvaluateClick = handleEvaluateClick;
       // - Form configurations or state
     });
 
-    $(document).ready(() => {
-    });
+    $(document).ready(() => {});
   }
 
   // Initialize based on jQuery availability
@@ -1573,7 +1001,7 @@ if (typeof window !== 'undefined') {
   window.operatonDebugFixed = function () {
     const stats = window.operatonInitialized.performanceStats;
 
-     operatonDebugVerbose('Frontend', 'Debug Info:', {
+    operatonDebugVerbose('Frontend', 'Debug Info:', {
       initializationState: window.operatonInitialized,
       performanceStats: stats,
       cacheStats: {
@@ -1594,7 +1022,7 @@ if (typeof window !== 'undefined') {
   window.operatonForceCleanup = window.resetFormSystem;
 
   window.operatonReinitialize = function () {
-     operatonDebugVerbose('Frontend', 'MANUAL REINIT: Starting re-initialization');
+    operatonDebugVerbose('Frontend', 'MANUAL REINIT: Starting re-initialization');
     window.resetFormSystem();
   };
 }

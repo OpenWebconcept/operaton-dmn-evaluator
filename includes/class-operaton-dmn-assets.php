@@ -322,7 +322,7 @@ class Operaton_DMN_Assets
             true
         );
 
-        // 🔧 Utils Module - Utility functions and helpers (NEW)
+        // 🔧 Utils Module - Utility functions and helpers
         wp_enqueue_script(
             'operaton-dmn-frontend-utils',
             $this->plugin_url . 'assets/js/frontend-utils.js',
@@ -331,11 +331,20 @@ class Operaton_DMN_Assets
             true
         );
 
+        // 🏷️ Fields Module - Result field management and validation (NEW)
+        wp_enqueue_script(
+            'operaton-dmn-frontend-fields',
+            $this->plugin_url . 'assets/js/frontend-fields.js',
+            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend-utils'),
+            $this->version,
+            true
+        );
+
         // 🎨 UI Module - Button management and UI controls
         wp_enqueue_script(
             'operaton-dmn-frontend-ui',
             $this->plugin_url . 'assets/js/frontend-ui.js',
-            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend-utils'),
+            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend-utils', 'operaton-dmn-frontend-fields'),
             $this->version,
             true
         );
@@ -344,7 +353,7 @@ class Operaton_DMN_Assets
         wp_enqueue_script(
             'operaton-dmn-frontend-forms',
             $this->plugin_url . 'assets/js/frontend-forms.js',
-            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend-utils', 'operaton-dmn-frontend-ui'),
+            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend-utils', 'operaton-dmn-frontend-fields', 'operaton-dmn-frontend-ui'),
             $this->version,
             true
         );
@@ -353,7 +362,7 @@ class Operaton_DMN_Assets
         wp_enqueue_script(
             'operaton-dmn-frontend',
             $this->plugin_url . 'assets/js/frontend.js',
-            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend-utils', 'operaton-dmn-frontend-ui', 'operaton-dmn-frontend-forms'),
+            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend-utils', 'operaton-dmn-frontend-fields', 'operaton-dmn-frontend-ui', 'operaton-dmn-frontend-forms'),
             $this->version,
             true
         );
@@ -362,7 +371,7 @@ class Operaton_DMN_Assets
         wp_enqueue_script(
             'operaton-dmn-gravity-integration',
             $this->plugin_url . 'assets/js/gravity-forms.js',
-            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend-utils', 'operaton-dmn-frontend-ui', 'operaton-dmn-frontend-forms', 'operaton-dmn-frontend'),
+            array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend-utils', 'operaton-dmn-frontend-fields', 'operaton-dmn-frontend-ui', 'operaton-dmn-frontend-forms', 'operaton-dmn-frontend'),
             $this->version,
             true
         );
@@ -373,7 +382,7 @@ class Operaton_DMN_Assets
             wp_enqueue_script(
                 'operaton-dmn-decision-flow',
                 $this->plugin_url . 'assets/js/decision-flow.js',
-                array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend-utils', 'operaton-dmn-frontend-ui', 'operaton-dmn-frontend-forms', 'operaton-dmn-frontend'),
+                array('jquery', 'operaton-dmn-debug', 'operaton-dmn-frontend-core', 'operaton-dmn-frontend-utils', 'operaton-dmn-frontend-fields', 'operaton-dmn-frontend-ui', 'operaton-dmn-frontend-forms', 'operaton-dmn-frontend'),
                 $this->version,
                 true
             );
@@ -399,13 +408,13 @@ class Operaton_DMN_Assets
 
         if ($timer_id)
         {
-            $this->performance->stop_timer($timer_id, 'Frontend assets loaded with modular core + utils + UI + forms');
+            $this->performance->stop_timer($timer_id, 'Frontend assets loaded with modular core + utils + fields + UI + forms');
         }
 
         self::$asset_loading_state['frontend_loaded'] = true;
-        operaton_debug('Assets', 'Frontend assets enqueued successfully with modular core + utils + UI + forms');
+        operaton_debug('Assets', 'Frontend assets enqueued successfully with modular core + utils + fields + UI + forms');
     }
-    
+
     /**
      * Enqueue admin assets for configuration interface
      *
