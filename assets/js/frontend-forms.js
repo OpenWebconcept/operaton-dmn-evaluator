@@ -110,6 +110,11 @@ window.simpleFormInitialization = function (formId) {
     // Setup navigation and change detection
     window.setupPageChangeDetection(formId);
 
+    // CRITICAL: Setup input change monitoring for result field clearing
+    if (typeof window.setupInputChangeMonitoring === 'function') {
+      window.setupInputChangeMonitoring(formId);
+    }
+    
     // Initialize field logic if available
     if (window.OperatonFieldLogic && typeof window.OperatonFieldLogic.initializeForm === 'function') {
       window.OperatonFieldLogic.initializeForm(formId);
