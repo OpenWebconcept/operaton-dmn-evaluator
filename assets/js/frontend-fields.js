@@ -235,7 +235,7 @@ window.setupInputChangeMonitoring = function (formId) {
   /**
    * Check if results should be cleared based on current state
    */
-  function shouldClearResults(fieldName, fieldValue, eventType) {
+  function shouldClearResults() {
     // Never clear during safeguard periods
     if (window.operatonPopulatingResults || window.operatonFieldLogicUpdating) {
       return false;

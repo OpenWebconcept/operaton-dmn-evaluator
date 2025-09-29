@@ -114,7 +114,7 @@ window.simpleFormInitialization = function (formId) {
     if (typeof window.setupInputChangeMonitoring === 'function') {
       window.setupInputChangeMonitoring(formId);
     }
-    
+
     // Initialize field logic if available
     if (window.OperatonFieldLogic && typeof window.OperatonFieldLogic.initializeForm === 'function') {
       window.OperatonFieldLogic.initializeForm(formId);
@@ -182,6 +182,9 @@ window.simpleFormInitialization = function (formId) {
 /**
  * Setup page change detection and navigation handlers for a form
  * @param {number} formId - Gravity Forms form ID
+ *
+ * MINIMAL FIX: Removed duplicate captureFormState() and hasActualFormChanges() functions.
+ * Now delegates navigation event handling to window.bindNavigationEventsOptimized() from Fields module.
  */
 window.setupPageChangeDetection = function (formId) {
   const $ = window.jQuery || window.$;
@@ -202,215 +205,35 @@ window.setupPageChangeDetection = function (formId) {
     return;
   }
 
-  const resultFieldIds = window.getResultFieldIds ? window.getResultFieldIds(formId, config) : [];
-  let formStateSnapshot = null;
-  let changeTimeout = null;
-  let navigationInProgress = false;
-
-  /**
-   * Capture current form state excluding result fields
-   */
-  function captureFormState() {
-    const state = {};
-    $form.find('input:visible, select:visible, textarea:visible').each(function () {
-      const $field = $(this);
-      const fieldName = $field.attr('name') || $field.attr('id');
-
-      if (fieldName) {
-        const isResultField = resultFieldIds.some(
-          id =>
-            fieldName.includes(`input_${formId}_${id}`) ||
-            fieldName === `input_${formId}_${id}` ||
-            fieldName.includes(`_${id}`)
-        );
-
-        if (!isResultField) {
-          if ($field.is(':checkbox')) {
-            state[fieldName] = $field.is(':checked') ? $field.val() : '';
-          } else {
-            state[fieldName] = $field.val() || '';
-          }
-        }
-      }
-    });
-
-    operatonDebugVerbose('Forms', 'Captured form state (excluding result fields):', Object.keys(state));
-    return state;
-  }
-
-  /**
-   * Check if there are actual user input changes (not navigation artifacts)
-   */
-  function hasActualFormChanges(oldState, newState) {
-    if (!oldState || !newState) {
-      operatonDebugVerbose('Forms', 'No previous state to compare - treating as NO change for navigation');
-      return false;
-    }
-
-    // Get all unique field names from both states
-    const allFields = new Set([...Object.keys(oldState), ...Object.keys(newState)]);
-    const changedFields = [];
-
-    for (const fieldName of allFields) {
-      const oldValue = oldState[fieldName] || '';
-      const newValue = newState[fieldName] || '';
-
-      if (oldValue !== newValue) {
-        // Filter out navigation artifacts
-        const isLikelyNavigationArtifact =
-          ((oldValue === '' && newValue !== '') || (oldValue !== '' && newValue === '')) && navigationInProgress;
-
-        // Double-check this isn't a result field
-        const isResultFieldChange = resultFieldIds.some(
-          id => fieldName.includes(`_${id}`) || fieldName.includes(`input_${formId}_${id}`)
-        );
-
-        if (!isLikelyNavigationArtifact && !isResultFieldChange) {
-          changedFields.push({
-            field: fieldName,
-            from: oldValue,
-            to: newValue,
-          });
-        }
-      }
-    }
-
-    if (changedFields.length > 0) {
-      operatonDebugVerbose('Forms', 'ACTUAL form changes detected (non-result fields):', changedFields);
-      return true;
-    }
-
-    operatonDebugVerbose('Forms', 'No actual USER INPUT changes detected');
-    return false;
-  }
-
-  // Capture initial state when ready
-  setTimeout(() => {
-    if (!formStateSnapshot) {
-      formStateSnapshot = captureFormState();
-      operatonDebugVerbose(
-        'Forms',
-        `Captured initial form state for form ${formId} with ${
-          Object.keys(formStateSnapshot).length
-        } input fields (result fields excluded)`
-      );
-    }
-  }, 500);
-
-  // Remove existing navigation handlers to prevent duplicates
-  $form.off(`.operaton-nav-${formId}`);
-
-  // Previous button handler
-  $form.on(
-    `click.operaton-nav-${formId}`,
-    'input[type="submit"][id*="gform_previous_button"], input[type="button"][id*="gform_previous_button"]',
-    function (e) {
-      operatonDebugVerbose('Forms', `PREVIOUS button clicked on form ${formId}`);
-      navigationInProgress = true;
-
-      const $currentForm = $(this).closest('form');
-      const hasExistingResults =
-        $currentForm
-          .find('input[value]:visible, textarea:not(:empty):visible, select option:selected:visible')
-          .filter(function () {
-            const fieldName = $(this).attr('name') || $(this).attr('id') || '';
-            return resultFieldIds.some(
-              id => fieldName.includes(`input_${formId}_${id}`) || fieldName.includes(`_${id}`)
-            );
-          }).length > 0;
-
-      if (hasExistingResults) {
-        operatonDebugVerbose('Forms', `PRESERVING results during PREVIOUS navigation - Form ${formId}`);
-      } else {
-        operatonDebugVerbose('Forms', `No results to preserve during PREVIOUS navigation - Form ${formId}`);
-      }
-
-      setTimeout(() => {
-        navigationInProgress = false;
-      }, 2000);
-    }
-  );
-
-  // Next button handler
-  $form.on(
-    `click.operaton-nav-${formId}`,
-    'input[type="submit"][id*="gform_next_button"], input[type="button"][id*="gform_next_button"]',
-    function (e) {
-      operatonDebugVerbose('Forms', `NEXT button clicked on form ${formId}`);
-      navigationInProgress = true;
-
-      const currentState = captureFormState();
-      const hasChanged = hasActualFormChanges(formStateSnapshot, currentState);
-
-      if (hasChanged) {
-        operatonDebugVerbose(
-          'Forms',
-          `USER CHANGES detected during NEXT navigation - Form ${formId} - clearing results`
-        );
-        if (typeof window.clearAllResultFields === 'function') {
-          window.clearAllResultFields(formId, 'User changes detected during navigation');
-        }
-        if (typeof window.clearStoredResults === 'function') {
-          window.clearStoredResults(formId);
-        }
-      } else {
-        operatonDebugVerbose('Forms', `NO user changes during NEXT navigation - Form ${formId} - preserving results`);
-      }
-
-      formStateSnapshot = currentState;
-
-      setTimeout(() => {
-        navigationInProgress = false;
-      }, 2000);
-    }
-  );
-
-  // Field change detection
-  $form.on(`change.operaton-nav-${formId} input.operaton-nav-${formId}`, 'input, select, textarea', function () {
-    const $field = $(this);
-    const fieldName = $field.attr('name') || $field.attr('id');
-
-    // Skip if it's a result field or during navigation
-    const isResultField = resultFieldIds.some(
-      id =>
-        fieldName &&
-        (fieldName.includes(`input_${formId}_${id}`) ||
-          fieldName === `input_${formId}_${id}` ||
-          fieldName.includes(`_${id}`))
-    );
-
-    if (isResultField || navigationInProgress || window.operatonPopulatingResults) {
-      operatonDebugVerbose(
-        'Forms',
-        `Skipping change handler: ${fieldName} (result field: ${isResultField}, navigation: ${navigationInProgress}, populating: ${window.operatonPopulatingResults})`
-      );
+  // Bind to Gravity Forms page load event
+  $(document).on(`gform_page_loaded.operaton_${formId}`, function (event, formIdFromEvent, currentPage) {
+    if (parseInt(formIdFromEvent) !== parseInt(formId)) {
       return;
     }
 
-    // Clear any existing timeout
-    if (changeTimeout) {
-      clearTimeout(changeTimeout);
+    operatonDebugVerbose('Forms', `📄 Page ${currentPage} loaded for form ${formId}`);
+
+    // Clear DOM cache for this form
+    if (typeof window.clearDOMCache === 'function') {
+      window.clearDOMCache(formId);
     }
 
-    // Set a debounced check for actual changes
-    changeTimeout = setTimeout(() => {
-      if (!navigationInProgress && !window.operatonPopulatingResults) {
-        const currentState = captureFormState();
-        const hasChanged = hasActualFormChanges(formStateSnapshot, currentState);
-
-        if (hasChanged) {
-          operatonDebugVerbose('Forms', `USER INPUT change detected: ${fieldName} - clearing results`);
-          if (typeof window.clearAllResultFields === 'function') {
-            window.clearAllResultFields(formId, `User input changed: ${fieldName}`);
-          }
-          if (typeof window.clearStoredResults === 'function') {
-            window.clearStoredResults(formId);
-          }
-          formStateSnapshot = currentState;
-        }
-      }
-    }, 300);
+    // Re-initialize button placement
+    if (typeof window.handleButtonPlacement === 'function') {
+      window.handleButtonPlacement(formId);
+    }
   });
+
+  // MINIMAL CHANGE: Delegate navigation event binding to Fields module
+  // This replaces ~150 lines of duplicate code that was previously here
+  if (typeof window.bindNavigationEventsOptimized === 'function') {
+    window.bindNavigationEventsOptimized(formId);
+    operatonDebugVerbose('Forms', `✅ Navigation handling delegated to Fields module for form ${formId}`);
+  } else {
+    operatonDebugMinimal('Forms', `WARNING: bindNavigationEventsOptimized not available for form ${formId}`);
+  }
+
+  operatonDebugVerbose('Forms', `✅ Page change detection setup complete for form ${formId}`);
 };
 
 // =============================================================================
@@ -427,6 +250,17 @@ window.initOperatonDMN = function () {
   }
 
   operatonDebugFrontend('Forms', '🚀 Starting Operaton DMN initialization...');
+
+  const $ = window.jQuery || window.$;
+  if (!$) {
+    operatonDebugVerbose('Forms', 'jQuery not available for initOperatonDMN');
+    return;
+  }
+
+  // Bind to Gravity Forms confirmation event
+  $(document).on('gform_confirmation_loaded', function (event, formId) {
+    operatonDebugVerbose('Forms', `Form ${formId} submitted - confirmation loaded`);
+  });
 
   // Hook into Gravity Forms events if available
   if (typeof gform !== 'undefined' && gform.addAction) {
@@ -457,6 +291,8 @@ window.initOperatonDMN = function () {
 
   // Set global flag
   window.operatonInitialized.globalInit = true;
+
+  operatonDebugFrontend('Forms', '✅ DMN system initialization complete');
 };
 
 // =============================================================================
@@ -531,7 +367,8 @@ window.operatonFormState = window.operatonFormState || {
 
 /**
  * Enhanced field logic that integrates with form system
- * Handles partner/alleenstaand and children logic without interfering with result fields
+ * Handles alleenstaand and children logic without interfering with result fields
+ * This version matches what frontend.js expects for proper override functionality
  */
 window.OperatonFieldLogic = window.OperatonFieldLogic || {
   // Track forms that have been initialized
@@ -544,7 +381,6 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
       alleenstaandField: 33,
       childField: 16,
       childrenField: 34,
-      // No radio mappings needed - we update the fields directly
     },
   },
 
@@ -581,13 +417,14 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
     this.setupEventListeners(formId, mapping, $form);
 
     this.initializedForms.add(formId);
-    operatonDebugVerbose('Forms', `Field logic initialized for form ${formId}`);
+    operatonDebugVerbose('Forms', `✅ Field logic initialized for form ${formId}`);
   },
 
   /**
    * Update alleenstaand field based on partner surname
    */
   updateAlleenstaandLogic: function (formId, mapping, $form) {
+    const $ = window.jQuery || window.$;
     const $partnerField = $form.find(`#input_${formId}_${mapping.partnerField}`);
 
     if ($partnerField.length === 0) {
@@ -601,14 +438,11 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
 
     operatonDebugVerbose('Forms', `Partner field "${partnerValue}" -> alleenstaand: ${isAlleenstaand}`);
 
-    // Update the radio field directly (field 33 is the actual radio field)
+    // Update the radio field directly
     const radioSelector = `input[name="input_${mapping.alleenstaandField}"][value="${
       isAlleenstaand ? 'true' : 'false'
     }"]`;
     const $radio = $form.find(radioSelector);
-
-    operatonDebugVerbose('Forms', `Looking for radio: ${radioSelector}`);
-    operatonDebugVerbose('Forms', `Found radio buttons: ${$radio.length}`);
 
     if ($radio.length > 0) {
       // Set flag to prevent interference
@@ -619,8 +453,6 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
       setTimeout(() => {
         window.operatonFieldLogicUpdating = false;
       }, 100);
-    } else {
-      operatonDebugVerbose('Forms', `No radio button found for alleenstaand`);
     }
   },
 
@@ -628,6 +460,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
    * Update children field based on child birthplace
    */
   updateChildrenLogic: function (formId, mapping, $form) {
+    const $ = window.jQuery || window.$;
     const $childField = $form.find(`#input_${formId}_${mapping.childField}`);
 
     if ($childField.length === 0) {
@@ -641,12 +474,9 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
 
     operatonDebugVerbose('Forms', `Child field "${childValue}" -> has children: ${hasChildren}`);
 
-    // Update the radio field directly (field 34 is the actual radio field)
+    // Update the radio field directly
     const radioSelector = `input[name="input_${mapping.childrenField}"][value="${hasChildren ? 'true' : 'false'}"]`;
     const $radio = $form.find(radioSelector);
-
-    operatonDebugVerbose('Forms', `Looking for radio: ${radioSelector}`);
-    operatonDebugVerbose('Forms', `Found radio buttons: ${$radio.length}`);
 
     if ($radio.length > 0) {
       // Set flag to prevent interference
@@ -657,8 +487,6 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
       setTimeout(() => {
         window.operatonFieldLogicUpdating = false;
       }, 100);
-    } else {
-      operatonDebugVerbose('Forms', `No radio button found for children`);
     }
   },
 
@@ -666,6 +494,7 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
    * Setup event listeners with proper integration
    */
   setupEventListeners: function (formId, mapping, $form) {
+    const $ = window.jQuery || window.$;
     const self = this;
 
     // Partner field listener
