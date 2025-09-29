@@ -1,109 +1,37 @@
 /**
- * Operaton DMN Frontend Utilities Module
- * Shared utilities, date conversion, caching helpers, and debug functions
- *
- * Dependencies: frontend-core.js
+ * Operaton DMN Frontend Utils Module
+ * Utility functions and helper methods
  *
  * @package OperatonDMN
- * @since 1.0.0
+ * @since 1.0.0-beta.18
  */
 
-operatonDebugVerbose('Frontend', 'Utils module loading...');
+operatonDebugFrontend('Utils', 'Frontend utils module loading...');
 
 // =============================================================================
-// CONFIGURATION AND CACHING UTILITIES
+// MODULE DEPENDENCY CHECK
 // =============================================================================
 
-/**
- * Get cached form configuration
- * @param {number} formId Form ID
- * @returns {object|null} Form configuration object
- */
-function getFormConfigCached(formId) {
-  // Use global cache from core module
-  const formConfigCache = window.formConfigCache || new Map();
-  const cacheKey = `config_${formId}`;
-
-  if (formConfigCache.has(cacheKey)) {
-    // Update performance stats if available
-    if (window.operatonInitialized && window.operatonInitialized.performanceStats) {
-      window.operatonInitialized.performanceStats.cacheHits++;
-    }
-    return formConfigCache.get(cacheKey);
-  }
-
-  const configVar = `operaton_config_${formId}`;
-  const config = window[configVar];
-
-  if (config) {
-    formConfigCache.set(cacheKey, config);
-  }
-
-  return config;
-}
-
-/**
- * Get current page number for a form
- * @param {number} formId Form ID
- * @returns {number} Current page number (1-based)
- */
-function getCurrentPageCached(formId) {
-  // Check URL parameters first
-  const urlParams = new URLSearchParams(window.location.search);
-  const pageParam = urlParams.get('gf_page');
-  if (pageParam) {
-    return parseInt(pageParam);
-  }
-
-  // Check form fields using cached elements
-  const $ = window.jQuery || window.$;
-  if ($) {
-    const $form = getCachedElement(`#gform_${formId}`);
-    const $pageField = $form.find(`input[name="gform_source_page_number_${formId}"]`);
-    if ($pageField.length > 0) {
-      return parseInt($pageField.val()) || 1;
-    }
-  }
-
-  return 1;
-}
-
-/**
- * Clear DOM cache for specific form or all forms
- * @param {number|null} formId Form ID to clear cache for, or null for all
- */
-function clearDOMCache(formId = null) {
-  const domQueryCache = window.domQueryCache || new Map();
-  
-  if (formId) {
-    const keysToDelete = Array.from(domQueryCache.keys()).filter(
-      key =>
-        key.includes(`_${formId}`) || 
-        key.includes(`#gform_${formId}`) || 
-        key.includes(`#operaton-evaluate-${formId}`)
-    );
-    keysToDelete.forEach(key => domQueryCache.delete(key));
-  } else {
-    domQueryCache.clear();
-  }
+// Ensure core module is loaded first
+if (!window.operatonModulesLoaded || !window.operatonModulesLoaded.core) {
+  operatonDebugMinimal('Utils', 'ERROR: Core module not loaded! Utils module requires frontend-core.js');
+  throw new Error('Operaton DMN: Core module must be loaded before Utils module');
 }
 
 // =============================================================================
-// DATE CONVERSION UTILITIES
+// DATE UTILITIES
 // =============================================================================
 
 /**
- * Convert date from various formats to ISO format (YYYY-MM-DD)
- * @param {string} dateStr Date string in various formats
- * @param {string} fieldName Field name for debugging
- * @returns {string|null} ISO formatted date or null if invalid
+ * Convert various date formats to YYYY-MM-DD format
+ * @param {string} dateStr - Date string in various formats
+ * @param {string} fieldName - Field name for debugging (optional)
+ * @returns {string} Date in YYYY-MM-DD format or original string if conversion fails
  */
-function convertDateFormat(dateStr, fieldName) {
+window.convertDateFormat = function (dateStr, fieldName) {
   if (!dateStr || dateStr === null) {
     return null;
   }
-
-  operatonDebugVerbose('Frontend', 'Converting date for field', {fieldName: fieldName, input: dateStr});
 
   // If already in ISO format (YYYY-MM-DD), return as-is
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -119,21 +47,23 @@ function convertDateFormat(dateStr, fieldName) {
     return `${year}-${month}-${day}`;
   }
 
-  // Handle DD/MM/YYYY format (with slashes)
+  // Handle DD/MM/YYYY format (with slashes) - THIS WAS THE BUG
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
     const parts = dateStr.split('/');
     const day = parts[0].padStart(2, '0');
     const month = parts[1].padStart(2, '0');
     const year = parts[2];
 
+    // FIXED: Correct order is YYYY-MM-DD, not YYYY-DD-MM
     const convertedDate = `${year}-${month}-${day}`;
-    operatonDebugVerbose('Frontend', 'DD/MM/YYYY conversion', {input: dateStr, output: convertedDate});
     return convertedDate;
   }
 
   // Handle MM/DD/YYYY format (US format)
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
-    operatonDebugVerbose('Frontend', 'Ambiguous date format detected, assuming DD/MM/YYYY', {dateStr: dateStr});
+    // Note: This creates ambiguity with DD/MM/YYYY
+    // You may need to specify which format your forms use
+    operatonDebugMinimal('Utils', 'Ambiguous date format detected:', dateStr, 'Assuming DD/MM/YYYY');
   }
 
   // Handle YYYY/MM/DD format
@@ -153,361 +83,520 @@ function convertDateFormat(dateStr, fieldName) {
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       const result = `${year}-${month}-${day}`;
-      operatonDebugVerbose('Frontend', 'Date object conversion', {input: dateStr, output: result});
       return result;
     }
   } catch (e) {
-    operatonDebugMinimal('Frontend', 'Error parsing date', {dateStr: dateStr, error: e.message || e});
+    operatonDebugMinimal('Utils', 'Error parsing date:', dateStr, e);
   }
 
-  operatonDebugVerbose('Frontend', 'Could not convert date format', {dateStr: dateStr});
+  // If all else fails, return original string
+  operatonDebugMinimal('Utils', 'Could not convert date format:', dateStr);
   return dateStr;
-}
+};
 
 // =============================================================================
-// FIELD VALIDATION UTILITIES
-// =============================================================================
-
-/**
- * Validate field value against expected type
- * @param {*} value Field value
- * @param {string} expectedType Expected data type
- * @returns {boolean} True if valid
- */
-function validateFieldType(value, expectedType) {
-  switch (expectedType) {
-    case 'Integer':
-      return /^-?\d+$/.test(value);
-    case 'Double':
-      return /^-?\d*\.?\d+$/.test(value);
-    case 'Boolean':
-      return ['true', 'false', '1', '0', 'yes', 'no'].includes(value.toString().toLowerCase());
-    case 'String':
-    default:
-      return true;
-  }
-}
-
-// =============================================================================
-// PROCESS INSTANCE UTILITIES
+// FIELD UTILITIES
 // =============================================================================
 
 /**
- * Store process instance ID for later retrieval
- * @param {number} formId Form ID
- * @param {string} processInstanceId Process instance ID
+ * Find a specific field on the current page with optimized caching
+ * @param {number} formId - Gravity Forms form ID
+ * @param {string|number} fieldId - Field ID to find
+ * @returns {jQuery|null} jQuery element or null if not found
  */
-function storeProcessInstanceId(formId, processInstanceId) {
-  if (typeof Storage !== 'undefined') {
-    sessionStorage.setItem(`operaton_process_${formId}`, processInstanceId);
-  }
-  window[`operaton_process_${formId}`] = processInstanceId;
-  operatonDebugVerbose('Frontend', 'Stored process instance ID', {formId: formId, processInstanceId: processInstanceId});
-}
-
-/**
- * Clear stored results and process data for a form
- * @param {number} formId Form ID
- */
-function clearStoredResults(formId) {
-  if (typeof Storage !== 'undefined') {
-    const keysToRemove = [
-      `operaton_dmn_result_${formId}`,
-      `operaton_dmn_eval_page_${formId}`,
-      `operaton_dmn_data_${formId}`,
-      `operaton_dmn_eval_data_${formId}`,
-      `operaton_process_${formId}`,
-    ];
-
-    keysToRemove.forEach(key => sessionStorage.removeItem(key));
-  }
-
-  delete window[`operaton_process_${formId}`];
-  operatonDebugVerbose('Frontend', 'Cleared all stored results and process data for form', {formId: formId});
-}
-
-// =============================================================================
-// RADIO BUTTON UTILITIES
-// =============================================================================
-
-/**
- * Generate possible radio button names for field detection
- * @param {string} fieldLabel Field label text
- * @param {number} fieldId Field ID
- * @returns {Array} Array of possible radio names
- */
-function generatePossibleRadioNames(fieldLabel, fieldId) {
-  const possibilities = [];
-
-  if (fieldLabel) {
-    const cleanLabel = fieldLabel
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, '')
-      .trim();
-
-    if (cleanLabel) {
-      possibilities.push(cleanLabel);
-      possibilities.push(`aanvrager${cleanLabel.charAt(0).toUpperCase() + cleanLabel.slice(1)}`);
-    }
-  }
-
-  possibilities.push(`field_${fieldId}`);
-  possibilities.push(`input_${fieldId}`);
-
-  return possibilities;
-}
-
-/**
- * Force synchronization of radio buttons with hidden fields
- * @param {number} formId Form ID
- */
-function forceSyncRadioButtons(formId) {
-  const $ = window.jQuery || window.$;
-  if (!$) {
-    operatonDebugMinimal('Frontend', 'jQuery not available for forceSyncRadioButtons');
-    return;
-  }
-
-  const $form = getCachedElement(`#gform_${formId}`);
-  const config = getFormConfigCached(formId);
-
-  if (!config || !config.field_mappings) {
-    return;
-  }
-
-  Object.entries(config.field_mappings).forEach(([dmnVariable, mapping]) => {
-    const fieldId = mapping.field_id;
-    const $hiddenField = $form.find(`#input_${formId}_${fieldId}`);
-
-    if ($hiddenField.length > 0) {
-      const $radioChecked = $(`input[name="${dmnVariable}"]:checked`);
-      if ($radioChecked.length > 0) {
-        const radioValue = $radioChecked.val();
-        const hiddenValue = $hiddenField.val();
-
-        if (radioValue !== hiddenValue) {
-          $hiddenField.val(radioValue);
-          $hiddenField.trigger('change');
-        }
-      }
-    }
-  });
-}
-
-/**
- * Find custom radio value with optimized detection
- * @param {number} formId Form ID
- * @param {number} fieldId Field ID
- * @returns {*} Radio value or null
- */
-function findCustomRadioValueOptimized(formId, fieldId) {
-  const $ = window.jQuery || window.$;
-  if (!$) {
-    operatonDebugMinimal('Frontend', 'jQuery not available for findCustomRadioValueOptimized');
-    return null;
-  }
-
-  const $form = getCachedElement(`#gform_${formId}`);
-  const $hiddenField = $form.find(`#input_${formId}_${fieldId}`);
-
-  if ($hiddenField.length > 0) {
-    const $fieldContainer = $hiddenField.closest('.gfield');
-    if ($fieldContainer.length > 0) {
-      const fieldLabel = $fieldContainer.find('label').first().text().toLowerCase();
-      const possibleRadioNames = generatePossibleRadioNames(fieldLabel, fieldId);
-
-      for (const radioName of possibleRadioNames) {
-        const $radioChecked = $(`input[name="${radioName}"]:checked`);
-        if ($radioChecked.length > 0) {
-          const value = $radioChecked.val();
-
-          if ($hiddenField.val() !== value) {
-            $hiddenField.val(value);
-            $hiddenField.trigger('change');
-          }
-
-          return value;
-        }
-      }
-    }
-  }
-
-  // Check using DMN variable name
-  const config = getFormConfigCached(formId);
-  if (config && config.field_mappings) {
-    let targetDmnVariable = null;
-    Object.entries(config.field_mappings).forEach(([dmnVariable, mapping]) => {
-      if (mapping.field_id == fieldId) {
-        targetDmnVariable = dmnVariable;
-      }
-    });
-
-    if (targetDmnVariable) {
-      const $radioChecked = $(`input[type="radio"][name="${targetDmnVariable}"]:checked`);
-      if ($radioChecked.length > 0) {
-        const value = $radioChecked.val();
-
-        const $hiddenField = $form.find(`#input_${formId}_${fieldId}`);
-        if ($hiddenField.length > 0 && $hiddenField.val() !== value) {
-          $hiddenField.val(value);
-          $hiddenField.trigger('change');
-        }
-
-        return value;
-      }
-    }
-  }
-
-  return null;
-}
-
-// =============================================================================
-// FIELD DETECTION AND OPTIMIZATION
-// =============================================================================
-
-/**
- * Find field on current page with caching and multiple strategies
- * @param {number} formId Form ID
- * @param {number} fieldId Field ID
- * @returns {jQuery|null} Field element or null
- */
-function findFieldOnCurrentPageOptimized(formId, fieldId) {
+window.findFieldOnCurrentPageOptimized = function (formId, fieldId) {
   const cacheKey = `field_${formId}_${fieldId}`;
-  const domQueryCache = window.domQueryCache || new Map();
-  const cached = domQueryCache.get(cacheKey);
+  const cached = window.operatonCaches.domQueryCache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < 3000) {
     return cached.element;
   }
 
   const $ = window.jQuery || window.$;
-  if (!$) {
+  const $form = window.getCachedElement(`#gform_${formId}`);
+
+  if (!$form.length) {
     return null;
   }
 
-  let $field = $(`#input_${formId}_${fieldId}`);
-  if ($field.length === 0) {
-    $field = $(`[name="input_${formId}_${fieldId}"]`);
-  }
-  if ($field.length === 0) {
-    $field = $(`[id*="${fieldId}"][id*="${formId}"]`);
+  // Primary selectors - try direct field access first
+  const primarySelectors = [
+    `#input_${formId}_${fieldId}`, // Direct field ID
+    `#field_${formId}_${fieldId} input:visible`, // Field container with input
+    `#field_${formId}_${fieldId} select:visible`, // Field container with select
+    `#field_${formId}_${fieldId} textarea:visible`, // Field container with textarea
+    `input[name="input_${formId}_${fieldId}"]:visible`, // Input by name
+    `select[name="input_${formId}_${fieldId}"]:visible`, // Select by name
+    `textarea[name="input_${formId}_${fieldId}"]:visible`, // Textarea by name
+  ];
+
+  // Try primary selectors first
+  for (const selector of primarySelectors) {
+    const $field = $form.find(selector);
+    if ($field.length > 0) {
+      window.operatonCaches.domQueryCache.set(cacheKey, {
+        element: $field.first(),
+        timestamp: Date.now(),
+      });
+      operatonDebugVerbose('Utils', `Field ${fieldId} found with selector: ${selector}`);
+      return $field.first();
+    }
   }
 
-  domQueryCache.set(cacheKey, {
-    element: $field,
-    timestamp: Date.now(),
-  });
+  // Fallback: check if it's a result display field from config
+  const config = window.getFormConfigCached(formId);
+  if (config && config.result_display_field && fieldId == config.result_display_field) {
+    const configSelectors = [
+      `#field_${formId}_${config.result_display_field} input:visible`,
+      `#field_${formId}_${config.result_display_field} select:visible`,
+      `#field_${formId}_${config.result_display_field} textarea:visible`,
+      `input[name="input_${formId}_${config.result_display_field}"]`,
+      `select[name="input_${formId}_${config.result_display_field}"]`,
+      `textarea[name="input_${formId}_${config.result_display_field}"]`,
+    ];
 
-  return $field;
-}
+    for (const selector of configSelectors) {
+      const $field = $form.find(`${selector}:visible`);
+      if ($field.length > 0) {
+        window.operatonCaches.domQueryCache.set(cacheKey, {
+          element: $field.first(),
+          timestamp: Date.now(),
+        });
+        operatonDebugVerbose('Utils', `Result field ${fieldId} found with config selector: ${selector}`);
+        return $field.first();
+      }
+    }
+  }
+
+  // Legacy fallback detection strategies for older field types
+  const detectionStrategies = [
+    () =>
+      $form
+        .find('label:visible')
+        .filter(function () {
+          const text = $(this).text().toLowerCase().trim();
+          return text === 'desired dish' || text === 'result' || text === 'desireddish';
+        })
+        .closest('.gfield')
+        .find('input:visible, select:visible, textarea:visible')
+        .first(),
+
+    () =>
+      $form
+        .find(
+          'input:visible[name*="dish"], input:visible[id*="dish"], select:visible[name*="dish"], select:visible[id*="dish"], textarea:visible[name*="dish"], textarea:visible[id*="dish"]'
+        )
+        .first(),
+
+    () =>
+      $form
+        .find(
+          'input:visible[name*="result"], input:visible[id*="result"], select:visible[name*="result"], select:visible[id*="result"], textarea:visible[name*="result"], textarea:visible[id*="result"]'
+        )
+        .first(),
+  ];
+
+  for (const strategy of detectionStrategies) {
+    const $field = strategy();
+    if ($field && $field.length > 0) {
+      window.operatonCaches.domQueryCache.set(cacheKey, {
+        element: $field,
+        timestamp: Date.now(),
+      });
+      operatonDebugVerbose('Utils', `Field ${fieldId} found with legacy strategy`);
+      return $field;
+    }
+  }
+
+  operatonDebugVerbose('Utils', `Field ${fieldId} not found with any selector`);
+  return null;
+};
 
 // =============================================================================
-// DEBUG AND TESTING FUNCTIONS
+// ASYNC UTILITIES
 // =============================================================================
 
 /**
- * Test delegation system availability
- * Used for debugging and system verification
+ * Wait for operaton_ajax configuration to be available
+ * @param {Function} callback - Function to call when operaton_ajax is ready
+ * @param {number} maxAttempts - Maximum number of attempts (default: 50)
  */
-window.testDelegation = function() {
-  operatonDebugVerbose('Frontend', 'Testing delegation availability');
-  operatonDebugVerbose('Frontend', 'operatonButtonManager available', {
-    available: typeof window.operatonButtonManager !== 'undefined'
-  });
-  operatonDebugVerbose('Frontend', 'handleEvaluateClick available', {
-    available: typeof window.handleEvaluateClick !== 'undefined'
-  });
-  
-  const shouldDelegate = typeof window.operatonButtonManager !== 'undefined' && 
-                         typeof window.handleEvaluateClick !== 'undefined';
-  
-  operatonDebugVerbose('Frontend', 'Should delegate', {shouldDelegate: shouldDelegate});
-  
-  return {
-    operatonButtonManager: typeof window.operatonButtonManager !== 'undefined',
-    handleEvaluateClick: typeof window.handleEvaluateClick !== 'undefined',
-    shouldDelegate: shouldDelegate
+window.waitForOperatonAjax = function (callback, maxAttempts = 50) {
+  let attempts = 0;
+
+  function check() {
+    attempts++;
+
+    if (typeof window.operaton_ajax !== 'undefined' && window.operaton_ajax.ajax_url) {
+      callback();
+    } else if (attempts < maxAttempts) {
+      if (attempts % 10 === 0) {
+        operatonDebugVerbose('Utils', `Waiting for operaton_ajax... (attempt ${attempts})`);
+      }
+      const delay = Math.min(100 * Math.pow(1.1, attempts), 1000);
+      setTimeout(check, delay);
+    } else {
+      operatonDebugMinimal('Utils', `❌ operaton_ajax not found after ${maxAttempts} attempts`);
+      callback();
+    }
+  }
+  check();
+};
+
+/**
+ * Wait for jQuery to be available
+ * @param {Function} callback - Function to call when jQuery is ready
+ * @param {number} maxAttempts - Maximum number of attempts (default: 50)
+ */
+window.waitForJQuery = function (callback, maxAttempts = 50) {
+  let attempts = 0;
+
+  function check() {
+    attempts++;
+
+    if (typeof jQuery !== 'undefined') {
+      callback();
+    } else if (attempts < maxAttempts) {
+      if (attempts % 10 === 0) {
+        operatonDebugVerbose('Utils', `Waiting for jQuery... (attempt ${attempts})`);
+      }
+      const delay = Math.min(100 * Math.pow(1.1, attempts), 1000);
+      setTimeout(check, delay);
+    } else {
+      operatonDebugMinimal('Utils', `❌ jQuery not found after ${maxAttempts} attempts`);
+    }
+  }
+  check();
+};
+
+// =============================================================================
+// ERROR HANDLING UTILITIES
+// =============================================================================
+
+/**
+ * Show error message to user
+ * @param {string} message - Error message to display
+ * @param {string} type - Error type ('error', 'warning', 'info')
+ */
+window.showError = function (message, type = 'error') {
+  const errorDiv = document.createElement('div');
+
+  const styles = {
+    error: 'background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;',
+    warning: 'background: #fff3cd; color: #856404; border: 1px solid #ffeaa7;',
+    info: 'background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb;',
+  };
+
+  errorDiv.style.cssText = `${styles[type]} padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 14px;`;
+  errorDiv.textContent = message;
+
+  const forms = document.querySelectorAll('form[id^="gform_"]');
+  if (forms.length > 0) {
+    forms[0].insertBefore(errorDiv, forms[0].firstChild);
+
+    // Auto-remove after 10 seconds for non-critical messages
+    if (type !== 'error') {
+      setTimeout(() => {
+        if (errorDiv.parentNode) {
+          errorDiv.parentNode.removeChild(errorDiv);
+        }
+      }, 10000);
+    }
+  }
+
+  operatonDebugMinimal('Utils', `${type.toUpperCase()} shown: ${message}`);
+};
+
+/**
+ * Show success message to user
+ * @param {string} message - Success message to display
+ */
+window.showSuccess = function (message) {
+  const successDiv = document.createElement('div');
+  successDiv.style.cssText =
+    'background: #d4edda; color: #155724; padding: 10px; border: 1px solid #c3e6cb; border-radius: 4px; margin: 10px 0; font-size: 14px;';
+  successDiv.textContent = message;
+
+  const forms = document.querySelectorAll('form[id^="gform_"]');
+  if (forms.length > 0) {
+    forms[0].insertBefore(successDiv, forms[0].firstChild);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (successDiv.parentNode) {
+        successDiv.parentNode.removeChild(successDiv);
+      }
+    }, 5000);
+  }
+
+  operatonDebugVerbose('Utils', `SUCCESS shown: ${message}`);
+};
+
+/**
+ * Get result field IDs for a specific form based on configuration
+ * @param {number} formId - Gravity Forms form ID
+ * @returns {Array} Array of result field IDs
+ */
+window.getResultFieldIds = function (formId) {
+  const config = window.getFormConfigCached(formId);
+  const resultFieldIds = [];
+
+  if (!config) {
+    operatonDebugMinimal('Utils', `No configuration found for form ${formId}`);
+    return resultFieldIds;
+  }
+
+  // Primary: result_field_ids from config (most reliable)
+  if (config.result_field_ids && Array.isArray(config.result_field_ids)) {
+    config.result_field_ids.forEach(fieldId => {
+      const normalizedId = parseInt(fieldId);
+      if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
+        resultFieldIds.push(normalizedId);
+      }
+    });
+  }
+
+  // Secondary: result_mappings (more reliable than field_mappings for results)
+  if (config.result_mappings && typeof config.result_mappings === 'object') {
+    Object.values(config.result_mappings).forEach(mapping => {
+      if (mapping && mapping.field_id) {
+        const normalizedId = parseInt(mapping.field_id);
+        if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
+          resultFieldIds.push(normalizedId);
+        }
+      }
+    });
+  }
+
+  // Tertiary: STRICT filtering from field_mappings - only clear result variables
+  if (config.field_mappings && typeof config.field_mappings === 'object') {
+    Object.entries(config.field_mappings).forEach(([dmnVariable, mapping]) => {
+      if (mapping && mapping.field_id) {
+        // ONLY include variables that clearly start with result indicators
+        if (dmnVariable.startsWith('aanmerking')) {
+          const normalizedId = parseInt(mapping.field_id);
+          if (!isNaN(normalizedId) && !resultFieldIds.includes(normalizedId)) {
+            resultFieldIds.push(normalizedId);
+          }
+        }
+      }
+    });
+  }
+
+  operatonDebugVerbose('Utils', `Result field IDs for form ${formId}:`, resultFieldIds);
+  return resultFieldIds;
+};
+
+// =============================================================================
+// VALIDATION UTILITIES
+// =============================================================================
+
+/**
+ * Validate email format
+ * @param {string} email - Email address to validate
+ * @returns {boolean} True if valid email format
+ */
+window.validateEmail = function (email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+/**
+ * Validate date format (DD/MM/YYYY or YYYY-MM-DD)
+ * @param {string} dateStr - Date string to validate
+ * @returns {boolean} True if valid date format
+ */
+window.validateDate = function (dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') {
+    return false;
+  }
+
+  // Check common formats
+  const formats = [
+    /^\d{1,2}\/\d{1,2}\/\d{4}$/, // DD/MM/YYYY
+    /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
+    /^\d{4}\/\d{1,2}\/\d{1,2}$/, // YYYY/MM/DD
+  ];
+
+  const matchesFormat = formats.some(format => format.test(dateStr));
+  if (!matchesFormat) {
+    return false;
+  }
+
+  // Try to parse with JavaScript Date
+  try {
+    const converted = window.convertDateFormat(dateStr);
+    const date = new Date(converted);
+    return !isNaN(date.getTime());
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
+ * Validate numeric input
+ * @param {string|number} value - Value to validate
+ * @param {Object} options - Validation options (min, max, decimals)
+ * @returns {boolean} True if valid number
+ */
+window.validateNumber = function (value, options = {}) {
+  const num = parseFloat(value);
+
+  if (isNaN(num)) {
+    return false;
+  }
+
+  if (options.min !== undefined && num < options.min) {
+    return false;
+  }
+
+  if (options.max !== undefined && num > options.max) {
+    return false;
+  }
+
+  if (options.decimals === 0 && num !== Math.floor(num)) {
+    return false;
+  }
+
+  return true;
+};
+
+// =============================================================================
+// STRING UTILITIES
+// =============================================================================
+
+/**
+ * Safely escape HTML to prevent XSS
+ * @param {string} text - Text to escape
+ * @returns {string} HTML-escaped text
+ */
+window.escapeHtml = function (text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+};
+
+/**
+ * Truncate text to specified length
+ * @param {string} text - Text to truncate
+ * @param {number} maxLength - Maximum length
+ * @param {string} suffix - Suffix to add (default: '...')
+ * @returns {string} Truncated text
+ */
+window.truncateText = function (text, maxLength, suffix = '...') {
+  if (!text || text.length <= maxLength) {
+    return text;
+  }
+
+  return text.substring(0, maxLength - suffix.length) + suffix;
+};
+
+/**
+ * Convert string to slug format
+ * @param {string} text - Text to convert
+ * @returns {string} Slug format string
+ */
+window.toSlug = function (text) {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-');
+};
+
+// =============================================================================
+// PERFORMANCE UTILITIES
+// =============================================================================
+
+/**
+ * Debounce function execution
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Wait time in milliseconds
+ * @param {boolean} immediate - Execute immediately on first call
+ * @returns {Function} Debounced function
+ */
+window.debounce = function (func, wait, immediate) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      timeout = null;
+      if (!immediate) func.apply(this, args);
+    };
+    const callNow = immediate && !timeout;
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+    if (callNow) func.apply(this, args);
   };
 };
 
 /**
- * Get comprehensive debug information
- * Returns system state for troubleshooting
+ * Throttle function execution
+ * @param {Function} func - Function to throttle
+ * @param {number} limit - Time limit in milliseconds
+ * @returns {Function} Throttled function
  */
-window.operatonDebugFixed = function () {
-  const stats = window.operatonInitialized?.performanceStats || {};
-  const domQueryCache = window.domQueryCache || new Map();
-  const formConfigCache = window.formConfigCache || new Map();
+window.throttle = function (func, limit) {
+  let inThrottle;
+  return function (...args) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  };
+};
 
-  const debugInfo = {
-    initializationState: window.operatonInitialized,
-    performanceStats: stats,
-    cacheStats: {
-      domCache: domQueryCache.size,
-      configCache: formConfigCache.size,
-      buttonCache: window.operatonButtonManager?.buttonCache?.size || 0,
+// =============================================================================
+// UTILS DEBUG FUNCTIONS
+// =============================================================================
+
+/**
+ * Debug function to test utility functions
+ * @returns {Object} Test results
+ */
+window.operatonDebugUtils = function () {
+  const utilsInfo = {
+    availableFunctions: {
+      convertDateFormat: typeof window.convertDateFormat,
+      findFieldOnCurrentPageOptimized: typeof window.findFieldOnCurrentPageOptimized,
+      getResultFieldIds: typeof window.getResultFieldIds,
+      waitForOperatonAjax: typeof window.waitForOperatonAjax,
+      waitForJQuery: typeof window.waitForJQuery,
+      showError: typeof window.showError,
+      showSuccess: typeof window.showSuccess,
+      validateEmail: typeof window.validateEmail,
+      validateDate: typeof window.validateDate,
+      validateNumber: typeof window.validateNumber,
+      escapeHtml: typeof window.escapeHtml,
+      truncateText: typeof window.truncateText,
+      toSlug: typeof window.toSlug,
+      debounce: typeof window.debounce,
+      throttle: typeof window.throttle,
     },
-    status: 'modular - utils module active',
+    testResults: {
+      dateConversion: window.convertDateFormat('23-01-1980'),
+      emailValidation: window.validateEmail('test@example.com'),
+      numberValidation: window.validateNumber('123.45'),
+      htmlEscape: window.escapeHtml('<script>alert("test")</script>'),
+      textTruncation: window.truncateText('This is a long text', 10),
+      slugConversion: window.toSlug('Hello World 123!'),
+      resultFieldIds: window.getResultFieldIds(2), // Test with form 2
+    },
+    moduleStatus: 'utils-module-active',
   };
 
-  operatonDebugVerbose('Frontend', 'Debug Info', debugInfo);
-
-  return {
-    status: 'modular',
-    initialized: window.operatonInitialized?.globalInit || false,
-    performance: stats,
-    caches: debugInfo.cacheStats,
-  };
+  operatonDebugVerbose('Utils', 'Utils Debug Info:', utilsInfo);
+  return utilsInfo;
 };
 
 // =============================================================================
-// MODULE EXPORTS AND GLOBAL REGISTRATION
+// MODULE COMPLETION FLAG
 // =============================================================================
 
-/**
- * Export utility functions for other modules to use
- */
-window.OperatonUtils = {
-  // Configuration utilities
-  getFormConfigCached: getFormConfigCached,
-  getCurrentPageCached: getCurrentPageCached,
-  clearDOMCache: clearDOMCache,
-  
-  // Date utilities
-  convertDateFormat: convertDateFormat,
-  
-  // Validation utilities
-  validateFieldType: validateFieldType,
-  
-  // Process utilities
-  storeProcessInstanceId: storeProcessInstanceId,
-  clearStoredResults: clearStoredResults,
-  
-  // Radio button utilities
-  generatePossibleRadioNames: generatePossibleRadioNames,
-  forceSyncRadioButtons: forceSyncRadioButtons,
-  findCustomRadioValueOptimized: findCustomRadioValueOptimized,
-  
-  // Field utilities
-  findFieldOnCurrentPageOptimized: findFieldOnCurrentPageOptimized,
-  
-  // Debug utilities
-  testDelegation: window.testDelegation,
-  getDebugInfo: window.operatonDebugFixed
-};
+// Mark Utils module as loaded
+window.operatonModulesLoaded = window.operatonModulesLoaded || {};
+window.operatonModulesLoaded.utils = true;
 
-// Make key functions globally accessible for backward compatibility
-window.getFormConfigCached = getFormConfigCached;
-window.getCurrentPageCached = getCurrentPageCached;
-window.clearDOMCache = clearDOMCache;
-window.convertDateFormat = convertDateFormat;
-window.validateFieldType = validateFieldType;
-window.storeProcessInstanceId = storeProcessInstanceId;
-window.clearStoredResults = clearStoredResults;
-window.generatePossibleRadioNames = generatePossibleRadioNames;
-window.forceSyncRadioButtons = forceSyncRadioButtons;
-window.findCustomRadioValueOptimized = findCustomRadioValueOptimized;
-window.findFieldOnCurrentPageOptimized = findFieldOnCurrentPageOptimized;
-
-operatonDebugVerbose('Frontend', 'Utils module loaded - Production version');
+operatonDebugFrontend('Utils', 'Frontend utils module loaded successfully');
