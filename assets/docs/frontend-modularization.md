@@ -275,7 +275,7 @@ assets/js/
 ├── frontend-utils.js
 ├── frontend-fields.js
 ├── frontend-ui.js
-├── frontend-forms.js (reduced by ~150 lines)
+├── frontend-forms.js
 ├── frontend-evaluation.js
 ├── frontend.js (main integration)
 ├── gravity-forms.js
