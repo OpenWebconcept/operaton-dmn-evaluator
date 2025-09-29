@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - [Issue #66](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/66) - Enhance debug system
 - [Issue #67](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/67) - Create a global Debug Manager Class
 - [Issue #68](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/68) - Eliminate debug data dump of a WordPress Hook object
+- [Issue #73](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/73) - Enhance the debug system to automatically include console.log during development
 
 ### Frontend Modularization
 The monolithic frontend.js file has been refactored into 7 focused, maintainable modules with clear separation of concerns. All functionality has been preserved, all tests pass.
@@ -38,7 +39,11 @@ The newly added `Operaton_DMN_API_Debug_Enhanced` trait provides a comprehensive
 - ✅ **Debug Utilities:** Configuration reporting and cache management
 - ✅ **Emergency Logging:** Critical error logging that bypasses restrictions
 
+### Enhanced Console Logging (Development Mode)
+The JavaScript debug system automatically includes browser console logging during development, providing beautiful formatted output with emojis and colors. Console logging and AJAX logging work in parallel - console output for immediate feedback, AJAX for persistent WordPress error log entries.
+
 See [Debudg Trait Documentation](./assets/docs/debug-trait-documentation.md).
+
 
 ### Architecture
 Refactored the massive API class into a clean, maintainable trait-based architecture. Benefits achieved:
