@@ -205,7 +205,8 @@ if (window.OperatonDebugConfig) {
     // Configuration includes:
     // - ajax_url: WordPress AJAX endpoint
     // - nonce: Security nonce for requests
-    // - debug_level: Current debug level
+    // - debug_level: Current debug level (0-4)
+    // - wp_debug: WP_DEBUG constant status
     // - components: Available component identifiers
 }
 ```
@@ -222,9 +223,122 @@ jQuery.post(OperatonDebugConfig.ajax_url, {
     level: 2 // Standard level
 });
 
-// Buffered logging for performance
-operaton_debug_js('Frontend', 'User interaction', interactionData);
+// Convenience functions for different debug levels
+operatonDebugMinimal('Frontend', 'Critical error occurred', errorData);
+operatonDebugStandard('Frontend', 'Normal operation', operationData);
+operatonDebugVerbose('Frontend', 'Detailed information', detailData);
+operatonDebugDiagnostic('Frontend', 'Full diagnostic data', diagnosticData);
 ```
+
+### Enhanced Console Logging (Development Mode)
+
+The JavaScript debug system automatically includes browser console logging during development, providing beautiful formatted output with emojis and colors. Console logging and AJAX logging work in parallel - console output for immediate feedback, AJAX for persistent WordPress error log entries.
+
+#### Development Mode Detection
+
+The `operatonIsDevMode()` function (accessible via `window.operatonIsDevMode()`) determines whether development mode is active. Development mode returns **true** when **ANY** of the following conditions are met:
+
+**1. Debug Flag Enabled**
+```javascript
+window.operaton_ajax && window.operaton_ajax.debug === true
+```
+When the PHP backend sets the debug flag in the localized `operaton_ajax` object.
+
+**2. High Debug Level**
+```javascript
+window.OperatonDebugConfig && window.OperatonDebugConfig.debug_level > 2
+```
+When debug level is VERBOSE (3) or DIAGNOSTIC (4). STANDARD (2) and below are not considered development mode.
+
+**3. Localhost Domain**
+```javascript
+window.location.hostname.includes('localhost')
+```
+Any hostname containing "localhost" (e.g., `localhost`, `localhost:8080`)
+
+**4. Local Development Domain**
+```javascript
+window.location.hostname.includes('.local')
+```
+Any hostname containing ".local" (e.g., `mysite.local`, `dev.mysite.local`)
+
+**5. Development Domain Pattern**
+```javascript
+window.location.hostname.includes('dev')
+```
+Any hostname containing "dev" (e.g., `dev.mysite.com`, `development.example.com`)
+
+**6. WordPress Debug Mode**
+```javascript
+window.OperatonDebugConfig && window.OperatonDebugConfig.wp_debug === true
+```
+When WordPress `WP_DEBUG` constant is enabled in PHP configuration.
+
+#### Development Mode Behavior
+
+When `operatonIsDevMode()` returns `true`:
+- ✅ **Console logs appear automatically** with beautiful formatted output
+- ✅ **Color-coded by level**: Minimal (red), Standard (green), Verbose (blue), Diagnostic (purple)
+- ✅ **Enhanced with emojis**: 🚨 Minimal, 🔧 Standard, 📝 Verbose, 🔍 Diagnostic
+- ✅ **No duplicate logs** - console output replaces fallback mechanisms
+- ✅ **AJAX still sends to PHP** - logs appear in both console and WordPress error log
+
+When `operatonIsDevMode()` returns `false`:
+- ❌ **No console output** (production mode)
+- ✅ **AJAX logs to PHP** - logs only appear in WordPress error log
+- ✅ **Fallback to console only if AJAX fails** - graceful degradation
+
+#### Testing Development Mode
+
+```javascript
+// Check if in development mode
+console.log('Development mode:', operatonIsDevMode());
+
+// View full debug configuration
+console.log('Debug config:', operatonGetDebugConfig());
+
+// Test individual detection conditions
+console.log('Hostname:', window.location.hostname);
+console.log('operaton_ajax.debug:', window.operaton_ajax?.debug);
+console.log('Debug level:', window.OperatonDebugConfig?.debug_level);
+console.log('WP_DEBUG:', window.OperatonDebugConfig?.wp_debug);
+
+// Test the debug system with all levels
+operatonTestDebug();
+```
+
+#### Practical Examples
+
+```javascript
+// Production site (mysite.com)
+// - Debug level: STANDARD (2)
+// - WP_DEBUG: false
+// - operaton_ajax.debug: false
+// Result: operatonIsDevMode() === false (no console output)
+
+// Development site (mysite.local)
+// - Hostname contains ".local"
+// Result: operatonIsDevMode() === true (console output enabled)
+
+// Staging with high debug (staging.mysite.com)
+// - Debug level: VERBOSE (3)
+// Result: operatonIsDevMode() === true (console output enabled)
+
+// Local development (localhost:8080)
+// - Hostname contains "localhost"
+// Result: operatonIsDevMode() === true (console output enabled)
+```
+
+#### Smart Duplicate Prevention
+
+The system intelligently prevents duplicate console logs:
+
+1. **In development mode**: Console logs appear via `devConsoleLog()`, fallbacks are skipped
+2. **AJAX available**: Logs sent to PHP, console used only in dev mode
+3. **AJAX fails in production**: Fallback to `consoleFallback()` only if not in dev mode
+4. **AJAX fails in development**: No fallback needed, console already has logs from `devConsoleLog()`
+
+This ensures you never see duplicate console entries while maintaining reliability across all scenarios.
 
 ## Configuration and Environment Detection
 
@@ -239,9 +353,9 @@ define('OPERATON_DEBUG_LEVEL', 3); // Plugin-specific level override
 ### Environment-Aware Configuration
 The debug manager automatically detects development environments and adjusts logging levels:
 
-#### Development Environment Detection
+#### Development Environment Detection (PHP)
 - **localhost** domains
-- **.local**, **.dev**, **.test** domains  
+- **.local**, **.dev**, **.test** domains
 - **test.open-regels-lab.nl** (project-specific)
 - **open-regels-lab** patterns
 
@@ -251,8 +365,6 @@ The debug manager automatically detects development environments and adjusts log
 // Production environments respect explicit configuration
 // Staging environments can use custom OPERATON_DEBUG_LEVEL definition
 ```
-
-
 
 ## Performance Considerations
 

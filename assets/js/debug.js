@@ -5,6 +5,8 @@
  * All debug calls from JavaScript are transmitted via AJAX to appear in the
  * WordPress error log with proper component organization and level control.
  *
+ * ENHANCED: Now automatically includes console.log during development
+ *
  * @package OperatonDMN
  * @since 1.0.0
  */
@@ -24,6 +26,78 @@
   var DEBUG_LEVEL_STANDARD = 2;
   var DEBUG_LEVEL_VERBOSE = 3;
   var DEBUG_LEVEL_DIAGNOSTIC = 4;
+
+  /**
+   * Check if we're in development mode
+   * @returns {boolean} True if in development mode
+   */
+  function isDevelopmentMode() {
+    return (
+      // Check if operaton_ajax debug flag is set
+      (window.operaton_ajax && window.operaton_ajax.debug) ||
+      // Check if debug config indicates debug mode
+      (window.OperatonDebugConfig && window.OperatonDebugConfig.debug_level > DEBUG_LEVEL_STANDARD) ||
+      // Check for localhost/dev domains
+      window.location.hostname.includes('localhost') ||
+      window.location.hostname.includes('.local') ||
+      window.location.hostname.includes('dev') ||
+      // Check for WP_DEBUG indicator
+      (window.OperatonDebugConfig && window.OperatonDebugConfig.wp_debug)
+    );
+  }
+
+  /**
+   * Development mode console output with beautiful formatting
+   */
+  function devConsoleLog(component, message, data, level) {
+    var styles = {
+      1: 'color: #ef4444; font-weight: bold;', // Red for minimal
+      2: 'color: #10b981;', // Green for standard
+      3: 'color: #3b82f6;', // Blue for verbose
+      4: 'color: #a855f7;', // Purple for diagnostic
+    };
+
+    var emojis = {
+      1: '🚨',
+      2: '🔧',
+      3: '📝',
+      4: '🔍',
+    };
+
+    var emoji = emojis[level] || '📋';
+    var style = styles[level] || '';
+    var logMessage = emoji + ' [' + component + '] ' + message;
+
+    if (data) {
+      console.log('%c' + logMessage, style, data);
+    } else {
+      console.log('%c' + logMessage, style);
+    }
+  }
+
+  /**
+   * Console fallback with better formatting
+   */
+  function consoleFallback(component, message, data, level) {
+    var levelNames = {
+      1: '[MIN]',
+      2: '',
+      3: '[VERBOSE]',
+      4: '[DIAG]',
+    };
+
+    var levelName = levelNames[level] || '';
+    var logMessage = '[Operaton ' + component + '] ' + levelName + (levelName ? ' ' : '') + message;
+
+    // Use appropriate console method based on level
+    if (level === DEBUG_LEVEL_MINIMAL) {
+      console.error(logMessage, data || '');
+    } else if (level === DEBUG_LEVEL_VERBOSE || level === DEBUG_LEVEL_DIAGNOSTIC) {
+      console.log(logMessage, data || '');
+    } else {
+      console.log(logMessage, data || '');
+    }
+  }
 
   /**
    * Main JavaScript debug function
@@ -46,23 +120,34 @@
       return;
     }
 
+    // ENHANCEMENT: Always console.log during development mode
+    // This provides immediate visual feedback without waiting for AJAX
+    if (isDevelopmentMode()) {
+      devConsoleLog(component, message, data, level);
+    }
+
     // Check if debug config is available
     if (typeof window.OperatonDebugConfig === 'undefined') {
-      // Fallback to console if config not available
-      consoleFallback(component, message, data, level);
-      return;
+      // Only fallback to console if NOT in development mode (to avoid duplicates)
+      if (!isDevelopmentMode()) {
+        consoleFallback(component, message, data, level);
+      }
+      // Don't return - we still want to attempt other methods
+      // FIXED: Don't return early here - continue to try AJAX if possible
+      // return; // ❌ REMOVED - This was causing the bug!
     }
 
     // Check if current debug level allows this message
-    if (level > window.OperatonDebugConfig.debug_level) {
+    // Only skip if config is available and level is too high
+    if (window.OperatonDebugConfig && level > window.OperatonDebugConfig.debug_level) {
       return; // Skip if level too high
     }
 
     // Send via AJAX using the actual action name from debug manager
-    if (typeof jQuery !== 'undefined') {
+    if (typeof jQuery !== 'undefined' && window.OperatonDebugConfig) {
       sendAjaxLog(component, message, data, level);
-    } else {
-      // Fallback to console if jQuery not available
+    } else if (!isDevelopmentMode()) {
+      // Only fallback to console if NOT in development mode (to avoid duplicates)
       consoleFallback(component, message, data, level);
     }
   };
@@ -81,34 +166,12 @@
         level: level,
       })
       .fail(function (xhr, status, error) {
-        // Fallback to console if AJAX fails
-        console.warn('Operaton Debug: AJAX failed, using console fallback');
-        consoleFallback(component, message, data, level);
+        // Fallback to console if AJAX fails (only if not in dev mode to avoid duplicates)
+        if (!isDevelopmentMode()) {
+          console.warn('Operaton Debug: AJAX failed, using console fallback');
+          consoleFallback(component, message, data, level);
+        }
       });
-  }
-
-  /**
-   * Console fallback for when AJAX is not available or fails
-   */
-  function consoleFallback(component, message, data, level) {
-    var levelNames = {
-      1: '[MIN]',
-      2: '',
-      3: '[VERBOSE]',
-      4: '[DIAG]',
-    };
-
-    var levelName = levelNames[level] || '';
-    var logMessage = '[Operaton ' + component + '] ' + levelName + (levelName ? ' ' : '') + message;
-
-    // Use appropriate console method based on level
-    if (level === DEBUG_LEVEL_MINIMAL) {
-      console.error(logMessage, data || '');
-    } else if (level === DEBUG_LEVEL_VERBOSE || level === DEBUG_LEVEL_DIAGNOSTIC) {
-      console.log(logMessage, data || '');
-    } else {
-      console.log(logMessage, data || '');
-    }
   }
 
   // =============================================================================
@@ -201,10 +264,18 @@
   };
 
   /**
+   * Check if in development mode
+   */
+  window.operatonIsDevMode = function () {
+    return isDevelopmentMode();
+  };
+
+  /**
    * Test the debug system
    */
   window.operatonTestDebug = function () {
     console.log('Testing Operaton Debug System...');
+    console.log('Development mode:', isDevelopmentMode());
 
     // Test different levels
     operatonDebugJS('Test', 'Testing minimal level', { test: 'minimal' }, DEBUG_LEVEL_MINIMAL);
@@ -219,82 +290,6 @@
     console.log('Debug test complete. Check WordPress error log for results.');
   };
 
-  /**
-   * Check if debug system is ready
-   */
-  window.operatonDebugReady = function () {
-    var ready = {
-      config_available: typeof window.OperatonDebugConfig !== 'undefined',
-      jquery_available: typeof jQuery !== 'undefined',
-      debug_level: window.OperatonDebugConfig ? window.OperatonDebugConfig.debug_level : 'unknown',
-      components: window.OperatonDebugConfig ? window.OperatonDebugConfig.components : 'unknown',
-    };
-
-    console.log('Operaton Debug System Status:', ready);
-    return ready;
-  };
-
-  // =============================================================================
-  // INITIALIZATION AND SELF-DIAGNOSTICS
-  // =============================================================================
-
-  /**
-   * Initialize debug system when ready
-   */
-  function initializeDebugSystem() {
-    // Wait for configuration to be available
-    var maxWaits = 50;
-    var currentWait = 0;
-
-    function checkForConfig() {
-      currentWait++;
-
-      if (typeof window.OperatonDebugConfig !== 'undefined') {
-        // Configuration is available
-        operatonDebugJS('Debug', 'JavaScript debug bridge initialized', {
-          debug_level: window.OperatonDebugConfig.debug_level,
-          components: window.OperatonDebugConfig.components,
-          ajax_url: window.OperatonDebugConfig.ajax_url,
-        });
-
-        // Make ready status available
-        window.operatonDebugSystemReady = true;
-
-        return;
-      }
-
-      if (currentWait < maxWaits) {
-        setTimeout(checkForConfig, 100);
-      } else {
-        console.warn('Operaton Debug: Configuration not found after', maxWaits, 'attempts');
-        console.log('Operaton Debug: Will use console fallback mode');
-        window.operatonDebugSystemReady = false;
-      }
-    }
-
-    checkForConfig();
-  }
-
-  // =============================================================================
-  // AUTO-INITIALIZATION
-  // =============================================================================
-
-  // Initialize when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeDebugSystem);
-  } else {
-    // DOM already loaded
-    setTimeout(initializeDebugSystem, 100);
-  }
-
-  // Also try on window load as fallback
-  if (typeof window.addEventListener !== 'undefined') {
-    window.addEventListener('load', function () {
-      if (!window.operatonDebugSystemReady) {
-        setTimeout(initializeDebugSystem, 200);
-      }
-    });
-  }
-
-  console.log('Operaton Debug: Bridge loaded, waiting for configuration...');
+  // Mark as initialized
+  window.operatonDebugJS = window.operatonDebugJS || true;
 })();
