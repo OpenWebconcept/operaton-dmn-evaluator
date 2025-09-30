@@ -382,6 +382,18 @@ window.OperatonFieldLogic = window.OperatonFieldLogic || {
       childField: 16,
       childrenField: 34,
     },
+    4: {
+      partnerField: 14,
+      alleenstaandField: 33,
+      childField: 16,
+      childrenField: 34,
+    },
+    5: {
+      partnerField: 14,
+      alleenstaandField: 33,
+      childField: 16,
+      childrenField: 34,
+    },
   },
 
   /**
