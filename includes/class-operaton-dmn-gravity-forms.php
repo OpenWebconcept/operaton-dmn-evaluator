@@ -552,6 +552,9 @@ class Operaton_DMN_Gravity_Forms
         $result_mappings = $this->get_result_mappings($config);
         $result_field_ids = $this->extract_result_field_ids($form_id, $config, $field_mappings, $result_mappings);
 
+        // Get all form fields with metadata including dateFormat
+        $all_fields = $this->get_form_fields($form_id);
+
         // JavaScript configuration object
         $js_config = array(
             'config_id' => $config->id,
@@ -565,7 +568,8 @@ class Operaton_DMN_Gravity_Forms
             'result_display_field' => $config->result_display_field ?? null,
             'debug' => defined('WP_DEBUG') && WP_DEBUG,
             'result_field_ids' => $result_field_ids,
-            'clear_results_on_change' => true
+            'clear_results_on_change' => true,
+            'all_fields' => $all_fields
         );
 
         // Output configuration with duplicate protection
@@ -1002,6 +1006,12 @@ class Operaton_DMN_Gravity_Forms
                     'cssClass' => $field->cssClass ?? '',
                     'size' => $field->size ?? 'medium'
                 );
+
+                // Add dateFormat for date fields
+                if ($field->type === 'date' && !empty($field->dateFormat))
+                {
+                    $field_data['dateFormat'] = $field->dateFormat;
+                }
 
                 // Add choices for select/radio/checkbox fields
                 if (in_array($field->type, array('select', 'radio', 'checkbox')) && !empty($field->choices))

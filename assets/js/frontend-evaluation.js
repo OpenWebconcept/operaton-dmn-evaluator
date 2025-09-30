@@ -182,15 +182,31 @@ window.handleEvaluateClick = function ($button) {
             }
 
             if ($resultField && $resultField.length > 0) {
-              $resultField.val(resultValue);
+              let displayValue = resultValue;
+
+              // Convert date format if the value looks like a date
+              if (typeof resultValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(resultValue)) {
+                const dateFormat = window.getFieldDateFormat(formId, fieldId);
+
+                if (dateFormat) {
+                  displayValue = window.convertToGravityDateFormat(resultValue, dateFormat);
+                  console.log(`✓ Converted date from ${resultValue} to ${displayValue} using format ${dateFormat}`);
+                } else {
+                  // Fallback to default dd/mm/yyyy if format not found
+                  displayValue = window.convertToGravityDateFormat(resultValue, 'dmy');
+                  console.log(`✓ Converted date from ${resultValue} to ${displayValue} using default dmy format`);
+                }
+              }
+
+              $resultField.val(displayValue);
               $resultField.trigger('change');
               $resultField.trigger('input');
 
               populatedCount++;
-              resultSummary.push(`${dmnResultField}: ${resultValue}`);
+              resultSummary.push(`${dmnResultField}: ${displayValue}`);
 
               window.highlightField($resultField);
-              console.log('Populated field', fieldId, 'with result:', resultValue);
+              console.log('Populated field', fieldId, 'with result:', displayValue);
             } else {
               console.warn('No field found for result:', dmnResultField, 'Field ID:', fieldId);
             }
