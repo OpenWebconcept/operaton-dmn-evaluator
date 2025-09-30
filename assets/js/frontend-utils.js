@@ -94,6 +94,86 @@ window.convertDateFormat = function (dateStr, fieldName) {
   return dateStr;
 };
 
+/**
+ * Convert YYYY-MM-DD date format to Gravity Forms field format
+ * Dynamically adapts to the field's configured date format
+ * @param {string} dateStr - Date string in YYYY-MM-DD format
+ * @param {string} targetFormat - Target format (e.g., 'mdy', 'dmy', 'dmy_dash', etc.)
+ * @returns {string} Date in target format or original string if conversion fails
+ */
+window.convertToGravityDateFormat = function (dateStr, targetFormat) {
+  if (!dateStr || dateStr === null) {
+    return null;
+  }
+
+  // If not in ISO format, return as-is
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr;
+  }
+
+  const parts = dateStr.split('-');
+  const year = parts[0];
+  const month = parts[1];
+  const day = parts[2];
+
+  // Default to dmy (dd/mm/yyyy) if no format specified
+  if (!targetFormat) {
+    targetFormat = 'dmy';
+  }
+
+  // Convert based on Gravity Forms date format settings
+  switch (targetFormat) {
+    case 'mdy': // mm/dd/yyyy (US format)
+      return `${month}/${day}/${year}`;
+
+    case 'dmy': // dd/mm/yyyy (European format)
+      return `${day}/${month}/${year}`;
+
+    case 'dmy_dash': // dd-mm-yyyy
+      return `${day}-${month}-${year}`;
+
+    case 'dmy_dot': // dd.mm.yyyy
+      return `${day}.${month}.${year}`;
+
+    case 'ymd_slash': // yyyy/mm/dd
+      return `${year}/${month}/${day}`;
+
+    case 'ymd_dash': // yyyy-mm-dd (already in this format)
+      return dateStr;
+
+    case 'ymd_dot': // yyyy.mm.dd
+      return `${year}.${month}.${day}`;
+
+    default:
+      // Default to dd/mm/yyyy if format unknown
+      operatonDebugMinimal('Utils', `Unknown date format: ${targetFormat}, defaulting to dd/mm/yyyy`);
+      return `${day}/${month}/${year}`;
+  }
+};
+
+/**
+ * Get the date format for a specific field from the localized config
+ * @param {number} formId - Gravity Forms form ID
+ * @param {string|number} fieldId - Field ID
+ * @returns {string|null} Date format or null if not found
+ */
+window.getFieldDateFormat = function (formId, fieldId) {
+  const config = window.getFormConfigCached(formId);
+
+  if (!config || !config.all_fields) {
+    return null;
+  }
+
+  // Find the field in the all_fields array
+  const field = config.all_fields.find(f => f.id == fieldId);
+
+  if (field && field.type === 'date' && field.dateFormat) {
+    return field.dateFormat;
+  }
+
+  return null;
+};
+
 // =============================================================================
 // FIELD UTILITIES
 // =============================================================================
