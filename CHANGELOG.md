@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - [Issue #67](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/67) - Create a global Debug Manager Class
 - [Issue #68](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/68) - Eliminate debug data dump of a WordPress Hook object
 - [Issue #73](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/73) - Enhance the debug system to automatically include console.log during development
+- [Issue #74](https://git.open-regels.nl/showcases/operaton-dmn-evaluator/-/issues/74) - Convert raw API response to match the Gravity Forms field format.
 
 ### Frontend Modularization
 The monolithic frontend.js file has been refactored into 7 focused, maintainable modules with clear separation of concerns. All functionality has been preserved, all tests pass.
